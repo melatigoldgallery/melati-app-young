@@ -71,8 +71,8 @@ export function announceQueueNumber(queueNumber, language = 'id') {
   const numbers = queueNumber.substring(1);
 
   const texts = {
-    id: `Nomor antrian, ${letter} ${numbers.split("").join("")}`,
-    en: `Queue number, ${letter} ${numbers.split("").join("")}`
+    id: `Nomor antrian, ${letter} ${numbers.split("").join(" ")}`,
+    en: `Queue number, ${letter} ${numbers.split("").join(" ")}`
   };
 
   const utterance = new SpeechSynthesisUtterance(texts[language]);
@@ -157,7 +157,7 @@ export async function announceVehicleMessage(carType, plateNumber, language = 'i
   window.speechSynthesis.cancel();
 }
 
-// export function playNotificationSound() {
-//   const notifSound = new Audio(AUDIO_PATHS.notifOn);
-//   notifSound.play();
-// }
+export function playNotificationSound() {
+  const notifSound = new Audio(AUDIO_PATHS.notifOn);
+  notifSound.play();
+}
