@@ -1,4 +1,5 @@
 // Import statements
+import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import { QueueAnalytics } from './queueAnalytics.js';
 import { database } from './configFirebase.js';
 import { dateHandler } from "./date.js";
@@ -9,12 +10,35 @@ import {
   playQueueAnnouncement,
   announceQueueNumber,
   announceVehicleMessage,
+  playNotificationSound
 } from "./audioHandlers.js";
-// Initialize analytics class
+
+
+const hamburgerMenu = document.querySelector('.hamburger-menu');
+const navList = document.querySelector('.nav-list');
+
+// Toggle menu when hamburger is clicked
+hamburgerMenu.addEventListener('click', (event) => {
+  event.stopPropagation();
+  navList.classList.toggle('active');
+});
+
+// Close menu when clicking anywhere on the document
+document.addEventListener('click', (event) => {
+  if (!navList.contains(event.target) && !hamburgerMenu.contains(event.target)) {
+    navList.classList.remove('active');
+  }
+});
+
+// Prevent menu from closing when clicking inside nav-list
+navList.addEventListener('click', (event) => {
+  event.stopPropagation();
+});
 
 document.querySelector(".hamburger-menu").addEventListener("click", function () {
   document.querySelector(".sidebar").classList.toggle("active");
 });
+
 dateHandler.initializeDatepicker();
 document.addEventListener("DOMContentLoaded", () => {
   aksesorisSaleHandler.init();
@@ -61,11 +85,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Initialize queue manager
   queueManager = new QueueManager();
   await queueManager.initializeFromFirebase();
+  await queueManager.initializeCustomerCount();
   updateDisplays();
+  
   // Update the delay queue button handler
   // Initialize buttons
   const delayQueueButton = document.getElementById("delayQueueButton");
   const confirmDelayYes = document.getElementById("confirmDelayYes");
+  
+ // Customer count button handlers
+ const tambahCustomerBtn = document.getElementById("tambahCustomerBtn");
+  const kurangiCustomerBtn = document.getElementById("kurangiCustomerBtn");
+
+  tambahCustomerBtn.addEventListener("click", () => queueManager.incrementCustomer());
+  kurangiCustomerBtn.addEventListener("click", () => queueManager.decrementCustomer());
+   
   
   // Add click handler for delay button
   if (delayQueueButton) {
@@ -114,25 +148,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     const modal = new bootstrap.Modal(document.getElementById("confirmModal"));
     modal.show();
   });
-  // Update confirm handler
+  // Update the confirm handlers to decrease customer count
   document.getElementById("confirmYes").addEventListener("click", async () => {
     try {
-        const currentQueue = queueDisplay.textContent;
-        console.log('Processing queue:', currentQueue);
-        
-        await queueAnalytics.trackServedQueue(currentQueue);
-        queueDisplay.textContent = queueManager.next();
-        
-        const modal = bootstrap.Modal.getInstance(document.getElementById("confirmModal"));
-        modal.hide();
-        
-        updateDisplays();
-        
-        console.log('Queue processed successfully');
+      const currentQueue = queueDisplay.textContent;
+      await queueAnalytics.trackServedQueue(currentQueue);
+      await queueManager.decrementCustomer(); // Kurangi customer saat dilayani
+      queueDisplay.textContent = queueManager.next();
+      
+      const modal = bootstrap.Modal.getInstance(document.getElementById("confirmModal"));
+      modal.hide();
+      
+      updateDisplays();
     } catch (error) {
-        console.error('Processing error:', error);
+      console.error('Processing error:', error);
     }
-});
+  });
   
   // Tombol Handle Delay Queue Number
   delayHandleButton.addEventListener("click", () => {
@@ -157,11 +188,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
   
-  document.getElementById("confirmDelayedYes").addEventListener("click", () => {
+  document.getElementById("confirmDelayedYes").addEventListener("click", async () => {
     const selectElement = document.getElementById("delayedQueueSelect");
     const selectedQueue = selectElement.value;
     
     if (selectedQueue) {
+      await queueManager.decrementCustomer(); // Kurangi customer saat dilayani
       queueManager.removeFromDelayedQueue(selectedQueue);
       updateDisplays();
       
@@ -170,6 +202,49 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
+  // Tambahkan listener untuk perubahan data customer count di Firebase
+// Customer count real-time listener
+onValue(queueManager.customerRef, (snapshot) => {
+  const count = snapshot.val() || 0;
+  const customerCountDisplay = document.getElementById("customerCount");
+  if (customerCountDisplay) {
+    customerCountDisplay.textContent = count;
+    
+    // Start or stop notifications based on count
+    if (count > 0) {
+      startPeriodicNotifications();
+    } else {
+      stopPeriodicNotifications();
+    }
+  }
+});
+
+//Fungsi notifikasi setiap 30 detik
+let notificationInterval;
+
+// Function to start periodic notifications
+function startPeriodicNotifications() {
+  if (!notificationInterval) {
+    notificationInterval = setInterval(() => {
+      const count = parseInt(document.getElementById("customerCount").textContent);
+      if (count > 0) {
+        playNotificationSound();
+      }
+    }, 60000); // 60 seconds
+  }
+}
+
+// Function to stop periodic notifications
+function stopPeriodicNotifications() {
+  if (notificationInterval) {
+    clearInterval(notificationInterval);
+    notificationInterval = null;
+  }
+}
+// Clean up interval when page unloads
+window.addEventListener('beforeunload', () => {
+  stopPeriodicNotifications();
+});
 
 // Tambahkan variabel untuk tracking index pemanggilan
 let currentCallIndex = 0;

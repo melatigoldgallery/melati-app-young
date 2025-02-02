@@ -133,11 +133,14 @@ align-items: center;
     cursor: pointer;
     border: 1px solid #ebe731 ;
 }
+/* Default state for regular navigation */
+.nav-list {
+  display: block;
+}
+
+/* Default state for hamburger menu */
 .hamburger-menu {
   display: none;
-  cursor: pointer;
-  font-size: 24px;
-  padding: 10px;
 }
 .boxServis, .cardThird {
   background-color: #fee440;
@@ -151,7 +154,7 @@ align-items: center;
 .report, .cardFirst {
   background-color: #70e000;
 }
-.buyback {
+.buyback, .cardFour {
   background-color: #e69e41;
 }
 .antrian {
@@ -188,12 +191,12 @@ align-items: center;
   padding-right: 5px;
 }
 
-.queue-display {
+.queue-display, .display {
   font-size: 4rem;
   font-weight: bold;
   
 }
-.queue-display-client {
+.queue-display-client, .display-client {
   font-size: 5rem;
   font-weight: bold;
 }
@@ -350,6 +353,21 @@ aside ul ul li {
   top: 50%;
   transform: translateY(-50%);
 }
+footer {
+  background: var(--warna);
+  font-size: 0.9rem;
+  position: fixed; /* Menempel di posisi tetap */
+  bottom: 0;       /* Menempel di bagian bawah layar */
+  left: 0;
+  width: 100%
+}
+
+.credit {
+  text-align: center;
+  padding: 0.5rem;
+  color: white;
+}
+
 @media screen and (max-width: 768px) {
   .sidebar {
     transform: translateX(-250px); /* Hide sidebar by default */
@@ -365,35 +383,58 @@ aside ul ul li {
     margin-left: 0; /* Remove margin when sidebar is hidden */
     width: 100%;
   }
-
-  /* Hide date and dropdown menu */
-  .left-nav #tgl,
-  .left-nav .dropdown {
+   /* Hide the regular navigation */
+  .nav-list {
     display: none;
   }
 
   /* Show hamburger menu */
   .hamburger-menu {
     display: block;
+    position: fixed;
+    right: 10px;
+    z-index: 10; /* Increased z-index to appear above sidebar */
+    cursor: pointer;
+    font-size: 20px;
+    color: #333;
+     /* Add background to make it stand out */
+    padding: 7px;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
   }
-}
 
+  /* When nav is active/clicked */
+  .nav-list.active {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 200px;
+    height: 100vh;
+    background-color: #fff;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+   
+    margin-top: 0 !important;
+  }
+  
 
-footer {
-  background: var(--warna);
-  font-size: 0.9rem;
-  position: fixed; /* Menempel di posisi tetap */
-  bottom: 0;       /* Menempel di bagian bawah layar */
-  left: 0;
-  width: 100%
-}
+  /* Adjust the ul when menu is active */
+  .nav-list.active ul {
+    flex-direction: column;
+   
+  }
 
-.credit {
-  text-align: center;
-  padding: 0.5rem;
-  color: white;
-}
-@media screen and (max-width: 768px) {
+  /* Style the list items */
+  .nav-list.active li {
+    width: 100%;
+  }
+
+  /* Style the links */
+  .nav-list.active a {
+    display: block;
+    padding: 10px 0;
+    color: #333;
+  }
   /* Make table scrollable horizontally */
   .container {
     padding: 10px;
@@ -416,7 +457,10 @@ footer {
   }
   
   /* Adjust top section spacing */
-  .maintop {
-    margin-bottom: 15px;
+  .maintop, .cardInform {
+    margin-bottom: 35px;
+  }
+  .date {
+    display: none;
   }
 }
