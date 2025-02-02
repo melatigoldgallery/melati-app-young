@@ -13,13 +13,32 @@ import {
   playNotificationSound
 } from "./audioHandlers.js";
 
-// ===== Global Variables =====
 
-// Initialize analytics class
+const hamburgerMenu = document.querySelector('.hamburger-menu');
+const navList = document.querySelector('.nav-list');
+
+// Toggle menu when hamburger is clicked
+hamburgerMenu.addEventListener('click', (event) => {
+  event.stopPropagation();
+  navList.classList.toggle('active');
+});
+
+// Close menu when clicking anywhere on the document
+document.addEventListener('click', (event) => {
+  if (!navList.contains(event.target) && !hamburgerMenu.contains(event.target)) {
+    navList.classList.remove('active');
+  }
+});
+
+// Prevent menu from closing when clicking inside nav-list
+navList.addEventListener('click', (event) => {
+  event.stopPropagation();
+});
 
 document.querySelector(".hamburger-menu").addEventListener("click", function () {
   document.querySelector(".sidebar").classList.toggle("active");
 });
+
 dateHandler.initializeDatepicker();
 document.addEventListener("DOMContentLoaded", () => {
   aksesorisSaleHandler.init();
