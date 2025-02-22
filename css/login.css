@@ -98,32 +98,31 @@ section .signin .content h2
   font-family: 'Exo', sans-serif;
 }
 
-section .signin .content .form 
-{
+#loginForm {
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 25px;
 }
-section .signin .content .form .inputBox
+.inputBox
 {
   position: relative;
   width: 100%;
 }
-section .signin .content .form .inputBox input 
+section .signin .content .inputBox input 
 {
   position: relative;
   width: 100%;
   background: rgb(206, 205, 205);
   border: none;
   outline: none;
-  padding: 25px 5px 7.5px;
+  padding: 30px 5px 7.5px 7.5px;
   border-radius: 4px;
   color: #000;
   font-weight: 500;
   font-size: 1em;
 }
-section .signin .content .form .inputBox i 
+section .signin .content .inputBox i 
 {
   position: absolute;
   left: 0;
@@ -141,8 +140,10 @@ section .signin .content .form .inputBox i
   color: #000000;
 }
 
-.signin .content .form .inputBox input[type="submit"]
+button[type="submit"]
 {
+  border: none;
+  width: 100%;
   border-radius: 20px;
   padding: 8px;
   background:#fcce46;
@@ -153,7 +154,7 @@ section .signin .content .form .inputBox i
   cursor: pointer;
   transition: all 0.2s ease-in-out;
 }
-input[type="submit"]:hover
+button[type="submit"]:hover
 {
   opacity: 0.8;
   transform: translateY(-0.25em);

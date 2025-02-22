@@ -26,7 +26,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
     <!-- Your custom CSS -->
     <link rel="stylesheet" href="css/Project1.css" />
-    <title>Sistem Antrian</title>
+    <title>Sistem Antrian Young</title>
   </head>
   <body>
     <header>
@@ -74,6 +74,9 @@
             <div class="col text-center">
               <button class="btn cta btn-lg" id="takeMessage">Pengingat Antrian</button>
               <button class="btn cta btn-lg d-none" id="takeQueue">Queue Reminder</button>
+            </div>
+            <div class="col text-center">
+              <button class="btn cta btn-lg" id="logoutBtn" onclick="handleLogout()">Logout</button>
             </div>
           </div>
         </div>
@@ -317,7 +320,7 @@
     <script type="module" src="js/melati.js"></script>
      <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
-      import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+      import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
     </script> 
   </body>
 </html>
