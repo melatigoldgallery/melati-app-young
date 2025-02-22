@@ -4,6 +4,10 @@ import { QueueAnalytics } from './queueAnalytics.js';
 import { database } from './configFirebase.js';
 import { dateHandler } from "./date.js";
 import { QueueManager } from "./antrian.js";
+import { initializeUsers } from './auth/initUsers.js';
+import { authService } from './configFirebase.js';
+import { checkAuth } from './auth/authCheck.js';
+import { handleLogout } from './auth/logout.js';
 import {
   playWaitMessageSequence,
   playTakeQueueMessage,
@@ -13,7 +17,24 @@ import {
   playNotificationSound
 } from "./audioHandlers.js";
 
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  handleLogout();
+});
+async function initializePage() {
+  try {
+      await initializeUsers();
+      console.log('Users initialized successfully');
+      
+      const isAuthenticated = await checkAuth();
+      if (isAuthenticated) {
+          // Continue with authenticated user logic
+      }
+  } catch (error) {
+      console.log('Initialization error:', error);
+  }
+}
 
+document.addEventListener('DOMContentLoaded', initializePage);
 const hamburgerMenu = document.querySelector('.hamburger-menu');
 const navList = document.querySelector('.nav-list');
 

@@ -10,25 +10,39 @@ export class QueueManager {
     }
 
     async initializeFromFirebase() {
-        const queueRef = ref(database, 'queue');
-        const snapshot = await get(queueRef);
-        if (snapshot.exists()) {
-            const data = snapshot.val();
-            this.currentLetter = data.currentLetter;
-            this.currentNumber = data.currentNumber;
-            this.delayedQueue = data.delayedQueue || [];
-        } else {
+        try {
+            const queueRef = ref(database, 'queue');
+            const snapshot = await get(queueRef);
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                this.currentLetter = data.currentLetter;
+                this.currentNumber = data.currentNumber;
+                this.delayedQueue = data.delayedQueue || [];
+            } else {
+                this.currentLetter = 0;
+                this.currentNumber = 1;
+                this.delayedQueue = [];
+                await this.saveState();
+            }
+        } catch (error) {
+            console.log('Initializing default values due to:', error.message);
             this.currentLetter = 0;
             this.currentNumber = 1;
             this.delayedQueue = [];
-            this.saveState();
+            await this.saveState();
         }
     }
     async initializeCustomerCount() {
-        const snapshot = await get(this.customerRef);
-        this.customerCount = snapshot.val() || 0;
-        this.updateCustomerDisplay();
-      }
+        try {
+            const snapshot = await get(this.customerRef);
+            this.customerCount = snapshot.val() || 0;
+            this.updateCustomerDisplay();
+        } catch (error) {
+            console.log('Initializing customer count to 0 due to:', error.message);
+            this.customerCount = 0;
+            this.updateCustomerDisplay();
+        }
+    }
     
       async incrementCustomer() {
         const snapshot = await get(this.customerRef);

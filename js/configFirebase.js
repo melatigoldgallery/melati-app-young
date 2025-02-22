@@ -13,6 +13,22 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+export default app;
 const database = getDatabase(app);
 console.log('Firebase initialized successfully');
 export { database };
+
+export const authService = {
+  getCurrentUser: async () => {
+      const user = sessionStorage.getItem('currentUser');
+      return user ? JSON.parse(user) : null;
+  },
+  
+  setCurrentUser: (user) => {
+      sessionStorage.setItem('currentUser', JSON.stringify(user));
+  },
+  
+  logout: () => {
+      sessionStorage.removeItem('currentUser');
+  }
+};
