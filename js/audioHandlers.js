@@ -71,8 +71,8 @@ export function announceQueueNumber(queueNumber, language = "id") {
   const numbers = queueNumber.substring(1);
 
   const texts = {
-    id: `Nomor antrian, ${letter} ${numbers.split("").join(" ")}`,
-    en: `Queue number, ${letter} ${numbers.split("").join(" ")}`
+    id: `Nomor antrian, ${letter}, ${numbers.split("").join("")}`,
+    en: `Queue number, ${letter}, ${numbers.split("").join("")}`
   };
 
   const utterance = new SpeechSynthesisUtterance(texts[language]);
@@ -101,7 +101,6 @@ export async function playQueueAnnouncement(queueNumber, language = "id") {
 
   // Play sequence: ringtone first, then queue announcement
   await playRingtone();
-  await announceQueueNumber(queueNumber, language);
   await announceQueueNumber(queueNumber, language);
 }
 
