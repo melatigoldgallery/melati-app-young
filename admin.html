@@ -23,10 +23,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/locales/bootstrap-datepicker.id.min.js"></script>
     <!-- Firebase -->
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
     <!-- Your custom CSS -->
     <link rel="stylesheet" href="css/Project1.css" />
-    <title>Sistem Antrian</title>
+    <title>Sistem Antrian Young</title>
   </head>
   <body>
     <header>
@@ -50,11 +50,11 @@
             </li>
           </ul>
         </div>
+        <div class="hamburger-menu">
+          <i class="fas fa-bars"></i>
+        </div>
         <div class="left-nav">
-          <div class="hamburger-menu">
-            <i class="fas fa-bars"></i>
-          </div>
-          <div class="">
+          <div class="date">
             <span id="clock" class="font-weight-bold"></span>
             <br />
             <span id="tgl" class="font-weight-bold"></span>
@@ -74,6 +74,9 @@
             <div class="col text-center">
               <button class="btn cta btn-lg" id="takeMessage">Pengingat Antrian</button>
               <button class="btn cta btn-lg d-none" id="takeQueue">Queue Reminder</button>
+            </div>
+            <div class="col text-center">
+              <button class="btn cta btn-lg" id="logoutBtn" onclick="handleLogout()">Logout</button>
             </div>
           </div>
         </div>
@@ -133,7 +136,7 @@
                       <input type="text" class="form-control" id="plateNumber" placeholder="Nomor Polisi" />
                     </div>
                   </div>
-                  <div class="action-buttons d-flex flex-column gap-3">
+                  <div class="action-buttons cardInform d-flex flex-column gap-3">
                     <button class="btn btn-primary" id="panggilInformasi">Umumkan Informasi</button>
                     <button class="btn btn-info" id="callInformation">Announce Information</button>
                   </div>
@@ -315,9 +318,9 @@
       <div class="credit">&copy Melati Gold Gallery 2025</div>
     </footer>
     <script type="module" src="js/melati.js"></script>
-    <!-- <script type="module">
+     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
-      import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
-    </script> -->
+      import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+    </script> 
   </body>
 </html>
