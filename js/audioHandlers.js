@@ -156,7 +156,3 @@ export async function announceVehicleMessage(carType, plateNumber, language = 'i
   window.speechSynthesis.cancel();
 }
 
-export function playNotificationSound() {
-  const notifSound = new Audio(AUDIO_PATHS.notifOn);
-  notifSound.play();
-}
