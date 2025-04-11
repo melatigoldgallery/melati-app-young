@@ -7,6 +7,9 @@ export class QueueManager {
         this.initializeFromFirebase();
         this.customerRef = ref(database, 'customerCount');
         this.initializeCustomerCount();
+        this.skipList = [];
+        // Tambahkan baris ini untuk memastikan tampilan diperbarui saat inisialisasi
+        setTimeout(() => this.updateSkipListDisplay(), 1000); // Delay sedikit untuk memastikan DOM sudah siap
     }
 
     async initializeFromFirebase() {
@@ -18,20 +21,27 @@ export class QueueManager {
                 this.currentLetter = data.currentLetter;
                 this.currentNumber = data.currentNumber;
                 this.delayedQueue = data.delayedQueue || [];
+                this.skipList = data.skipList || [];
+                this.updateSkipListDisplay(); // Tambahkan baris ini
             } else {
                 this.currentLetter = 0;
                 this.currentNumber = 1;
                 this.delayedQueue = [];
+                this.skipList = [];
                 await this.saveState();
+                this.updateSkipListDisplay(); // Tambahkan baris ini
             }
         } catch (error) {
             console.log('Initializing default values due to:', error.message);
             this.currentLetter = 0;
             this.currentNumber = 1;
             this.delayedQueue = [];
+            this.skipList = [];
             await this.saveState();
+            this.updateSkipListDisplay(); // Tambahkan baris ini
         }
     }
+    
     async initializeCustomerCount() {
         try {
             const snapshot = await get(this.customerRef);
@@ -76,17 +86,101 @@ export class QueueManager {
     }
 
     getCurrentQueue() {
-        return `${this.letters[this.currentLetter]}${this.formatNumber(this.currentNumber)}`;
+        const number = parseInt(this.currentNumber);
+        return `${this.letters[this.currentLetter]}${this.formatNumber(number)}`;
     }
+    
+    skipQueue() {
+        // Simpan nomor antrian saat ini
+        const currentQueue = this.getCurrentQueue();
+        
+        // Tambahkan 1 ke nomor antrian (untuk mendapatkan nomor berikutnya)
+        this.currentNumber++;
+        
+        // Jika nomor antrian melebihi batas, atur ke nomor awal dan tambah huruf
+        if (this.currentNumber > 50) {
+            this.currentNumber = 1;
+            this.currentLetter++;
+            
+            // Jika huruf melebihi batas, kembali ke huruf pertama
+            if (this.currentLetter >= this.letters.length) {
+                this.currentLetter = 0;
+            }
+        }
+        
+        // Simpan perubahan ke Firebase
+        this.saveState();
+        
+        // Kembalikan nomor antrian yang baru
+        return this.getCurrentQueue();
+    }
+    // Tambahkan method baru untuk memperbarui tampilan skip list
+updateSkipListDisplay() {
+    const skipListDisplay = document.getElementById("skipListDisplay");
+    if (skipListDisplay) {
+        if (this.skipList.length > 0) {
+            skipListDisplay.textContent = this.skipList.join(", ");
+        } else {
+            skipListDisplay.textContent = "-";
+        }
+    }
+}
+
+    // Tambahkan fungsi ini ke class QueueManager
+previousQueue() {
+    // Simpan nomor antrian saat ini
+    const currentQueue = this.getCurrentQueue();
+    
+    // Kurangi nomor antrian
+    this.currentNumber--;
+    
+    // Jika nomor antrian menjadi kurang dari 1, kembali ke nomor maksimum dan kurangi huruf
+    if (this.currentNumber < 1) {
+        this.currentNumber = 50;
+        this.currentLetter--;
+        
+        // Jika huruf menjadi kurang dari 0, kembali ke huruf terakhir
+        if (this.currentLetter < 0) {
+            this.currentLetter = this.letters.length - 1;
+        }
+    }
+    
+    // Simpan perubahan ke Firebase
+    this.saveState();
+    
+    // Kembalikan nomor antrian yang baru
+    return this.getCurrentQueue();
+}
+
     saveState() {
         const queueRef = ref(database, 'queue');
         set(queueRef, {
             currentLetter: this.currentLetter,
             currentNumber: this.currentNumber,
-            delayedQueue: this.delayedQueue
+            delayedQueue: this.delayedQueue,
+            skipList: this.skipList
         });
     }
+// Modifikasi method addToSkipList
+addToSkipList(letter, number) {
+    // Format nomor dengan leading zero
+    const formattedNumber = this.formatNumber(number);
+    const skipItem = `${letter}${formattedNumber}`;
+    
+    if (!this.skipList.includes(skipItem)) {
+        this.skipList.push(skipItem);
+        this.saveState();
+        this.updateSkipListDisplay(); // Tambahkan baris ini untuk memperbarui tampilan
+        return true;
+    }
+    return false;
+}
 
+
+// Tambahkan method untuk mendapatkan skipList
+getSkipList() {
+    return this.skipList;
+}
     addToDelayedQueue(queueNumber) {
         if (!this.delayedQueue.includes(queueNumber)) {
             this.delayedQueue.push(queueNumber);
@@ -116,24 +210,29 @@ export class QueueManager {
                 this.currentLetter = 0;
             }
         }
+         // Periksa apakah nomor berikutnya ada di skipList
+    const nextQueue = this.getCurrentQueue();
+    if (this.skipList.includes(nextQueue)) {
+        // Jika ada di skipList, hapus dari skipList dan panggil next lagi
+        const index = this.skipList.indexOf(nextQueue);
+        this.skipList.splice(index, 1);
+        this.saveState();
+        return this.next(); // Rekursif untuk mendapatkan nomor berikutnya yang tidak di-skip
+    }
         this.saveState();
         return this.getCurrentQueue();
     }
 
     getNextQueue() {
-        let nextNumber = this.currentNumber + 1;
+        const currentNumber = parseInt(this.currentNumber);
+        const nextNumber = currentNumber + 1;
         let nextLetter = this.currentLetter;
-
-        if (nextNumber > 50) {
-            nextNumber = 1;
-            nextLetter++;
-
-            if (nextLetter >= this.letters.length) {
-                nextLetter = 0;
-            }
+    
+        if (nextNumber <= 50) {
+            return `${this.letters[nextLetter]}${this.formatNumber(nextNumber)}`;
+        } else {
+            return `${this.letters[(nextLetter + 1) % this.letters.length]}${this.formatNumber(1)}`;
         }
-
-        return `${this.letters[nextLetter]}${this.formatNumber(nextNumber)}`;
     }
 
     setCustomQueue(letter, number) {
