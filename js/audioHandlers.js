@@ -39,7 +39,7 @@ export async function playTakeQueueMessage(language = 'id') {
   
   // Reminder message texts
   const reminderTexts = {
-    id: "Kepada pelanggan yang belum mendapat nomor antrian, harap meminta nomor antrian terlebih dahulu kepada staff Melati. Terima kasih atas perhatiannya",
+    id: "Kepada pelanggan yang belum mendapat nomor antrian, harap mengambil nomor antrian di tempat yang sudah disediakan. Terima kasih atas perhatiannya",
     en: "To customers who haven't received a queue number, please request a queue number first from Melati staff. Thank you for your attention"
   };
 
