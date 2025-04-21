@@ -45,7 +45,6 @@
                 <span class="menu-text">Buyback</span>
               </a>
             </li>
-            <!-- Antrian dropdown menu -->
             <li class="nav-item">
               <a
                 class="nav-link collapsed"
@@ -76,6 +75,41 @@
                     <a class="nav-link" href="analisis.html">
                       <i class="fas fa-chart-bar"></i>
                       <span class="menu-text">Laporan Antrian</span>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </li>
+            <li class="nav-item">
+              <a
+                class="nav-link collapsed"
+                href="#"
+                data-bs-toggle="collapse"
+                data-bs-target="#aksesorisSubmenu"
+                aria-expanded="false"
+              >
+                <i class="fas fa-ticket-alt"></i>
+                <span class="menu-text">Aksesoris</span>
+                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
+              </a>
+              <div class="collapse" id="aksesorisSubmenu" data-bs-parent="#sidebarAccordion">
+                <ul class="nav flex-column ms-3">
+                  <li class="nav-item">
+                    <a class="nav-link" href="tambahAksesoris.html">
+                      <i class="fas fa-user-cog"></i>
+                      <span class="menu-text">Tambah Aksesoris</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="penjualanAksesoris.html">
+                      <i class="fas fa-desktop"></i>
+                      <span class="menu-text">Penjualan Aksesoris</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="laporanAksesoris.html">
+                      <i class="fas fa-chart-bar"></i>
+                      <span class="menu-text">Laporan Aksesoris</span>
                     </a>
                   </li>
                 </ul>
@@ -153,6 +187,15 @@
                     <p>Hitung harga penerimaan buyback</p>
                   </div>
                 </div>
+                <div class="stat-card">
+                  <div class="stat-card-icon bg-success">
+                    <i class="fas fa-exchange-alt"></i>
+                  </div>
+                  <div class="stat-card-success">
+                    <h4>Aksesoris Perhiasan</h4>
+                    <p>Penjualan aksesoris dan kotak perhiasan</p>
+                  </div>
+                </div>
               </div>
 
               <!-- Quick Access -->
@@ -165,16 +208,22 @@
                 </div>
                 <div class="card-body">
                   <div class="row">
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                       <a href="admin.html" class="btn btn-primary w-100 py-3">
                         <i class="fas fa-user-cog me-2"></i>
                         Admin Antrian
                       </a>
                     </div>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                       <a href="buyback.html" class="btn btn-warning w-100 py-3">
                         <i class="fas fa-exchange-alt me-2"></i>
                         Buyback
+                      </a>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                      <a href=".html" class="btn btn-success w-100 py-3">
+                        <i class="fas fa-exchange-alt me-2"></i>
+                       Aksesoris
                       </a>
                     </div>
                   </div>

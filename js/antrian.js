@@ -252,6 +252,7 @@ getSkipList() {
         this.currentLetter = 0;
         this.currentNumber = 1;
         this.delayedQueue = [];
+        this.skipList = []; // Tambahkan baris ini untuk mereset skipList
         this.saveState();
         return this.getCurrentQueue();
     }
