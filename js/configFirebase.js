@@ -1,5 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js';
 import { getDatabase } from 'https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js';
+import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js';
 
 const firebaseConfig = {
     apiKey: "AIzaSyC9iHJOSuNIpsviiv52X4sfyXtYdZ7LWcE",
@@ -13,10 +14,26 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export default app;
 const database = getDatabase(app);
+const firestore = getFirestore(app);
 console.log('Firebase initialized successfully');
-export { database };
+export default app;
+export { database, firestore };
+
+// Test Firestore connection
+async function testFirestoreConnection() {
+  try {
+    const snapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "kotak"));
+    console.log("Firestore connection successful!");
+    snapshot.forEach(doc => {
+      console.log(doc.id, " => ", doc.data());
+    });
+  } catch (error) {
+    console.error("Error connecting to Firestore:", error);
+  }
+}
+
+testFirestoreConnection();
 
 export const authService = {
   getCurrentUser: async () => {
