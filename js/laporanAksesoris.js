@@ -44,16 +44,16 @@ const laporanAksesorisHandler = {
   filteredSalesData: [],
   filteredStockData: [],
 
-   // Cache properties
-   cache: {
+  // Cache properties
+  cache: {
     salesData: {
       data: null,
-      lastFetched: null
+      lastFetched: null,
     },
     stockData: {
       data: null,
-      lastFetched: null
-    }
+      lastFetched: null,
+    },
   },
 
   // Initialize the module
@@ -124,17 +124,17 @@ const laporanAksesorisHandler = {
   },
 
   // Set default dates (current day for both start and end)
-setDefaultDates() {
-  const today = new Date();
-  const formattedToday = formatDate(today);
+  setDefaultDates() {
+    const today = new Date();
+    const formattedToday = formatDate(today);
 
-  // Set values for all date inputs
-  const dateInputs = document.querySelectorAll(".datepicker");
-  dateInputs.forEach((input) => {
-    // Set both start and end dates to today
-    input.value = formattedToday;
-  });
-},
+    // Set values for all date inputs
+    const dateInputs = document.querySelectorAll(".datepicker");
+    dateInputs.forEach((input) => {
+      // Set both start and end dates to today
+      input.value = formattedToday;
+    });
+  },
 
   // Attach event listeners
   attachEventListeners() {
@@ -144,34 +144,10 @@ setDefaultDates() {
       filterSalesBtn.addEventListener("click", () => this.filterSalesData());
     }
 
-    // Reset Sales button
-    const resetSalesBtn = document.getElementById("resetSalesBtn");
-    if (resetSalesBtn) {
-      resetSalesBtn.addEventListener("click", () => this.resetSalesFilters());
-    }
-
     // Filter Stock button
     const filterStockBtn = document.getElementById("filterStockBtn");
     if (filterStockBtn) {
       filterStockBtn.addEventListener("click", () => this.filterStockData());
-    }
-
-    // Reset Stock button
-    const resetStockBtn = document.getElementById("resetStockBtn");
-    if (resetStockBtn) {
-      resetStockBtn.addEventListener("click", () => this.resetStockFilters());
-    }
-
-    // Export Sales button
-    const exportSalesBtn = document.getElementById("exportSalesBtn");
-    if (exportSalesBtn) {
-      exportSalesBtn.addEventListener("click", () => this.exportSalesData());
-    }
-
-    // Export Stock button
-    const exportStockBtn = document.getElementById("exportStockBtn");
-    if (exportStockBtn) {
-      exportStockBtn.addEventListener("click", () => this.exportStockData());
     }
 
     // Tab change event to refresh tables
@@ -180,7 +156,12 @@ setDefaultDates() {
       if (targetId === "sales-tab") {
         this.refreshSalesTable();
       } else if (targetId === "stock-tab") {
-        this.refreshStockTable();
+        // PERBAIKAN: Muat ulang data stok saat tab stok diaktifkan
+        this.cache.stockData.data = null; // Reset cache
+        this.cache.stockAdditions = null; // Reset cache penambahan stok
+        this.loadStockData().then(() => {
+          this.filterStockData();
+        });
       }
     });
   },
@@ -192,7 +173,6 @@ setDefaultDates() {
 
     document.querySelector("#sales-tab-pane #startDate").value = formatDate(firstDay);
     document.querySelector("#sales-tab-pane #endDate").value = formatDate(today);
-    document.querySelector("#sales-tab-pane #searchStock").value = "";
 
     this.filterSalesData();
   },
@@ -204,7 +184,6 @@ setDefaultDates() {
 
     document.querySelector("#stock-tab-pane #startDate").value = formatDate(firstDay);
     document.querySelector("#stock-tab-pane #endDate").value = formatDate(today);
-    document.querySelector("#stock-tab-pane #searchStock").value = "";
 
     this.filterStockData();
   },
@@ -217,11 +196,12 @@ setDefaultDates() {
       // Check cache validity (cache expires after 5 minutes)
       const now = new Date().getTime();
       const cacheExpiry = 5 * 60 * 1000; // 5 minutes
-      
-      if (this.cache.salesData.data && 
-          this.cache.salesData.lastFetched && 
-          (now - this.cache.salesData.lastFetched) < cacheExpiry) {
-        
+
+      if (
+        this.cache.salesData.data &&
+        this.cache.salesData.lastFetched &&
+        now - this.cache.salesData.lastFetched < cacheExpiry
+      ) {
         console.log("Using cached sales data");
         this.salesData = this.cache.salesData.data;
         this.filterSalesData();
@@ -242,7 +222,7 @@ setDefaultDates() {
           ...data,
         });
       });
-      
+
       // Update cache
       this.cache.salesData.data = this.salesData;
       this.cache.salesData.lastFetched = now;
@@ -262,21 +242,7 @@ setDefaultDates() {
     try {
       this.showLoading(true);
 
-      // Check cache validity (cache expires after 5 minutes)
-      const now = new Date().getTime();
-      const cacheExpiry = 5 * 60 * 1000; // 5 minutes
-      
-      if (this.cache.stockData.data && 
-          this.cache.stockData.lastFetched && 
-          (now - this.cache.stockData.lastFetched) < cacheExpiry) {
-        
-        console.log("Using cached stock data");
-        this.stockData = this.cache.stockData.data;
-        this.filterStockData();
-        this.showLoading(false);
-        return;
-      }
-
+      // Selalu ambil data stok terbaru dari Firestore
       // Get stock data from Firestore
       const stockRef = collection(firestore, "stokAksesoris");
       const stockSnapshot = await getDocs(stockRef);
@@ -293,10 +259,10 @@ setDefaultDates() {
 
       // Get all kode aksesoris from kodeAksesoris collection
       await this.loadAllKodeAksesoris();
-      
+
       // Update cache
       this.cache.stockData.data = this.stockData;
-      this.cache.stockData.lastFetched = now;
+      this.cache.stockData.lastFetched = new Date().getTime();
 
       // Apply initial filter
       this.filterStockData();
@@ -309,75 +275,74 @@ setDefaultDates() {
   },
 
   // Load all kode aksesoris from Firestore
-async loadAllKodeAksesoris() {
+  async loadAllKodeAksesoris() {
     try {
-        // Get kotak data
-        const kotakSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "kotak"));
-        
-        // Get aksesoris data
-        const aksesorisSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "aksesoris"));
-        
-        // Process kotak data
-        kotakSnapshot.forEach(doc => {
-            const data = doc.data();
-            // Check if this kode already exists in stockData
-            const existingIndex = this.stockData.findIndex(item => item.kode === data.text);
-            
-            if (existingIndex === -1) {
-                // If not exists, add new item with default values
-                this.stockData.push({
-                    id: null, // No document ID yet
-                    kode: data.text,
-                    nama: data.nama,
-                    kategori: 'kotak', // Tambahkan informasi kategori
-                    stokAwal: 0,
-                    tambahStok: 0,
-                    laku: 0,
-                    free: 0,
-                    gantiLock: 0,
-                    stokAkhir: 0,
-                    lastUpdate: new Date()
-                });
-            } else {
-                // Update kategori jika item sudah ada
-                this.stockData[existingIndex].kategori = 'kotak';
-            }
-        });
-        
-        // Process aksesoris data
-        aksesorisSnapshot.forEach(doc => {
-            const data = doc.data();
-            // Check if this kode already exists in stockData
-            const existingIndex = this.stockData.findIndex(item => item.kode === data.text);
-            
-            if (existingIndex === -1) {
-                // If not exists, add new item with default values
-                this.stockData.push({
-                    id: null, // No document ID yet
-                    kode: data.text,
-                    nama: data.nama,
-                    kategori: 'aksesoris', // Tambahkan informasi kategori
-                    stokAwal: 0,
-                    tambahStok: 0,
-                    laku: 0,
-                    free: 0,
-                    gantiLock: 0,
-                    stokAkhir: 0,
-                    lastUpdate: new Date()
-                });
-            } else {
-                // Update kategori jika item sudah ada
-                this.stockData[existingIndex].kategori = 'aksesoris';
-            }
-        });
-        
-    } catch (error) {
-        console.error("Error loading kode aksesoris:", error);
-        throw error;
-    }
-},
+      // Get kotak data
+      const kotakSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "kotak"));
 
-  // Filter sales data based on date range and search text
+      // Get aksesoris data
+      const aksesorisSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "aksesoris"));
+
+      // Process kotak data
+      kotakSnapshot.forEach((doc) => {
+        const data = doc.data();
+        // Check if this kode already exists in stockData
+        const existingIndex = this.stockData.findIndex((item) => item.kode === data.text);
+
+        if (existingIndex === -1) {
+          // If not exists, add new item with default values
+          this.stockData.push({
+            id: null, // No document ID yet
+            kode: data.text,
+            nama: data.nama,
+            kategori: "kotak", // Tambahkan informasi kategori
+            stokAwal: 0,
+            tambahStok: 0,
+            laku: 0,
+            free: 0,
+            gantiLock: 0,
+            stokAkhir: 0,
+            lastUpdate: new Date(),
+          });
+        } else {
+          // Update kategori jika item sudah ada
+          this.stockData[existingIndex].kategori = "kotak";
+        }
+      });
+
+      // Process aksesoris data
+      aksesorisSnapshot.forEach((doc) => {
+        const data = doc.data();
+        // Check if this kode already exists in stockData
+        const existingIndex = this.stockData.findIndex((item) => item.kode === data.text);
+
+        if (existingIndex === -1) {
+          // If not exists, add new item with default values
+          this.stockData.push({
+            id: null, // No document ID yet
+            kode: data.text,
+            nama: data.nama,
+            kategori: "aksesoris", // Tambahkan informasi kategori
+            stokAwal: 0,
+            tambahStok: 0,
+            laku: 0,
+            free: 0,
+            gantiLock: 0,
+            stokAkhir: 0,
+            lastUpdate: new Date(),
+          });
+        } else {
+          // Update kategori jika item sudah ada
+          this.stockData[existingIndex].kategori = "aksesoris";
+        }
+      });
+    } catch (error) {
+      console.error("Error loading kode aksesoris:", error);
+      throw error;
+    }
+  },
+
+  // Filter sales data based on date range and search text (lanjutan)
   filterSalesData() {
     if (!this.salesData.length) return;
 
@@ -386,7 +351,6 @@ async loadAllKodeAksesoris() {
     // Get filter values
     const startDateStr = document.querySelector("#sales-tab-pane #startDate").value;
     const endDateStr = document.querySelector("#sales-tab-pane #endDate").value;
-    const searchText = document.querySelector("#sales-tab-pane #searchStock").value.toLowerCase();
 
     // Parse dates
     const startDate = parseDate(startDateStr);
@@ -404,20 +368,6 @@ async loadAllKodeAksesoris() {
       // Check if date is within range
       const dateInRange = (!startDate || transactionDate >= startDate) && (!endDate || transactionDate < endDate);
 
-      // Check if matches search text
-      let matchesSearch = true;
-      if (searchText) {
-        matchesSearch =
-          (item.noPenjualan && item.noPenjualan.toLowerCase().includes(searchText)) ||
-          (item.sales && item.sales.toLowerCase().includes(searchText)) ||
-          (item.items &&
-            item.items.some(
-              (product) =>
-                (product.nama && product.nama.toLowerCase().includes(searchText)) ||
-                (product.kode && product.kode.toLowerCase().includes(searchText))
-            ));
-      }
-
       return dateInRange && matchesSearch;
     });
 
@@ -433,64 +383,297 @@ async loadAllKodeAksesoris() {
     this.showLoading(false);
   },
 
-  // Filter stock data based on date range and search text
-filterStockData() {
+  // Filter stock data based on date range and search text with continuity
+  async filterStockData() {
     if (!this.stockData.length) return;
-    
+
     this.showLoading(true);
-    
-    // Get filter values
-    const startDateStr = document.querySelector('#stock-tab-pane #startDate').value;
-    const endDateStr = document.querySelector('#stock-tab-pane #endDate').value;
-    const searchText = document.querySelector('#stock-tab-pane #searchStock').value.toLowerCase();
-    
-    // Parse dates
-    const startDate = parseDate(startDateStr);
-    const endDate = parseDate(endDateStr);
-    if (endDate) {
-        // Add one day to end date to include the end date in the range
-        endDate.setDate(endDate.getDate() + 1);
+
+    try {
+      // Get filter values
+      const startDateStr = document.querySelector("#stock-tab-pane #startDate").value;
+      const endDateStr = document.querySelector("#stock-tab-pane #endDate").value;
+
+      // Parse dates
+      const startDate = parseDate(startDateStr);
+      const endDate = parseDate(endDateStr);
+      if (!startDate || !endDate) {
+        this.showError("Tanggal awal dan akhir harus diisi");
+        this.showLoading(false);
+        return;
+      }
+
+      // Cek apakah data sudah ada di cache untuk rentang tanggal ini
+      const cacheKey = `stock_${startDateStr}_${endDateStr}`;
+      if (this.cache[cacheKey] && this.cache[cacheKey].data) {
+        console.log(`Using cached stock data for range ${startDateStr} to ${endDateStr}`);
+        this.filteredStockData = this.cache[cacheKey].data.filter((item) => {});
+
+        this.renderStockTable();
+        this.showLoading(false);
+        return;
+      }
+
+      // Ambil data penjualan hanya sekali dan simpan dalam cache
+      if (!this.cache.allSalesData) {
+        // Ambil semua data penjualan (ini hanya dilakukan sekali)
+        const salesRef = collection(firestore, "penjualanAksesoris");
+        const salesSnapshot = await getDocs(salesRef);
+
+        // Proses data penjualan
+        const allSalesData = [];
+        salesSnapshot.forEach((doc) => {
+          const sale = doc.data();
+          // Tambahkan ID dokumen ke data
+          allSalesData.push({
+            id: doc.id,
+            ...sale,
+          });
+        });
+
+        // Simpan di cache
+        this.cache.allSalesData = {
+          data: allSalesData,
+          lastFetched: new Date().getTime(),
+        };
+      }
+
+      // Hitung stok dengan kontinuitas
+      await this.calculateStockContinuity(startDate, endDate);
+
+      // Simpan hasil di cache
+      this.cache[cacheKey] = {
+        data: this.filteredStockData,
+        lastFetched: new Date().getTime(),
+      };
+
+      // Render tabel
+      this.renderStockTable();
+      this.showLoading(false);
+    } catch (error) {
+      console.error("Error dalam filterStockData:", error);
+      this.showError("Error memfilter data stok: " + error.message);
+      this.showLoading(false);
     }
-    
-    // Filter data
-    this.filteredStockData = this.stockData.filter(item => {
-        // Parse update date
-        const updateDate = item.lastUpdate ? 
-            (item.lastUpdate.toDate ? item.lastUpdate.toDate() : 
-             typeof item.lastUpdate === 'string' ? parseDate(item.lastUpdate) : item.lastUpdate) : 
-            new Date();
-        
-        // Check if date is within range
-        const dateInRange = (!startDate || updateDate >= startDate) && 
-                           (!endDate || updateDate < endDate);
-        
-        // Check if matches search text
-        let matchesSearch = true;
-        if (searchText) {
-            matchesSearch = 
-                (item.kode && item.kode.toLowerCase().includes(searchText)) ||
-                (item.nama && item.nama.toLowerCase().includes(searchText));
+  },
+
+  // Metode untuk menghitung kontinuitas stok dengan logika yang benar
+  async calculateStockContinuity(startDate, endDate) {
+    try {
+      this.showLoading(true);
+
+      // Buat tanggal sehari sebelum tanggal awal
+      const previousDay = new Date(startDate);
+      previousDay.setDate(previousDay.getDate() - 1);
+      previousDay.setHours(23, 59, 59, 999);
+
+      // Tambahkan waktu ke tanggal akhir
+      const endDateWithTime = new Date(endDate);
+      endDateWithTime.setHours(23, 59, 59, 999);
+
+      // Ambil data transaksi stok dari Firestore
+      const stockTransactionsRef = collection(firestore, "stokAksesorisTransaksi");
+
+      // Query untuk mendapatkan semua transaksi hingga tanggal akhir
+      const transactionsQuery = query(
+        stockTransactionsRef,
+        where("timestamp", "<=", Timestamp.fromDate(endDateWithTime)),
+        orderBy("timestamp", "asc")
+      );
+
+      const transactionsSnapshot = await getDocs(transactionsQuery);
+
+      // Map untuk menyimpan data stok per kode barang
+      const stockByCode = {};
+
+      // Proses semua transaksi
+      transactionsSnapshot.forEach((doc) => {
+        const transaction = doc.data();
+        const kode = transaction.kode;
+        const timestamp = transaction.timestamp.toDate();
+
+        if (!kode) return;
+
+        if (!stockByCode[kode]) {
+          stockByCode[kode] = {
+            // Data untuk periode sebelum tanggal mulai
+            before: {
+              stokAwal: 0,
+              tambahStok: 0,
+              laku: 0,
+              free: 0,
+              gantiLock: 0,
+            },
+            // Data untuk periode yang dipilih
+            during: {
+              tambahStok: 0,
+              laku: 0,
+              free: 0,
+              gantiLock: 0,
+            },
+            nama: transaction.nama || "",
+            kategori: transaction.kategori || "",
+          };
         }
-        
-        return dateInRange && matchesSearch;
-    });
-    
-    // Sort by kategori first (kotak first, then aksesoris), then by kode
-    this.filteredStockData.sort((a, b) => {
+
+        // Tentukan apakah transaksi terjadi sebelum atau selama periode yang dipilih
+        const isPeriodBefore = timestamp <= previousDay;
+        const isPeriodDuring = timestamp > previousDay && timestamp <= endDateWithTime;
+
+        // Update data berdasarkan jenis transaksi dan periode
+        if (isPeriodBefore) {
+          // Transaksi sebelum periode yang dipilih
+          switch (transaction.jenis) {
+            case "stokAwal":
+              stockByCode[kode].before.stokAwal = transaction.jumlah || 0;
+              break;
+            case "tambah":
+              stockByCode[kode].before.tambahStok += transaction.jumlah || 0;
+              break;
+            case "laku":
+              stockByCode[kode].before.laku += transaction.jumlah || 0;
+              break;
+            case "free":
+              stockByCode[kode].before.free += transaction.jumlah || 0;
+              break;
+            case "gantiLock":
+              stockByCode[kode].before.gantiLock += transaction.jumlah || 0;
+              break;
+          }
+        } else if (isPeriodDuring) {
+          // Transaksi selama periode yang dipilih
+          switch (transaction.jenis) {
+            case "tambah":
+              stockByCode[kode].during.tambahStok += transaction.jumlah || 0;
+              break;
+            case "laku":
+              stockByCode[kode].during.laku += transaction.jumlah || 0;
+              break;
+            case "free":
+              stockByCode[kode].during.free += transaction.jumlah || 0;
+              break;
+            case "gantiLock":
+              stockByCode[kode].during.gantiLock += transaction.jumlah || 0;
+              break;
+          }
+        }
+      });
+
+      // Ambil data tambahan stok dari stockAdditions jika ada
+      const stockAddRef = collection(firestore, "stockAdditions");
+      const stockAddSnapshot = await getDocs(stockAddRef);
+
+      stockAddSnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (!data.timestamp) return;
+
+        const timestamp = data.timestamp.toDate();
+
+        if (data.items && data.items.length) {
+          data.items.forEach((item) => {
+            const kode = item.kodeText;
+            if (!kode) return;
+
+            const quantity = parseInt(item.jumlah) || 0;
+
+            if (!stockByCode[kode]) {
+              stockByCode[kode] = {
+                before: {
+                  stokAwal: 0,
+                  tambahStok: 0,
+                  laku: 0,
+                  free: 0,
+                  gantiLock: 0,
+                },
+                during: {
+                  tambahStok: 0,
+                  laku: 0,
+                  free: 0,
+                  gantiLock: 0,
+                },
+                nama: item.nama || "",
+                kategori: "",
+              };
+            }
+
+            // Kategorikan berdasarkan tanggal
+            if (timestamp <= previousDay) {
+              stockByCode[kode].before.tambahStok += quantity;
+            } else if (timestamp <= endDateWithTime) {
+              stockByCode[kode].during.tambahStok += quantity;
+            }
+          });
+        }
+      });
+
+      // Ambil data kode aksesoris untuk memastikan semua item tercakup
+      await this.loadAllKodeAksesoris();
+
+      // Buat data stok dengan kontinuitas yang benar
+      this.filteredStockData = this.stockData.map((item) => {
+        const kode = item.kode;
+        const stockInfo = stockByCode[kode] || {
+          before: {
+            stokAwal: 0,
+            tambahStok: 0,
+            laku: 0,
+            free: 0,
+            gantiLock: 0,
+          },
+          during: {
+            tambahStok: 0,
+            laku: 0,
+            free: 0,
+            gantiLock: 0,
+          },
+        };
+
+        // Hitung stok awal periode (stok akhir dari periode sebelumnya)
+        const initialStock =
+          stockInfo.before.stokAwal +
+          stockInfo.before.tambahStok -
+          stockInfo.before.laku -
+          stockInfo.before.free -
+          stockInfo.before.gantiLock;
+
+        // Hitung stok akhir periode
+        const finalStock =
+          Math.max(0, initialStock) +
+          stockInfo.during.tambahStok -
+          stockInfo.during.laku -
+          stockInfo.during.free -
+          stockInfo.during.gantiLock;
+
+        // Buat objek data stok dengan kontinuitas yang benar
+        return {
+          ...item,
+          stokAwal: Math.max(0, initialStock),
+          tambahStok: stockInfo.during.tambahStok,
+          laku: stockInfo.during.laku,
+          free: stockInfo.during.free,
+          gantiLock: stockInfo.during.gantiLock,
+          stokAkhir: Math.max(0, finalStock),
+        };
+      });
+
+      // Urutkan berdasarkan kategori dulu (kotak dulu, lalu aksesoris), kemudian berdasarkan kode
+      this.filteredStockData.sort((a, b) => {
         // Prioritaskan kategori
-        if ((a.kategori || 'unknown') !== (b.kategori || 'unknown')) {
-            // Kotak selalu di atas
-            return (a.kategori || 'unknown') === 'kotak' ? -1 : 1;
+        if ((a.kategori || "unknown") !== (b.kategori || "unknown")) {
+          return (a.kategori || "unknown") === "kotak" ? -1 : 1;
         }
-        
+
         // Jika kategori sama, urutkan berdasarkan kode
-        return (a.kode || '').localeCompare(b.kode || '');
-    });
-    
-    // Render the table
-    this.renderStockTable();
-    this.showLoading(false);
-},
+        return (a.kode || "").localeCompare(b.kode || "");
+      });
+
+      this.showLoading(false);
+    } catch (error) {
+      console.error("Error menghitung kontinuitas stok:", error);
+      this.showError("Error menghitung kontinuitas stok: " + error.message);
+      this.showLoading(false);
+    }
+  },
 
   // Render the sales table
   renderSalesTable() {
@@ -505,10 +688,10 @@ filterStockData() {
     // Check if there's data to display
     if (this.filteredSalesData.length === 0) {
       tableBody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="text-center">Tidak ada data yang sesuai dengan filter</td>
-                </tr>
-            `;
+                  <tr>
+                      <td colspan="6" class="text-center">Tidak ada data yang sesuai dengan filter</td>
+                  </tr>
+              `;
 
       // Reinitialize empty DataTable
       $("#penjualanTable").DataTable({
@@ -530,21 +713,21 @@ filterStockData() {
       if (sale.items && sale.items.length) {
         sale.items.forEach((item) => {
           html += `
-                        <tr>
-                            <td>${date}</td>
-                            <td>${sale.sales || "-"}</td>
-                            <td>${item.kodeText || "-"}</td>
-                            <td>${item.nama || "-"}</td>
-                            <td>${item.jumlah || 0}</td>
-                            <td>Rp ${formatRupiah(item.hargaSatuan || 0)}</td>
-                        </tr>
-                    `;
+                          <tr>
+                              <td>${date}</td>
+                              <td>${sale.sales || "-"}</td>
+                              <td>${item.kodeText || "-"}</td>
+                              <td>${item.nama || "-"}</td>
+                              <td>${item.jumlah || 0}</td>
+                              <td>Rp ${formatRupiah(item.hargaSatuan || 0)}</td>
+                          </tr>
+                      `;
         });
       } else {
         // If no items, create a single row
         html += `
-                                <tr>
-                                    <td>${date}</td>
+                                  <tr>
+                                                                         <td>${date}</td>
                                     <td>${sale.sales || "-"}</td>
                                     <td colspan="4" class="text-center">Tidak ada item</td>
                                 </tr>
@@ -575,55 +758,57 @@ filterStockData() {
     });
   },
 
-// Render the stock table
-renderStockTable() {
-  // Destroy existing DataTable
-  if ($.fn.DataTable.isDataTable('#stockTable')) {
-      $('#stockTable').DataTable().destroy();
-  }
-  
-  // Get table body
-  const tableBody = document.querySelector('#stockTable tbody');
-  if (!tableBody) return;
-  
-  // Check if there's data to display
-  if (this.filteredStockData.length === 0) {
+  // Render the stock table with continuity information
+  renderStockTable() {
+    // Destroy existing DataTable
+    if ($.fn.DataTable.isDataTable("#stockTable")) {
+      $("#stockTable").DataTable().destroy();
+    }
+
+    // Get table body
+    const tableBody = document.querySelector("#stockTable tbody");
+    if (!tableBody) return;
+
+    // Check if there's data to display
+    if (this.filteredStockData.length === 0) {
       tableBody.innerHTML = `
           <tr>
               <td colspan="9" class="text-center">Tidak ada data yang sesuai dengan filter</td>
           </tr>
       `;
-      
+
       // Initialize empty DataTable
-      $('#stockTable').DataTable({
-          responsive: true,
-          language: {
-              emptyTable: "Tidak ada data yang tersedia"
-          }
+      $("#stockTable").DataTable({
+        responsive: true,
+        language: {
+          emptyTable: "Tidak ada data yang tersedia",
+        },
       });
-      
+
       return;
-  }
-  
-  // Kelompokkan data berdasarkan kategori
-  const kotakItems = this.filteredStockData.filter(item => item.kategori === 'kotak');
-  const aksesorisItems = this.filteredStockData.filter(item => item.kategori === 'aksesoris');
-  const otherItems = this.filteredStockData.filter(item => item.kategori !== 'kotak' && item.kategori !== 'aksesoris');
-  
-  // Buat HTML untuk tabel tanpa header kategori
-  let html = '';
-  let rowIndex = 1;
-  
-  // Tambahkan semua item tanpa header kategori
-  [...kotakItems, ...aksesorisItems, ...otherItems].forEach(item => {
-      const categoryClass = item.kategori === 'kotak' ? 'kotak-item' : 
-                           item.kategori === 'aksesoris' ? 'aksesoris-item' : 'other-item';
-      
+    }
+
+    // Kelompokkan data berdasarkan kategori
+    const kotakItems = this.filteredStockData.filter((item) => item.kategori === "kotak");
+    const aksesorisItems = this.filteredStockData.filter((item) => item.kategori === "aksesoris");
+    const otherItems = this.filteredStockData.filter(
+      (item) => item.kategori !== "kotak" && item.kategori !== "aksesoris"
+    );
+
+    // Buat HTML untuk tabel tanpa header kategori
+    let html = "";
+    let rowIndex = 1;
+
+    // Tambahkan semua item tanpa header kategori
+    [...kotakItems, ...aksesorisItems, ...otherItems].forEach((item) => {
+      const categoryClass =
+        item.kategori === "kotak" ? "kotak-item" : item.kategori === "aksesoris" ? "aksesoris-item" : "other-item";
+
       html += `
           <tr class="${categoryClass}">
               <td class="text-center">${rowIndex++}</td>
-              <td class="text-center">${item.kode || '-'}</td>
-              <td>${item.nama || '-'}</td>
+              <td class="text-center">${item.kode || "-"}</td>
+              <td>${item.nama || "-"}</td>
               <td class="text-center">${item.stokAwal || 0}</td>
               <td class="text-center">${item.tambahStok || 0}</td>
               <td class="text-center">${item.laku || 0}</td>
@@ -632,17 +817,17 @@ renderStockTable() {
               <td class="text-center">${item.stokAkhir || 0}</td>
           </tr>
       `;
-  });
-  
-  tableBody.innerHTML = html;
-  
-  // Get current date for title
-  const today = new Date();
-  const formattedDate = formatDate(today);
-  
-  // Add CSS for text wrapping and equal column widths
-  const styleElement = document.createElement('style');
-  styleElement.textContent = `
+    });
+
+    tableBody.innerHTML = html;
+
+    // Get current date for title
+    const today = new Date();
+    const formattedDate = formatDate(today);
+
+    // Add CSS for text wrapping and equal column widths
+    const styleElement = document.createElement("style");
+    styleElement.textContent = `
       #stockTable th, #stockTable td {
           white-space: normal;
           word-wrap: break-word;
@@ -667,276 +852,317 @@ renderStockTable() {
               overflow: visible !important;
           }
       }
-  `;
-  document.head.appendChild(styleElement);
-  
-  // Inisialisasi DataTable dengan tombol export
-  const dataTable = $('#stockTable').DataTable({
+      
+      .continuity-note {
+          margin-bottom: 15px;
+          font-size: 0.9rem;
+      }
+    `;
+    document.head.appendChild(styleElement);
+
+    // Inisialisasi DataTable dengan tombol export
+    const dataTable = $("#stockTable").DataTable({
       responsive: true,
-      dom: 'Bfrtip',
+      dom: "Bfrtip",
       ordering: false, // Menonaktifkan fitur pengurutan/sorting
       autoWidth: false, // Disable auto width calculation
       buttons: [
-          {
-              extend: 'excel',
-              text: '<i class="fas fa-file-excel me-2"></i>Excel',
-              className: 'btn btn-success btn-sm me-1',
-              exportOptions: {
-                  columns: ':visible'
-              },
-              title: `Laporan Aksesoris Kasir Atas\n(${formattedDate})`,
-              customize: function(xlsx) {
-                  // Kustomisasi file Excel
-                  var sheet = xlsx.xl.worksheets['sheet1.xml'];
-                  
-                  // Adjust column widths in Excel
-                  $('row c[r^="C"]', sheet).attr('s', '55'); // Nama column - wider with wrap text
-                  
-                  // Set wrap text for all data cells
-                  $('row:not(:first-child) c', sheet).attr('s', '55');
-              }
+        {
+          extend: "excel",
+          text: '<i class="fas fa-file-excel me-2"></i>Excel',
+          className: "btn btn-success btn-sm me-1",
+          exportOptions: {
+            columns: ":visible",
           },
-          {
-              extend: 'pdf',
-              text: '<i class="fas fa-file-pdf me-2"></i>PDF',
-              className: 'btn btn-danger btn-sm me-1',
-              exportOptions: {
-                  columns: ':visible'
-              },
-              title: `Laporan Aksesoris Kasir Atas\n(${formattedDate})`,
-              customize: function(doc) {
-                  // Kustomisasi file PDF
-                  doc.defaultStyle.fontSize = 8;
-                  doc.styles.tableHeader.fontSize = 9;
-                  
-                  // Set column widths for PDF
-                  doc.content[1].table.widths = ['5%', '10%', '35%', '8.33%', '8.33%', '8.33%', '8.33%', '8.33%', '8.33%'];
-                  
-                  // Enable text wrapping
-                  doc.styles.tableHeader.alignment = 'center';
-                  doc.styles.tableBodyEven.alignment = 'center';
-                  doc.styles.tableBodyOdd.alignment = 'center';
-                  
-                  // Center all columns except the name column
-                  doc.content[1].table.body.forEach(function(row, rowIndex) {
-                      row.forEach(function(cell, cellIndex) {
-                          if (cellIndex !== 2) { // Skip the name column (index 2)
-                              cell.alignment = 'center';
-                          }
-                      });
-                  });
-              }
+          title: `Laporan Aksesoris Kasir Atas\n(${formattedDate})`,
+          customize: function (xlsx) {
+            // Kustomisasi file Excel
+            var sheet = xlsx.xl.worksheets["sheet1.xml"];
+
+            // Adjust column widths in Excel
+            $('row c[r^="C"]', sheet).attr("s", "55"); // Nama column - wider with wrap text
+
+            // Set wrap text for all data cells
+            $("row:not(:first-child) c", sheet).attr("s", "55");
           },
-          {
-              extend: 'print',
-              text: '<i class="fas fa-print me-2"></i>Print',
-              className: 'btn btn-primary btn-sm',
-              exportOptions: {
-                  columns: ':visible'
-              },
-              title: `Laporan Aksesoris Kasir Atas\n(${formattedDate})`,
-              customize: function(win) {
-                  // Add custom CSS for print view
-                  $(win.document.head).append(`
-                      <style>
-                          @page { size: landscape; }
-                          table.dataTable {
-                              width: 100% !important;
-                              table-layout: fixed !important;
-                              border-collapse: collapse !important;
-                          }
-                          table.dataTable th, table.dataTable td {
-                              white-space: normal !important;
-                              word-wrap: break-word !important;
-                              padding: 5px !important;
-                              font-size: 10pt !important;
-                              border: 1px solid #ddd !important;
-                              vertical-align: middle !important;
-                          }
-                          table.dataTable th:nth-child(1), table.dataTable td:nth-child(1) { width: 5% !important; text-align: center !important; }
-                          table.dataTable th:nth-child(2), table.dataTable td:nth-child(2) { width: 10% !important; text-align: center !important; }
-                          table.dataTable th:nth-child(3), table.dataTable td:nth-child(3) { width: 35% !important; text-align: left !important; }
-                          table.dataTable th:nth-child(4), table.dataTable td:nth-child(4),
-                          table.dataTable th:nth-child(5), table.dataTable td:nth-child(5),
-                          table.dataTable th:nth-child(6), table.dataTable td:nth-child(6),
-                          table.dataTable th:nth-child(7), table.dataTable td:nth-child(7),
-                          table.dataTable th:nth-child(8), table.dataTable td:nth-child(8),
-                          table.dataTable th:nth-child(9), table.dataTable td:nth-child(9) { 
-                              width: 8.33% !important; 
-                              text-align: center !important;
-                          }
-                          table.dataTable thead th {
-                              background-color: #f2f2f2 !important;
-                              font-weight: bold !important;
-                          }
-                      </style>
-                  `);
-                  
-                  // Center all columns except the name column
-                  $(win.document.body).find('table td:not(:nth-child(3))').css('text-align', 'center');
-                  
-                  // Make sure the table uses the full width
-                  $(win.document.body).find('table').css('width', '100%');
-              }
-          }
+        },
+        {
+          extend: "pdf",
+          text: '<i class="fas fa-file-pdf me-2"></i>PDF',
+          className: "btn btn-danger btn-sm me-1",
+          exportOptions: {
+            columns: ":visible",
+          },
+          title: `Laporan Aksesoris Kasir Atas\n(${formattedDate})`,
+          customize: function (doc) {
+            // Kustomisasi file PDF
+            doc.defaultStyle.fontSize = 8;
+            doc.styles.tableHeader.fontSize = 9;
+
+            // Set column widths for PDF
+            doc.content[1].table.widths = ["5%", "10%", "35%", "8.33%", "8.33%", "8.33%", "8.33%", "8.33%", "8.33%"];
+
+            // Enable text wrapping
+            doc.styles.tableHeader.alignment = "center";
+            doc.styles.tableBodyEven.alignment = "center";
+            doc.styles.tableBodyOdd.alignment = "center";
+
+            // Center all columns except the name column
+            doc.content[1].table.body.forEach(function (row, rowIndex) {
+              row.forEach(function (cell, cellIndex) {
+                if (cellIndex !== 2) {
+                  // Skip the name column (index 2)
+                  cell.alignment = "center";
+                }
+              });
+            });
+          },
+        },
+        {
+          extend: "print",
+          text: '<i class="fas fa-print me-2"></i>Print',
+          className: "btn btn-primary btn-sm",
+          exportOptions: {
+            columns: ":visible",
+          },
+          title: `Laporan Aksesoris Kasir Atas\n(${formattedDate})`,
+          customize: function (win) {
+            // Add custom CSS for print view
+            $(win.document.head).append(`
+              <style>
+                @page { size: landscape; }
+                table.dataTable {
+                  width: 100% !important;
+                  table-layout: fixed !important;
+                  border-collapse: collapse !important;
+                }
+                table.dataTable th, table.dataTable td {
+                  white-space: normal !important;
+                  word-wrap: break-word !important;
+                  padding: 5px !important;
+                  font-size: 10pt !important;
+                  border: 1px solid #ddd !important;
+                  vertical-align: middle !important;
+                }
+                table.dataTable th:nth-child(1), table.dataTable td:nth-child(1) { width: 5% !important; text-align: center !important; }
+                table.dataTable th:nth-child(2), table.dataTable td:nth-child(2) { width: 10% !important; text-align: center !important; }
+                table.dataTable th:nth-child(3), table.dataTable td:nth-child(3) { width: 35% !important; text-align: left !important; }
+                table.dataTable th:nth-child(4), table.dataTable td:nth-child(4),
+                table.dataTable th:nth-child(5), table.dataTable td:nth-child(5),
+                table.dataTable th:nth-child(6), table.dataTable td:nth-child(6),
+                table.dataTable th:nth-child(7), table.dataTable td:nth-child(7),
+                table.dataTable th:nth-child(8), table.dataTable td:nth-child(8),
+                table.dataTable th:nth-child(9), table.dataTable td:nth-child(9) { 
+                  width: 8.33% !important; 
+                  text-align: center !important;
+                }
+                table.dataTable thead th {
+                  background-color: #f2f2f2 !important;
+                  font-weight: bold !important;
+                }
+              </style>
+            `);
+
+            // Center all columns except the name column
+            $(win.document.body).find("table td:not(:nth-child(3))").css("text-align", "center");
+
+            // Make sure the table uses the full width
+            $(win.document.body).find("table").css("width", "100%");
+          },
+        },
       ],
       columnDefs: [
-          { className: "text-center", targets: [0,1,3,4,5,6,7,8] }, // Center align all columns except name
-          { className: "text-wrap", targets: "_all" }, // Enable text wrapping for all columns
-          { width: "5%", targets: 0 },    // No
-          { width: "10%", targets: 1 },   // Kode
-          { width: "30%", targets: 2 },   // Nama - lebih lebar
-          { width: "8.33%", targets: 3 }, // Stok Awal
-          { width: "8.33%", targets: 4 }, // Tambah Stok
-          { width: "8.33%", targets: 5 }, // Laku
-          { width: "8.33%", targets: 6 }, // Free
-          { width: "8.33%", targets: 7 }, // Ganti Lock
-          { width: "8.33%", targets: 8 }  // Stok Akhir
+        { className: "text-center", targets: [0, 1, 3, 4, 5, 6, 7, 8] }, // Center align all columns except name
+        { className: "text-wrap", targets: "_all" }, // Enable text wrapping for all columns
+        { width: "5%", targets: 0 }, // No
+        { width: "10%", targets: 1 }, // Kode
+        { width: "30%", targets: 2 }, // Nama - lebih lebar
+        { width: "8.33%", targets: 3 }, // Stok Awal
+        { width: "8.33%", targets: 4 }, // Tambah Stok
+        { width: "8.33%", targets: 5 }, // Laku
+        { width: "8.33%", targets: 6 }, // Free
+        { width: "8.33%", targets: 7 }, // Ganti Lock
+        { width: "8.33%", targets: 8 }, // Stok Akhir
       ],
       language: {
-          search: "Cari:",
-          lengthMenu: "Tampilkan _MENU_ data",
-          info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",
-          infoEmpty: "Menampilkan 0 sampai 0 dari 0 data",
-          infoFiltered: "(disaring dari _MAX_ total data)",
-          paginate: {
-              first: "Pertama",
-              last: "Terakhir",
-              next: "Selanjutnya",
-              previous: "Sebelumnya"
-          }
-      }
-  });
+        search: "Cari:",
+        lengthMenu: "Tampilkan _MENU_ data",
+        info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",
+        infoEmpty: "Menampilkan 0 sampai 0 dari 0 data",
+        infoFiltered: "(disaring dari _MAX_ total data)",
+        paginate: {
+          first: "Pertama",
+          last: "Terakhir",
+          next: "Selanjutnya",
+          previous: "Sebelumnya",
+        },
+      },
+    });
 
-  // Tambahkan header kategori setelah DataTable diinisialisasi
-  this.addCategoryHeaders(kotakItems, aksesorisItems, otherItems);
-},
+    // Tambahkan header kategori dan catatan kontinuitas setelah DataTable diinisialisasi
+    this.addCategoryHeadersAndContinuityNote(kotakItems, aksesorisItems, otherItems);
+  },
 
-
-// Fungsi untuk menambahkan header kategori setelah DataTable diinisialisasi
-addCategoryHeaders(kotakItems, aksesorisItems, otherItems) {
+  // Fungsi untuk menambahkan header kategori dan catatan kontinuitas
+  addCategoryHeadersAndContinuityNote(kotakItems, aksesorisItems, otherItems) {
     // Tambahkan container untuk header kategori di atas tabel
-    const tableContainer = document.querySelector('#stockTable_wrapper');
+    const tableContainer = document.querySelector("#stockTable_wrapper");
     if (!tableContainer) return;
-    
+
     // Cek apakah container header kategori sudah ada
-    let categoryHeaderContainer = document.querySelector('.category-headers');
+    let categoryHeaderContainer = document.querySelector(".category-headers");
     if (!categoryHeaderContainer) {
-        categoryHeaderContainer = document.createElement('div');
-        categoryHeaderContainer.className = 'category-headers mb-3 mt-3';
-        tableContainer.insertBefore(categoryHeaderContainer, tableContainer.querySelector('.dataTables_filter'));
+      categoryHeaderContainer = document.createElement("div");
+      categoryHeaderContainer.className = "category-headers mb-3 mt-3";
+      tableContainer.insertBefore(categoryHeaderContainer, tableContainer.querySelector(".dataTables_filter"));
     }
-    
+
     // Buat HTML untuk header kategori
     categoryHeaderContainer.innerHTML = `
-        <div class="d-flex flex-wrap gap-2">
-            ${kotakItems.length > 0 ? 
-                `<div class="category-badge badge bg-primary p-2">${kotakItems.length} Kotak Perhiasan</div>` : ''}
-            ${aksesorisItems.length > 0 ? 
-                `<div class="category-badge badge bg-success p-2">${aksesorisItems.length} Aksesoris Perhiasan</div>` : ''}
-            ${otherItems.length > 0 ? 
-                `<div class="category-badge badge bg-secondary p-2">${otherItems.length} Lainnya</div>` : ''}
+      <div class="d-flex flex-wrap gap-2">
+        ${
+          kotakItems.length > 0
+            ? `<div class="category-badge badge bg-primary p-2">${kotakItems.length} Kotak Perhiasan</div>`
+            : ""
+        }
+        ${
+          aksesorisItems.length > 0
+            ? `<div class="category-badge badge bg-success p-2">${aksesorisItems.length} Aksesoris Perhiasan</div>`
+            : ""
+        }
+          ${
+            otherItems.length > 0
+              ? `<div class="category-badge badge bg-secondary p-2">${otherItems.length} Lainnya</div>`
+              : ""
+          }
         </div>
-    `;
-    
+      `;
+
     // Tambahkan CSS untuk styling
-    const styleElement = document.createElement('style');
+    const styleElement = document.createElement("style");
     styleElement.textContent = `
         .category-headers {
-            display: flex;
-            justify-content: flex-end;
-            margin-right: 10px;
+          display: flex;
+          justify-content: flex-end;
+          margin-right: 10px;
         }
         
         .category-badge {
-            cursor: pointer;
+          cursor: pointer;
         }
         
         .kotak-item, .aksesoris-item, .other-item {
-            display: table-row;
+          display: table-row;
         }
-    `;
+      `;
     document.head.appendChild(styleElement);
-    
-    // Tambahkan event listener untuk filter berdasarkan kategori
-    document.querySelectorAll('.category-badge').forEach(badge => {
-        badge.addEventListener('click', function() {
-            const text = this.textContent.toLowerCase();
-            let categoryClass = '';
-            
-            if (text.includes('kotak')) {
-                categoryClass = 'kotak-item';
-            } else if (text.includes('aksesoris')) {
-                categoryClass = 'aksesoris-item';
-            } else {
-                categoryClass = 'other-item';
-            }
-            
-            // Toggle active state
-            this.classList.toggle('active');
-            const isActive = this.classList.contains('active');
-            
-            // Update badge style
-            if (isActive) {
-                this.style.opacity = '1';
-            } else {
-                this.style.opacity = '0.6';
-            }
-            
-            // Filter table
-            const table = $('#stockTable').DataTable();
-            
-            // Custom filtering function
-            $.fn.dataTable.ext.search.push(function(settings, data, dataIndex, row) {
-                // Get all active categories
-                const activeCategories = [];
-                document.querySelectorAll('.category-badge.active').forEach(activeBadge => {
-                    const badgeText = activeBadge.textContent.toLowerCase();
-                    if (badgeText.includes('kotak')) {
-                        activeCategories.push('kotak-item');
-                    } else if (badgeText.includes('aksesoris')) {
-                        activeCategories.push('aksesoris-item');
-                    } else {
-                        activeCategories.push('other-item');
-                    }
-                });
-                
-                // If no categories are active, show all rows
-                if (activeCategories.length === 0) {
-                    return true;
-                }
-                
-                // Check if row belongs to any active category
-                const rowNode = table.row(dataIndex).node();
-                return activeCategories.some(category => rowNode.classList.contains(category));
-            });
-            
-            // Redraw the table
-            table.draw();
-        });
-    });
-},
 
-// Helper method to create table row HTML
-createTableRow(item, index) {
+    // Tambahkan event listener untuk filter berdasarkan kategori
+    document.querySelectorAll(".category-badge").forEach((badge) => {
+      badge.addEventListener("click", function () {
+        const text = this.textContent.toLowerCase();
+        let categoryClass = "";
+
+        if (text.includes("kotak")) {
+          categoryClass = "kotak-item";
+        } else if (text.includes("aksesoris")) {
+          categoryClass = "aksesoris-item";
+        } else {
+          categoryClass = "other-item";
+        }
+
+        // Toggle active state
+        this.classList.toggle("active");
+        const isActive = this.classList.contains("active");
+
+        // Update badge style
+        if (isActive) {
+          this.style.opacity = "1";
+        } else {
+          this.style.opacity = "0.6";
+        }
+
+        // Filter table
+        const table = $("#stockTable").DataTable();
+
+        // Custom filtering function
+        $.fn.dataTable.ext.search.push(function (settings, data, dataIndex, row) {
+          // Get all active categories
+          const activeCategories = [];
+          document.querySelectorAll(".category-badge.active").forEach((activeBadge) => {
+            const badgeText = activeBadge.textContent.toLowerCase();
+            if (badgeText.includes("kotak")) {
+              activeCategories.push("kotak-item");
+            } else if (badgeText.includes("aksesoris")) {
+              activeCategories.push("aksesoris-item");
+            } else {
+              activeCategories.push("other-item");
+            }
+          });
+
+          // If no categories are active, show all rows
+          if (activeCategories.length === 0) {
+            return true;
+          }
+
+          // Check if row belongs to any active category
+          const rowNode = table.row(dataIndex).node();
+          return activeCategories.some((category) => rowNode.classList.contains(category));
+        });
+
+        // Redraw the table
+        table.draw();
+      });
+    });
+  },
+
+  // Fungsi untuk menampilkan notifikasi sukses
+  showSuccessNotification(message) {
+    if (typeof Swal !== "undefined") {
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: message,
+        confirmButtonColor: "#28a745",
+        timer: 3000,
+        timerProgressBar: true,
+        showClass: {
+          popup: "animate__animated animate__fadeInDown",
+        },
+        hideClass: {
+          popup: "animate__animated animate__fadeOutUp",
+        },
+        didOpen: (toast) => {
+          toast.addEventListener("mouseenter", Swal.stopTimer);
+          toast.addEventListener("mouseleave", Swal.resumeTimer);
+        },
+      });
+    } else {
+      alert(message);
+    }
+  },
+  
+
+  // Helper method to create table row HTML
+  createTableRow(item, index) {
     // Tambahkan kelas untuk kategori
-    const categoryClass = item.kategori === 'kotak' ? 'kotak-item' : 
-                         item.kategori === 'aksesoris' ? 'aksesoris-item' : 'other-item';
-    
+    const categoryClass =
+      item.kategori === "kotak" ? "kotak-item" : item.kategori === "aksesoris" ? "aksesoris-item" : "other-item";
+
     return `
         <tr class="${categoryClass}">
-            <td>${index}</td>
-            <td>${item.kode || '-'}</td>
-            <td>${item.nama || '-'}</td>
-            <td>${item.stokAwal || 0}</td>
-            <td>${item.tambahStok || 0}</td>
-            <td>${item.laku || 0}</td>
-            <td>${item.free || 0}</td>
-            <td>${item.gantiLock || 0}</td>
-            <td>${item.stokAkhir || 0}</td>
+          <td>${index}</td>
+          <td>${item.kode || "-"}</td>
+          <td>${item.nama || "-"}</td>
+          <td>${item.stokAwal || 0}</td>
+          <td>${item.tambahStok || 0}</td>
+          <td>${item.laku || 0}</td>
+          <td>${item.free || 0}</td>
+          <td>${item.gantiLock || 0}</td>
+          <td>${item.stokAkhir || 0}</td>
         </tr>
-    `;
-},
+      `;
+  },
 
   // Refresh sales table (called when tab is activated)
   refreshSalesTable() {
@@ -1011,17 +1237,16 @@ createTableRow(item, index) {
     XLSX.writeFile(wb, filename);
   },
 
- // Export stock data to Excel (fungsi ini bisa dihapus karena sudah digantikan oleh DataTables Buttons)
-exportStockData() {   
+  // Export stock data to Excel (fungsi ini bisa dihapus karena sudah digantikan oleh DataTables Buttons)
+  exportStockData() {
     if (!this.filteredStockData.length) {
-        alert('Tidak ada data untuk diekspor');
-        return;
+      alert("Tidak ada data untuk diekspor");
+      return;
     }
-    
+
     // Gunakan tombol export dari DataTables
-    $('#stockTable').DataTable().button(0).trigger(); // Trigger tombol Excel
-}
-,
+    $("#stockTable").DataTable().button(0).trigger(); // Trigger tombol Excel
+  },
 
   // Show loading indicator
   showLoading(isLoading) {
@@ -1037,6 +1262,36 @@ exportStockData() {
     console.error(message);
     alert(message);
   },
+
+  // Metode untuk membersihkan cache yang sudah tidak digunakan
+  cleanupCache() {
+    const now = new Date().getTime();
+    const cacheExpiry = 30 * 60 * 1000; // 30 menit
+
+    // Bersihkan cache yang sudah kadaluarsa
+    Object.keys(this.cache).forEach((key) => {
+      if (key.startsWith("stock_") && this.cache[key].lastFetched && now - this.cache[key].lastFetched > cacheExpiry) {
+        console.log(`Cleaning up expired cache for ${key}`);
+        delete this.cache[key];
+      }
+    });
+
+    // Batasi jumlah cache untuk mencegah penggunaan memori berlebihan
+    const maxCacheEntries = 10;
+    const cacheKeys = Object.keys(this.cache).filter((key) => key.startsWith("stock_"));
+
+    if (cacheKeys.length > maxCacheEntries) {
+      // Urutkan berdasarkan waktu terakhir diakses (yang paling lama dihapus)
+      cacheKeys.sort((a, b) => this.cache[a].lastFetched - this.cache[b].lastFetched);
+
+      // Hapus cache yang paling lama
+      const keysToRemove = cacheKeys.slice(0, cacheKeys.length - maxCacheEntries);
+      keysToRemove.forEach((key) => {
+        console.log(`Removing excess cache for ${key}`);
+        delete this.cache[key];
+      });
+    }
+  },
 };
 
 // Initialize when document is ready
@@ -1048,6 +1303,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Initialize the handler
   laporanAksesorisHandler.init();
+
+  // Set interval to clean up cache periodically
+  setInterval(() => {
+    laporanAksesorisHandler.cleanupCache();
+  }, 5 * 60 * 1000); // Bersihkan cache setiap 5 menit
 });
 
 // Export the handler for potential use in other modules

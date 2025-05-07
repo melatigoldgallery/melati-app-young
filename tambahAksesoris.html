@@ -25,6 +25,59 @@
     <link rel="stylesheet" href="css/pages/absensi-modern.css" />
     <!-- Favicon sederhana -->
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
+    <!-- Tambahkan di bagian head HTML -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+    <style>
+      .success-icon, .error-icon {
+    animation: bounceIn 1s;
+  }
+  
+  @keyframes bounceIn {
+    0%, 20%, 40%, 60%, 80%, 100% {
+      transition-timing-function: cubic-bezier(0.215, 0.610, 0.355, 1.000);
+    }
+    0% {
+      opacity: 0;
+      transform: scale3d(.3, .3, .3);
+    }
+    20% {
+      transform: scale3d(1.1, 1.1, 1.1);
+    }
+    40% {
+      transform: scale3d(.9, .9, .9);
+    }
+    60% {
+      opacity: 1;
+      transform: scale3d(1.03, 1.03, 1.03);
+    }
+    80% {
+      transform: scale3d(.97, .97, .97);
+    }
+    100% {
+      opacity: 1;
+      transform: scale3d(1, 1, 1);
+    }
+  }
+  
+  #successModalContent, #errorModalContent {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  
+  .item-list {
+    text-align: left;
+    margin-top: 15px;
+  }
+  
+  .item-list .item {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .item-list .item:last-child {
+    border-bottom: none;
+  }
+    </style>
     <title>Tambah Aksesoris - Melati Gold Shop</title>
   </head>
   <body>
@@ -431,6 +484,61 @@
   </div>
 </div>
 
+<!-- Modal Notifikasi Sukses -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title" id="successModalLabel">
+          <i class="fas fa-check-circle me-2"></i>Berhasil!
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="text-center mb-4">
+          <div class="success-icon mb-3">
+            <i class="fas fa-check-circle fa-4x text-success"></i>
+          </div>
+          <h4 id="successModalTitle">Data berhasil disimpan</h4>
+        </div>
+        <div id="successModalContent" class="mt-3">
+          <!-- Detail akan diisi oleh JavaScript -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-success" data-bs-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Notifikasi Error -->
+<div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="errorModalLabel">
+          <i class="fas fa-exclamation-triangle me-2"></i>Error!
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="text-center mb-4">
+          <div class="error-icon mb-3">
+            <i class="fas fa-exclamation-circle fa-4x text-danger"></i>
+          </div>
+          <h4 id="errorModalTitle">Terjadi Kesalahan</h4>
+        </div>
+        <div id="errorModalContent" class="mt-3">
+          <!-- Detail akan diisi oleh JavaScript -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
     <!-- Scripts -->
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/components/sidebar.js"></script>

@@ -556,7 +556,7 @@ export const aksesorisSaleHandler = {
               this.showLoading(false);
               return;
             }
-      
+        
             // Kumpulkan data dari tabel
             const items = this.collectItemsData();
             if (!items) {
@@ -574,8 +574,17 @@ export const aksesorisSaleHandler = {
             // Update stok aksesoris
             await this.updateStokAksesoris(items);
             
-            // Tampilkan notifikasi sukses
-            this.showSuccessNotification("Stok berhasil ditambahkan!");
+            // Hitung total item yang ditambahkan
+            const totalItems = items.reduce((total, item) => total + item.jumlah, 0);
+            const kategoriText = this.elements.selectKategori.value === "1" ? "Kotak" : "Aksesoris";
+            
+            // Tampilkan notifikasi sukses dengan detail
+            this.showSuccessNotification(`
+              ${totalItems} item ${kategoriText} berhasil ditambahkan!
+              
+              Detail:
+              ${items.map(item => `• ${item.nama} (${item.kodeText}): ${item.jumlah} pcs`).join('\n')}
+            `);
             
             // Reload riwayat penambahan stok
             this.loadStockAdditionHistory();
@@ -889,7 +898,19 @@ export const aksesorisSaleHandler = {
         icon: 'success',
         title: 'Berhasil!',
         text: message,
-        confirmButtonColor: '#28a745'
+        confirmButtonColor: '#28a745',
+        timer: 3000,
+        timerProgressBar: true,
+        showClass: {
+          popup: 'animate__animated animate__fadeInDown'
+        },
+        hideClass: {
+          popup: 'animate__animated animate__fadeOutUp'
+        },
+        didOpen: (toast) => {
+          toast.addEventListener('mouseenter', Swal.stopTimer)
+          toast.addEventListener('mouseleave', Swal.resumeTimer)
+        }
       });
     } else {
       alert(message);
@@ -903,7 +924,11 @@ export const aksesorisSaleHandler = {
         icon: 'error',
         title: 'Error!',
         text: message,
-        confirmButtonColor: '#dc3545'
+        confirmButtonColor: '#dc3545',
+        showClass: {
+          popup: 'animate__animated animate__shakeX'
+        },
+        footer: '<span class="text-muted">Jika masalah berlanjut, hubungi administrator</span>'
       });
     } else {
       alert(message);
