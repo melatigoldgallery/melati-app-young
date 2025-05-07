@@ -383,70 +383,105 @@ const laporanAksesorisHandler = {
     this.showLoading(false);
   },
 
-  // Filter stock data based on date range and search text with continuity
   async filterStockData() {
     if (!this.stockData.length) return;
-
+  
     this.showLoading(true);
-
+  
     try {
       // Get filter values
-      const startDateStr = document.querySelector("#stock-tab-pane #startDate").value;
-      const endDateStr = document.querySelector("#stock-tab-pane #endDate").value;
-
-      // Parse dates
-      const startDate = parseDate(startDateStr);
-      const endDate = parseDate(endDateStr);
-      if (!startDate || !endDate) {
+      const startDateStr = document.querySelector("#stock-tab-pane #startDate")?.value;
+      const endDateStr = document.querySelector("#stock-tab-pane #endDate")?.value;
+  
+      // Validasi input tanggal
+      if (!startDateStr || !endDateStr) {
         this.showError("Tanggal awal dan akhir harus diisi");
         this.showLoading(false);
         return;
       }
-
+  
+      // Parse dates
+      const startDate = parseDate(startDateStr);
+      const endDate = parseDate(endDateStr);
+      if (!startDate || !endDate) {
+        this.showError("Format tanggal tidak valid. Gunakan format DD/MM/YYYY");
+        this.showLoading(false);
+        return;
+      }
+  
+      // Tambahkan waktu ke tanggal akhir untuk mencakup seluruh hari
+      const endDateWithTime = new Date(endDate);
+      endDateWithTime.setHours(23, 59, 59, 999);
+  
       // Cek apakah data sudah ada di cache untuk rentang tanggal ini
       const cacheKey = `stock_${startDateStr}_${endDateStr}`;
       if (this.cache[cacheKey] && this.cache[cacheKey].data) {
         console.log(`Using cached stock data for range ${startDateStr} to ${endDateStr}`);
-        this.filteredStockData = this.cache[cacheKey].data.filter((item) => {});
-
-        this.renderStockTable();
-        this.showLoading(false);
-        return;
+        
+        // Buat salinan data dari cache untuk menghindari masalah referensi
+        try {
+          this.filteredStockData = [...this.cache[cacheKey].data];
+          
+          // Perbarui timestamp akses terakhir
+          this.cache[cacheKey].lastAccessed = new Date().getTime();
+          
+          // Render tabel dengan data dari cache
+          this.renderStockTable();
+          this.showLoading(false);
+          return;
+        } catch (cacheError) {
+          console.warn("Error using cached data:", cacheError);
+          // Lanjutkan dengan mengambil data baru jika cache gagal
+        }
       }
-
+  
       // Ambil data penjualan hanya sekali dan simpan dalam cache
-      if (!this.cache.allSalesData) {
-        // Ambil semua data penjualan (ini hanya dilakukan sekali)
-        const salesRef = collection(firestore, "penjualanAksesoris");
-        const salesSnapshot = await getDocs(salesRef);
-
-        // Proses data penjualan
-        const allSalesData = [];
-        salesSnapshot.forEach((doc) => {
-          const sale = doc.data();
-          // Tambahkan ID dokumen ke data
-          allSalesData.push({
-            id: doc.id,
-            ...sale,
+      try {
+        if (!this.cache.allSalesData) {
+          // Ambil semua data penjualan (ini hanya dilakukan sekali)
+          const salesRef = collection(firestore, "penjualanAksesoris");
+          const salesSnapshot = await getDocs(salesRef);
+  
+          // Proses data penjualan
+          const allSalesData = [];
+          salesSnapshot.forEach((doc) => {
+            const sale = doc.data();
+            // Tambahkan ID dokumen ke data
+            allSalesData.push({
+              id: doc.id,
+              ...sale,
+            });
           });
-        });
-
-        // Simpan di cache
-        this.cache.allSalesData = {
-          data: allSalesData,
+  
+          // Simpan di cache
+          this.cache.allSalesData = {
+            data: allSalesData,
+            lastFetched: new Date().getTime(),
+          };
+        }
+      } catch (salesError) {
+        console.error("Error fetching sales data:", salesError);
+        // Lanjutkan meskipun gagal mengambil data penjualan
+      }
+  
+      // Hitung stok dengan kontinuitas
+      try {
+        await this.calculateStockContinuity(startDate, endDateWithTime);
+      } catch (calcError) {
+        console.error("Error calculating stock continuity:", calcError);
+        throw new Error("Gagal menghitung stok: " + calcError.message);
+      }
+  
+      // Simpan hasil di cache jika berhasil
+      if (this.filteredStockData && this.filteredStockData.length > 0) {
+        // Buat salinan data untuk disimpan di cache
+        this.cache[cacheKey] = {
+          data: [...this.filteredStockData],
           lastFetched: new Date().getTime(),
+          lastAccessed: new Date().getTime(),
         };
       }
-
-      // Hitung stok dengan kontinuitas
-      await this.calculateStockContinuity(startDate, endDate);
-
-      // Simpan hasil di cache
-      this.cache[cacheKey] = {
-        data: this.filteredStockData,
-        lastFetched: new Date().getTime(),
-      };
-
+  
       // Render tabel
       this.renderStockTable();
       this.showLoading(false);
@@ -454,6 +489,73 @@ const laporanAksesorisHandler = {
       console.error("Error dalam filterStockData:", error);
       this.showError("Error memfilter data stok: " + error.message);
       this.showLoading(false);
+      
+      // Reset the table to a clean state
+      try {
+        const tableElement = document.getElementById("stockTable");
+        if (!tableElement) {
+          console.warn("Table element not found for reset");
+          return;
+        }
+        
+        // Destroy existing DataTable if it exists
+        try {
+          if ($.fn.DataTable.isDataTable("#stockTable")) {
+            $("#stockTable").DataTable().destroy();
+          }
+        } catch (dtError) {
+          console.warn("Error destroying DataTable during reset:", dtError);
+        }
+        
+        const tableBody = document.querySelector("#stockTable tbody");
+        if (tableBody) {
+          tableBody.innerHTML = `
+            <tr>
+              <td colspan="9" class="text-center">Terjadi kesalahan saat memuat data</td>
+            </tr>
+          `;
+        }
+        
+        // Initialize a fresh DataTable
+        try {
+          if (!$.fn.DataTable.isDataTable("#stockTable")) {
+            $("#stockTable").DataTable({
+              responsive: true,
+              language: {
+                emptyTable: "Tidak ada data yang tersedia",
+              },
+              dom: "Bfrtip",
+              buttons: [
+                {
+                  extend: "excel",
+                  text: '<i class="fas fa-file-excel me-2"></i>Excel',
+                  className: "btn btn-success btn-sm me-1",
+                },
+                {
+                  extend: "pdf",
+                  text: '<i class="fas fa-file-pdf me-2"></i>PDF',
+                  className: "btn btn-danger btn-sm me-1",
+                },
+                {
+                  extend: "print",
+                  text: '<i class="fas fa-print me-2"></i>Print',
+                  className: "btn btn-primary btn-sm",
+                },
+              ],
+            });
+          }
+        } catch (initError) {
+          console.warn("Error initializing DataTable during reset:", initError);
+        }
+      } catch (innerError) {
+        console.warn("Error resetting table:", innerError);
+      }
+    } finally {
+      // Pastikan loading indicator dimatikan dalam semua kasus
+      this.showLoading(false);
+      
+      // Bersihkan cache yang sudah tidak digunakan
+      setTimeout(() => this.cleanupCache(), 1000);
     }
   },
 
@@ -758,249 +860,313 @@ const laporanAksesorisHandler = {
     });
   },
 
-  // Render the stock table with continuity information
   renderStockTable() {
-    // Destroy existing DataTable
-    if ($.fn.DataTable.isDataTable("#stockTable")) {
-      $("#stockTable").DataTable().destroy();
-    }
-
-    // Get table body
-    const tableBody = document.querySelector("#stockTable tbody");
-    if (!tableBody) return;
-
-    // Check if there's data to display
-    if (this.filteredStockData.length === 0) {
-      tableBody.innerHTML = `
-          <tr>
-              <td colspan="9" class="text-center">Tidak ada data yang sesuai dengan filter</td>
-          </tr>
-      `;
-
-      // Initialize empty DataTable
-      $("#stockTable").DataTable({
-        responsive: true,
-        language: {
-          emptyTable: "Tidak ada data yang tersedia",
-        },
+    try {
+      // Periksa apakah tabel ada di DOM sebelum mencoba destroy
+      const tableElement = document.getElementById("stockTable");
+      if (!tableElement) {
+        console.error("Elemen tabel #stockTable tidak ditemukan di DOM");
+        return;
+      }
+  
+      // Hancurkan DataTable yang ada dengan aman
+      try {
+        if ($.fn.DataTable.isDataTable("#stockTable")) {
+          $("#stockTable").DataTable().destroy();
+        }
+      } catch (error) {
+        console.warn("Error destroying DataTable:", error);
+        // Lanjutkan eksekusi meskipun destroy gagal
+      }
+  
+      // Get table body
+      const tableBody = document.querySelector("#stockTable tbody");
+      if (!tableBody) {
+        console.error("Elemen tbody dari #stockTable tidak ditemukan");
+        return;
+      }
+  
+      // Check if there's data to display
+      if (!this.filteredStockData || this.filteredStockData.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="9" class="text-center">Tidak ada data yang sesuai dengan filter</td>
+            </tr>
+        `;
+  
+        // Initialize empty DataTable
+        try {
+          $("#stockTable").DataTable({
+            responsive: true,
+            language: {
+              emptyTable: "Tidak ada data yang tersedia",
+            },
+          });
+        } catch (error) {
+          console.warn("Error initializing empty DataTable:", error);
+        }
+        return;
+      }
+  
+      // Kelompokkan data berdasarkan kategori
+      const kotakItems = this.filteredStockData.filter((item) => item.kategori === "kotak");
+      const aksesorisItems = this.filteredStockData.filter((item) => item.kategori === "aksesoris");
+      const otherItems = this.filteredStockData.filter(
+        (item) => item.kategori !== "kotak" && item.kategori !== "aksesoris"
+      );
+  
+      // Buat HTML untuk tabel tanpa header kategori
+      let html = "";
+      let rowIndex = 1;
+  
+      // Tambahkan semua item tanpa header kategori
+      [...kotakItems, ...aksesorisItems, ...otherItems].forEach((item) => {
+        const categoryClass =
+          item.kategori === "kotak" ? "kotak-item" : item.kategori === "aksesoris" ? "aksesoris-item" : "other-item";
+  
+        html += `
+            <tr class="${categoryClass}">
+                <td class="text-center">${rowIndex++}</td>
+                <td class="text-center">${item.kode || "-"}</td>
+                <td>${item.nama || "-"}</td>
+                <td class="text-center">${item.stokAwal || 0}</td>
+                <td class="text-center">${item.tambahStok || 0}</td>
+                <td class="text-center">${item.laku || 0}</td>
+                <td class="text-center">${item.free || 0}</td>
+                <td class="text-center">${item.gantiLock || 0}</td>
+                <td class="text-center">${item.stokAkhir || 0}</td>
+            </tr>
+        `;
       });
-
-      return;
-    }
-
-    // Kelompokkan data berdasarkan kategori
-    const kotakItems = this.filteredStockData.filter((item) => item.kategori === "kotak");
-    const aksesorisItems = this.filteredStockData.filter((item) => item.kategori === "aksesoris");
-    const otherItems = this.filteredStockData.filter(
-      (item) => item.kategori !== "kotak" && item.kategori !== "aksesoris"
-    );
-
-    // Buat HTML untuk tabel tanpa header kategori
-    let html = "";
-    let rowIndex = 1;
-
-    // Tambahkan semua item tanpa header kategori
-    [...kotakItems, ...aksesorisItems, ...otherItems].forEach((item) => {
-      const categoryClass =
-        item.kategori === "kotak" ? "kotak-item" : item.kategori === "aksesoris" ? "aksesoris-item" : "other-item";
-
-      html += `
-          <tr class="${categoryClass}">
-              <td class="text-center">${rowIndex++}</td>
-              <td class="text-center">${item.kode || "-"}</td>
-              <td>${item.nama || "-"}</td>
-              <td class="text-center">${item.stokAwal || 0}</td>
-              <td class="text-center">${item.tambahStok || 0}</td>
-              <td class="text-center">${item.laku || 0}</td>
-              <td class="text-center">${item.free || 0}</td>
-              <td class="text-center">${item.gantiLock || 0}</td>
-              <td class="text-center">${item.stokAkhir || 0}</td>
-          </tr>
-      `;
-    });
-
-    tableBody.innerHTML = html;
-
-    // Get current date for title
-    const today = new Date();
-    const formattedDate = formatDate(today);
-
-    // Add CSS for text wrapping and equal column widths
-    const styleElement = document.createElement("style");
-    styleElement.textContent = `
-      #stockTable th, #stockTable td {
-          white-space: normal;
-          word-wrap: break-word;
-          vertical-align: middle;
+  
+      // Pastikan HTML tidak kosong sebelum menetapkannya ke tableBody
+      if (html.trim() === "") {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="9" class="text-center">Tidak ada data yang valid untuk ditampilkan</td>
+            </tr>
+        `;
+      } else {
+        tableBody.innerHTML = html;
       }
-      
-      #stockTable th:nth-child(1), #stockTable td:nth-child(1) { width: 5%; }  /* No */
-      #stockTable th:nth-child(2), #stockTable td:nth-child(2) { width: 10%; } /* Kode */
-      #stockTable th:nth-child(3), #stockTable td:nth-child(3) { width: 35%; } /* Nama - lebih lebar */
-      #stockTable th:nth-child(4), #stockTable td:nth-child(4),
-      #stockTable th:nth-child(5), #stockTable td:nth-child(5),
-      #stockTable th:nth-child(6), #stockTable td:nth-child(6),
-      #stockTable th:nth-child(7), #stockTable td:nth-child(7),
-      #stockTable th:nth-child(8), #stockTable td:nth-child(8),
-      #stockTable th:nth-child(9), #stockTable td:nth-child(9) { width: 8.33%; } /* Kolom stock - sama lebar */
-      
-      @media print {
-          #stockTable { width: 100% !important; table-layout: fixed !important; }
+  
+      // Get current date for title
+      const today = new Date();
+      const formattedDate = formatDate(today);
+  
+      // Add CSS for text wrapping and equal column widths
+      try {
+        const existingStyle = document.getElementById("stockTableStyle");
+        if (existingStyle) {
+          existingStyle.remove();
+        }
+        
+        const styleElement = document.createElement("style");
+        styleElement.id = "stockTableStyle";
+        styleElement.textContent = `
           #stockTable th, #stockTable td {
-              padding: 4px !important;
-              font-size: 10pt !important;
-              overflow: visible !important;
+              white-space: normal;
+              word-wrap: break-word;
+              vertical-align: middle;
           }
-      }
-      
-      .continuity-note {
-          margin-bottom: 15px;
-          font-size: 0.9rem;
-      }
-    `;
-    document.head.appendChild(styleElement);
-
-    // Inisialisasi DataTable dengan tombol export
-    const dataTable = $("#stockTable").DataTable({
-      responsive: true,
-      dom: "Bfrtip",
-      ordering: false, // Menonaktifkan fitur pengurutan/sorting
-      autoWidth: false, // Disable auto width calculation
-      buttons: [
-        {
-          extend: "excel",
-          text: '<i class="fas fa-file-excel me-2"></i>Excel',
-          className: "btn btn-success btn-sm me-1",
-          exportOptions: {
-            columns: ":visible",
-          },
-          title: `Laporan Aksesoris Kasir Atas\n(${formattedDate})`,
-          customize: function (xlsx) {
-            // Kustomisasi file Excel
-            var sheet = xlsx.xl.worksheets["sheet1.xml"];
-
-            // Adjust column widths in Excel
-            $('row c[r^="C"]', sheet).attr("s", "55"); // Nama column - wider with wrap text
-
-            // Set wrap text for all data cells
-            $("row:not(:first-child) c", sheet).attr("s", "55");
-          },
-        },
-        {
-          extend: "pdf",
-          text: '<i class="fas fa-file-pdf me-2"></i>PDF',
-          className: "btn btn-danger btn-sm me-1",
-          exportOptions: {
-            columns: ":visible",
-          },
-          title: `Laporan Aksesoris Kasir Atas\n(${formattedDate})`,
-          customize: function (doc) {
-            // Kustomisasi file PDF
-            doc.defaultStyle.fontSize = 8;
-            doc.styles.tableHeader.fontSize = 9;
-
-            // Set column widths for PDF
-            doc.content[1].table.widths = ["5%", "10%", "35%", "8.33%", "8.33%", "8.33%", "8.33%", "8.33%", "8.33%"];
-
-            // Enable text wrapping
-            doc.styles.tableHeader.alignment = "center";
-            doc.styles.tableBodyEven.alignment = "center";
-            doc.styles.tableBodyOdd.alignment = "center";
-
-            // Center all columns except the name column
-            doc.content[1].table.body.forEach(function (row, rowIndex) {
-              row.forEach(function (cell, cellIndex) {
-                if (cellIndex !== 2) {
-                  // Skip the name column (index 2)
-                  cell.alignment = "center";
-                }
-              });
-            });
-          },
-        },
-        {
-          extend: "print",
-          text: '<i class="fas fa-print me-2"></i>Print',
-          className: "btn btn-primary btn-sm",
-          exportOptions: {
-            columns: ":visible",
-          },
-          title: `Laporan Aksesoris Kasir Atas\n(${formattedDate})`,
-          customize: function (win) {
-            // Add custom CSS for print view
-            $(win.document.head).append(`
-              <style>
-                @page { size: landscape; }
-                table.dataTable {
-                  width: 100% !important;
-                  table-layout: fixed !important;
-                  border-collapse: collapse !important;
-                }
-                table.dataTable th, table.dataTable td {
-                  white-space: normal !important;
-                  word-wrap: break-word !important;
-                  padding: 5px !important;
+          
+          #stockTable th:nth-child(1), #stockTable td:nth-child(1) { width: 5%; }  /* No */
+          #stockTable th:nth-child(2), #stockTable td:nth-child(2) { width: 10%; } /* Kode */
+          #stockTable th:nth-child(3), #stockTable td:nth-child(3) { width: 35%; } /* Nama - lebih lebar */
+          #stockTable th:nth-child(4), #stockTable td:nth-child(4),
+          #stockTable th:nth-child(5), #stockTable td:nth-child(5),
+          #stockTable th:nth-child(6), #stockTable td:nth-child(6),
+          #stockTable th:nth-child(7), #stockTable td:nth-child(7),
+          #stockTable th:nth-child(8), #stockTable td:nth-child(8),
+          #stockTable th:nth-child(9), #stockTable td:nth-child(9) { width: 8.33%; } /* Kolom stock - sama lebar */
+          
+          @media print {
+              #stockTable { width: 100% !important; table-layout: fixed !important; }
+              #stockTable th, #stockTable td {
+                  padding: 4px !important;
                   font-size: 10pt !important;
-                  border: 1px solid #ddd !important;
-                  vertical-align: middle !important;
-                }
-                table.dataTable th:nth-child(1), table.dataTable td:nth-child(1) { width: 5% !important; text-align: center !important; }
-                table.dataTable th:nth-child(2), table.dataTable td:nth-child(2) { width: 10% !important; text-align: center !important; }
-                table.dataTable th:nth-child(3), table.dataTable td:nth-child(3) { width: 35% !important; text-align: left !important; }
-                table.dataTable th:nth-child(4), table.dataTable td:nth-child(4),
-                table.dataTable th:nth-child(5), table.dataTable td:nth-child(5),
-                table.dataTable th:nth-child(6), table.dataTable td:nth-child(6),
-                table.dataTable th:nth-child(7), table.dataTable td:nth-child(7),
-                table.dataTable th:nth-child(8), table.dataTable td:nth-child(8),
-                table.dataTable th:nth-child(9), table.dataTable td:nth-child(9) { 
-                  width: 8.33% !important; 
-                  text-align: center !important;
-                }
-                table.dataTable thead th {
-                  background-color: #f2f2f2 !important;
-                  font-weight: bold !important;
-                }
-              </style>
-            `);
-
-            // Center all columns except the name column
-            $(win.document.body).find("table td:not(:nth-child(3))").css("text-align", "center");
-
-            // Make sure the table uses the full width
-            $(win.document.body).find("table").css("width", "100%");
+                  overflow: visible !important;
+              }
+          }
+          
+          .continuity-note {
+              margin-bottom: 15px;
+              font-size: 0.9rem;
+          }
+        `;
+        document.head.appendChild(styleElement);
+      } catch (styleError) {
+        console.warn("Error adding style element:", styleError);
+      }
+  
+      // Inisialisasi DataTable dengan tombol export
+      try {
+        const dataTable = $("#stockTable").DataTable({
+          responsive: true,
+          dom: "Bfrtip",
+          ordering: false, // Menonaktifkan fitur pengurutan/sorting
+          autoWidth: false, // Disable auto width calculation
+          buttons: [
+            {
+              extend: "excel",
+              text: '<i class="fas fa-file-excel me-2"></i>Excel',
+              className: "btn btn-success btn-sm me-1",
+              exportOptions: {
+                columns: ":visible",
+              },
+              title: `Laporan Aksesoris Kasir Atas\n(${formattedDate})`,
+              customize: function (xlsx) {
+                // Kustomisasi file Excel
+                var sheet = xlsx.xl.worksheets["sheet1.xml"];
+                // Adjust column widths in Excel
+                $('row c[r^="C"]', sheet).attr("s", "55"); // Nama column - wider with wrap text
+                // Set wrap text for all data cells
+                $("row:not(:first-child) c", sheet).attr("s", "55");
+              },
+            },
+            {
+              extend: "pdf",
+              text: '<i class="fas fa-file-pdf me-2"></i>PDF',
+              className: "btn btn-danger btn-sm me-1",
+              exportOptions: {
+                columns: ":visible",
+              },
+              title: `Laporan Aksesoris Kasir Atas\n(${formattedDate})`,
+              customize: function (doc) {
+                // Kustomisasi file PDF
+                doc.defaultStyle.fontSize = 8;
+                doc.styles.tableHeader.fontSize = 9;
+                // Set column widths for PDF
+                doc.content[1].table.widths = ["5%", "10%", "35%", "8.33%", "8.33%", "8.33%", "8.33%", "8.33%", "8.33%"];
+                // Enable text wrapping
+                doc.styles.tableHeader.alignment = "center";
+                doc.styles.tableBodyEven.alignment = "center";
+                doc.styles.tableBodyOdd.alignment = "center";
+                // Center all columns except the name column
+                doc.content[1].table.body.forEach(function (row, rowIndex) {
+                  row.forEach(function (cell, cellIndex) {
+                    if (cellIndex !== 2) {
+                      // Skip the name column (index 2)
+                      cell.alignment = "center";
+                    }
+                  });
+                });
+              },
+            },
+            {
+              extend: "print",
+              text: '<i class="fas fa-print me-2"></i>Print',
+              className: "btn btn-primary btn-sm",
+              exportOptions: {
+                columns: ":visible",
+              },
+              title: `Laporan Aksesoris Kasir Atas\n(${formattedDate})`,
+              customize: function (win) {
+                // Add custom CSS for print view
+                $(win.document.head).append(`
+                  <style>
+                    @page { size: landscape; }
+                    table.dataTable {
+                      width: 100% !important;
+                      table-layout: fixed !important;
+                      border-collapse: collapse !important;
+                    }
+                    table.dataTable th, table.dataTable td {
+                      white-space: normal !important;
+                      word-wrap: break-word !important;
+                      padding: 5px !important;
+                      font-size: 10pt !important;
+                      border: 1px solid #ddd !important;
+                      vertical-align: middle !important;
+                    }
+                    table.dataTable th:nth-child(1), table.dataTable td:nth-child(1) { width: 5% !important; text-align: center !important; }
+                    table.dataTable th:nth-child(2), table.dataTable td:nth-child(2) { width: 10% !important; text-align: center !important; }
+                    table.dataTable th:nth-child(3), table.dataTable td:nth-child(3) { width: 35% !important; text-align: left !important; }
+                    table.dataTable th:nth-child(4), table.dataTable td:nth-child(4),
+                    table.dataTable th:nth-child(5), table.dataTable td:nth-child(5),
+                    table.dataTable th:nth-child(6), table.dataTable td:nth-child(6),
+                    table.dataTable th:nth-child(7), table.dataTable td:nth-child(7),
+                    table.dataTable th:nth-child(8), table.dataTable td:nth-child(8),
+                    table.dataTable th:nth-child(9), table.dataTable td:nth-child(9) { 
+                      width: 8.33% !important; 
+                      text-align: center !important;
+                    }
+                    table.dataTable thead th {
+                      background-color: #f2f2f2 !important;
+                      font-weight: bold !important;
+                    }
+                  </style>
+                `);
+                // Center all columns except the name column
+                $(win.document.body).find("table td:not(:nth-child(3))").css("text-align", "center");
+                // Make sure the table uses the full width
+                $(win.document.body).find("table").css("width", "100%");
+              },
+            },
+          ],
+          columnDefs: [
+            { className: "text-center", targets: [0, 1, 3, 4, 5, 6, 7, 8] }, // Center align all columns except name
+            { className: "text-wrap", targets: "_all" }, // Enable text wrapping for all columns
+            { width: "5%", targets: 0 }, // No
+            { width: "10%", targets: 1 }, // Kode
+            { width: "30%", targets: 2 }, // Nama - lebih lebar
+            { width: "8.33%", targets: 3 }, // Stok Awal
+            { width: "8.33%", targets: 4 }, // Tambah Stok
+            { width: "8.33%", targets: 5 }, // Laku
+            { width: "8.33%", targets: 6 }, // Free
+            { width: "8.33%", targets: 7 }, // Ganti Lock
+            { width: "8.33%", targets: 8 }, // Stok Akhir
+          ],
+          language: {
+            search: "Cari:",
+            lengthMenu: "Tampilkan _MENU_ data",
+            info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",
+            infoEmpty: "Menampilkan 0 sampai 0 dari 0 data",
+            infoFiltered: "(disaring dari _MAX_ total data)",
+            paginate: {
+              first: "Pertama",
+              last: "Terakhir",
+              next: "Selanjutnya",
+              previous: "Sebelumnya",
+            },
           },
-        },
-      ],
-      columnDefs: [
-        { className: "text-center", targets: [0, 1, 3, 4, 5, 6, 7, 8] }, // Center align all columns except name
-        { className: "text-wrap", targets: "_all" }, // Enable text wrapping for all columns
-        { width: "5%", targets: 0 }, // No
-        { width: "10%", targets: 1 }, // Kode
-        { width: "30%", targets: 2 }, // Nama - lebih lebar
-        { width: "8.33%", targets: 3 }, // Stok Awal
-        { width: "8.33%", targets: 4 }, // Tambah Stok
-        { width: "8.33%", targets: 5 }, // Laku
-        { width: "8.33%", targets: 6 }, // Free
-        { width: "8.33%", targets: 7 }, // Ganti Lock
-        { width: "8.33%", targets: 8 }, // Stok Akhir
-      ],
-      language: {
-        search: "Cari:",
-        lengthMenu: "Tampilkan _MENU_ data",
-        info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",
-        infoEmpty: "Menampilkan 0 sampai 0 dari 0 data",
-        infoFiltered: "(disaring dari _MAX_ total data)",
-        paginate: {
-          first: "Pertama",
-          last: "Terakhir",
-          next: "Selanjutnya",
-          previous: "Sebelumnya",
-        },
-      },
-    });
-
-    // Tambahkan header kategori dan catatan kontinuitas setelah DataTable diinisialisasi
-    this.addCategoryHeadersAndContinuityNote(kotakItems, aksesorisItems, otherItems);
+        });
+  
+        // Tambahkan header kategori dan catatan kontinuitas setelah DataTable diinisialisasi
+        this.addCategoryHeadersAndContinuityNote(kotakItems, aksesorisItems, otherItems);
+      } catch (dtError) {
+        console.error("Error initializing DataTable:", dtError);
+        // Tampilkan pesan error yang lebih ramah pengguna
+        this.showError("Terjadi kesalahan saat memuat tabel. Silakan coba lagi.");
+      }
+    } catch (error) {
+      console.error("Error dalam renderStockTable:", error);
+      this.showError("Terjadi kesalahan saat menampilkan data stok: " + error.message);
+      
+      // Pastikan tabel dalam keadaan bersih
+      try {
+        const tableBody = document.querySelector("#stockTable tbody");
+        if (tableBody) {
+          tableBody.innerHTML = `
+            <tr>
+              <td colspan="9" class="text-center">Terjadi kesalahan saat memuat data</td>
+            </tr>
+          `;
+        }
+        
+        // Inisialisasi DataTable kosong jika terjadi error
+        if (!$.fn.DataTable.isDataTable("#stockTable")) {
+          $("#stockTable").DataTable({
+            responsive: true,
+            language: {
+              emptyTable: "Tidak ada data yang tersedia",
+            }
+          });
+        }
+      } catch (innerError) {
+        console.warn("Error saat mereset tabel:", innerError);
+      }
+    }
   },
 
   // Fungsi untuk menambahkan header kategori dan catatan kontinuitas
