@@ -25,7 +25,7 @@
     <link rel="stylesheet" href="css/pages/absensi-modern.css" />
     <!-- Favicon sederhana -->
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
-    <title>Penjualan Aksesoris - Melati Gold Shop</title>
+    <title>Penjualan - Melati Gold Shop</title>
   </head>
   <body>
     <div class="app-container">
@@ -107,7 +107,7 @@
                   <li class="nav-item">
                     <a class="nav-link active" href="penjualanAksesoris.html">
                       <i class="fas fa-shopping-cart"></i>
-                      <span class="menu-text">Penjualan Aksesoris</span>
+                      <span class="menu-text">Penjualan</span>
                     </a>
                   </li>
                   <li class="nav-item">
@@ -160,18 +160,18 @@
         <!-- Page Content -->
         <div class="page-content">
           <div class="page-header">
-            <h1>Penjualan Aksesoris</h1>
+            <h1>Penjualan</h1>
             <nav aria-label="breadcrumb">
               <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="dashboard.html">Home</a></li>
                 <li class="breadcrumb-item">Aksesoris</li>
-                <li class="breadcrumb-item active" aria-current="page">Penjualan Aksesoris</li>
+                <li class="breadcrumb-item active" aria-current="page">Penjualan</li>
               </ol>
             </nav>
           </div>
 
           <div class="content-wrapper">
-            <!-- Form Penjualan Aksesoris -->
+            <!-- Form Penjualan -->
             <div class="card mb-4">
               <div class="card-header">
                 <h2>
@@ -181,7 +181,16 @@
               </div>
               <div class="card-body">
                 <form class="row g-3">
-                  <div class="col-md-4">
+                  <div class="col-md-3">
+                    <label for="jenisPenjualan" class="form-label">Jenis Penjualan</label>
+                    <select class="form-select" id="jenisPenjualan">
+                      <option value="aksesoris" selected>Aksesoris</option>
+                      <option value="kotak">Kotak</option>
+                      <option value="gantiLock">Ganti Lock</option>
+                      <option value="manual">Penjualan Manual</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
                     <label for="tanggal" class="form-label">Tanggal</label>
                     <div class="input-group">
                       <input
@@ -195,11 +204,7 @@
                       </span>
                     </div>
                   </div>
-                  <div class="col-md-4">
-                    <label for="noPenjualan" class="form-label">No Penjualan</label>
-                    <input type="text" class="form-control" id="noPenjualan" placeholder="Otomatis" readonly>
-                  </div>
-                  <div class="col-md-4">
+                  <div class="col-md-3">
                     <label for="sales" class="form-label">Sales</label>
                     <input type="text" class="form-control" id="sales" placeholder="Masukkan nama sales">
                   </div>
@@ -212,22 +217,64 @@
               <div class="card-header d-flex justify-content-between align-items-center">
                 <h2>
                   <i class="fas fa-list"></i>
-                  Detail Barang
+                  <span id="detailTitle">Detail Barang</span>
                 </h2>
-                <button
-                  type="button"
-                  class="btn btn-primary"
-                  id="btnTambah"
-                >
-                  <i class="fas fa-plus me-2"></i>Tambah
-                </button>
+                <div>
+                  <!-- Tombol tambah untuk Aksesoris dan Kotak -->
+                  <button
+                    type="button"
+                    class="btn btn-primary catalog-select"
+                    id="btnTambah"
+                  >
+                    <i class="fas fa-plus me-2"></i>Pilih Kode
+                  </button>
+                  
+                  <!-- Tombol tambah baris untuk Ganti Lock dan Manual -->
+                  <button
+                    type="button"
+                    class="btn btn-success"
+                    id="btnTambahBaris">
+                    <i class="fas fa-plus me-2"></i>Tambah Baris
+                  </button>
+                </div>
               </div>
               <div class="card-body">
+                <!-- Form input langsung untuk Ganti Lock -->
+                <div id="directEntryForm" class="mb-4 direct-entry" style="display: none;">
+                  <form class="row g-3">
+                    <div class="col-md-2">
+                      <label for="inputKode" class="form-label">Kode (Opsional)</label>
+                      <input type="text" class="form-control" id="inputKode" placeholder="Kode">
+                    </div>
+                    <div class="col-md-3">
+                      <label for="inputNamaBarang" class="form-label">Nama Barang</label>
+                      <input type="text" class="form-control" id="inputNamaBarang" placeholder="Nama barang">
+                    </div>
+                    <div class="col-md-1">
+                      <label for="inputJumlah" class="form-label">Jumlah</label>
+                      <input type="number" class="form-control" id="inputJumlah" value="1" min="1">
+                    </div>
+                    <div class="col-md-2">
+                      <label for="inputBerat" class="form-label">Berat (gr)</label>
+                      <input type="number" class="form-control" id="inputBerat" step="0.01" placeholder="0.00">
+                    </div>
+                    <div class="col-md-2">
+                      <label for="inputHargaPerGram" class="form-label">Harga/Gram</label>
+                      <input type="number" class="form-control" id="inputHargaPerGram" placeholder="0">
+                    </div>
+                    <div class="col-md-2">
+                      <label for="inputTotalHarga" class="form-label">Total Harga</label>
+                      <input type="text" class="form-control" id="inputTotalHarga" placeholder="0" readonly>
+                    </div>
+                  </form>
+                </div>
+
                 <div class="table-responsive">
-                  <table class="table table-hover" id="tableKotak">
+                  <!-- Tabel untuk Aksesoris -->
+                  <table class="table table-hover" id="tableAksesorisDetail">
                     <thead class="table-light">
                       <tr>
-                        <th style="width:10%">Kode Aksesoris</th>
+                        <th style="width:10%">Kode</th>
                         <th style="width:35%">Nama Barang</th>
                         <th style="width:10%">Jumlah</th>
                         <th style="width:10%">Berat</th>
@@ -242,7 +289,31 @@
                     <tfoot>
                       <tr>
                         <th colspan="5" class="text-end">Total:</th>
-                        <th id="grand-total">0</th>
+                        <th id="grand-total-aksesoris">0</th>
+                        <th></th>
+                      </tr>
+                    </tfoot>
+                  </table>
+
+                  <!-- Tabel untuk Kotak -->
+                  <table class="table table-hover" id="tableKotakDetail" style="display: none;">
+                    <thead class="table-light">
+                      <tr>
+                        <th style="width:10%">Kode</th>
+                        <th style="width:35%">Jenis Kotak</th>
+                        <th style="width:10%">Jumlah</th>
+                        <th style="width:30%">Harga Satuan</th>
+                        <th style="width:10%">Total Harga</th>
+                        <th style="width:5%">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <!-- Baris akan ditambahkan oleh JavaScript -->
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <th colspan="4" class="text-end">Total:</th>
+                        <th id="grand-total-kotak">0</th>
                         <th></th>
                       </tr>
                     </tfoot>
@@ -261,28 +332,25 @@
               </div>
               <div class="card-body">
                 <form class="row g-3">
-                  <div class="col-md-4">
+                  <div class="col-md-3">
                     <label for="metodeBayar" class="form-label">Metode Pembayaran</label>
                     <select class="form-select" id="metodeBayar">
-                      <option value="1">Tunai</option>
-                      <option value="2">DP</option>
+                      <option value="tunai">Tunai</option>
+                      <option value="dp">DP</option>
+                      <option value="free" class="kotak-only" style="display: none;">Free</option>
                     </select>
                   </div>
-                  <div class="col-md-4">
+                  <div class="col-md-3">
                     <label for="totalOngkos" class="form-label">Total</label>
                     <input type="text" class="form-control" id="totalOngkos" placeholder="0" readonly>
                   </div>
-                  <div class="col-md-4">
+                  <div class="col-md-3 payment-field">
                     <label for="jumlahBayar" class="form-label">Jumlah Bayar</label>
                     <input type="text" class="form-control" id="jumlahBayar" placeholder="Masukkan jumlah bayar">
                   </div>
-                  <div class="col-md-4">
+                  <div class="col-md-3 payment-field">
                     <label for="kembalian" class="form-label">Kembalian</label>
                     <input type="text" class="form-control" id="kembalian" placeholder="0" readonly>
-                  </div>
-                  <div class="col-md-8">
-                    <label for="keterangan" class="form-label">Keterangan</label>
-                    <textarea class="form-control" id="keterangan" rows="2" placeholder="Masukkan keterangan jika ada"></textarea>
                   </div>
                 </form>
               </div>
@@ -339,27 +407,48 @@
       </div>
     </div>
 
+    <!-- Modal Pilih Kotak -->
+    <div class="modal fade" id="modalPilihKotak" tabindex="-1" aria-labelledby="modalPilihKotakLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalPilihKotakLabel">Pilih Kotak</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <input type="text" class="form-control" id="searchKotak" placeholder="Cari kotak...">
+            </div>
+            <div class="table-responsive">
+              <table class="table table-hover" id="tableKotak">
+                <thead>
+                  <tr>
+                    <th>Kode</th>
+                    <th>Jenis Kotak</th>
+                    <th>Stok</th>
+                    <th>Harga</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Data kotak akan ditampilkan di sini -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Scripts -->
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/components/sidebar.js"></script>
     <script type="module" src="js/components/header.js"></script>
-    <script type="module" src="js/aksesorisSale.js"></script>
-    <script>
-      // Initialize datepicker
-      $(document).ready(function() {
-        $('#tanggal').datepicker({
-          format: 'dd/mm/yyyy',
-          autoclose: true,
-          language: 'id',
-          todayHighlight: true
-        });
-        
-        // Calendar icon click handler
-        $('#calendarIcon').on('click', function() {
-          $('#tanggal').datepicker('show');
-        });
-      });
-    </script>
+    <script type="module" src="js/penjualanAksesoris.js"></script>
   </body>
 </html>
+
 
