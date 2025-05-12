@@ -18,7 +18,10 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <!-- Datepicker CSS and JS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css" rel="stylesheet">
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css"
+      rel="stylesheet"
+    />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/locales/bootstrap-datepicker.id.min.js"></script>
     <!-- Custom CSS -->
@@ -193,12 +196,7 @@
                   <div class="col-md-3">
                     <label for="tanggal" class="form-label">Tanggal</label>
                     <div class="input-group">
-                      <input
-                        type="text"
-                        class="form-control"
-                        id="tanggal"
-                        placeholder="Masukkan tanggal"
-                      />
+                      <input type="text" class="form-control" id="tanggal" placeholder="Masukkan tanggal" />
                       <span class="input-group-text bg-primary text-white" id="calendarIcon" style="cursor: pointer">
                         <i class="fa-solid fa-calendar-days"></i>
                       </span>
@@ -206,7 +204,7 @@
                   </div>
                   <div class="col-md-3">
                     <label for="sales" class="form-label">Sales</label>
-                    <input type="text" class="form-control" id="sales" placeholder="Masukkan nama sales">
+                    <input type="text" class="form-control" id="sales" placeholder="Masukkan nama sales" />
                   </div>
                 </form>
               </div>
@@ -221,66 +219,31 @@
                 </h2>
                 <div>
                   <!-- Tombol tambah untuk Aksesoris dan Kotak -->
-                  <button
-                    type="button"
-                    class="btn btn-primary catalog-select"
-                    id="btnTambah"
-                  >
-                    <i class="fas fa-plus me-2"></i>Pilih Kode
+                  <button type="button" class="btn btn-primary catalog-select" id="btnTambah">
+                    <i class="fas fa-plus me-2"></i>
+                    Pilih Kode
                   </button>
-                  
+
                   <!-- Tombol tambah baris untuk Ganti Lock dan Manual -->
-                  <button
-                    type="button"
-                    class="btn btn-success"
-                    id="btnTambahBaris">
-                    <i class="fas fa-plus me-2"></i>Tambah Baris
+                  <button type="button" class="btn btn-success" id="btnTambahBaris">
+                    <i class="fas fa-plus me-2"></i>
+                    Tambah Baris
                   </button>
                 </div>
               </div>
               <div class="card-body">
-                <!-- Form input langsung untuk Ganti Lock -->
-                <div id="directEntryForm" class="mb-4 direct-entry" style="display: none;">
-                  <form class="row g-3">
-                    <div class="col-md-2">
-                      <label for="inputKode" class="form-label">Kode (Opsional)</label>
-                      <input type="text" class="form-control" id="inputKode" placeholder="Kode">
-                    </div>
-                    <div class="col-md-3">
-                      <label for="inputNamaBarang" class="form-label">Nama Barang</label>
-                      <input type="text" class="form-control" id="inputNamaBarang" placeholder="Nama barang">
-                    </div>
-                    <div class="col-md-1">
-                      <label for="inputJumlah" class="form-label">Jumlah</label>
-                      <input type="number" class="form-control" id="inputJumlah" value="1" min="1">
-                    </div>
-                    <div class="col-md-2">
-                      <label for="inputBerat" class="form-label">Berat (gr)</label>
-                      <input type="number" class="form-control" id="inputBerat" step="0.01" placeholder="0.00">
-                    </div>
-                    <div class="col-md-2">
-                      <label for="inputHargaPerGram" class="form-label">Harga/Gram</label>
-                      <input type="number" class="form-control" id="inputHargaPerGram" placeholder="0">
-                    </div>
-                    <div class="col-md-2">
-                      <label for="inputTotalHarga" class="form-label">Total Harga</label>
-                      <input type="text" class="form-control" id="inputTotalHarga" placeholder="0" readonly>
-                    </div>
-                  </form>
-                </div>
-
-                <div class="table-responsive">
-                  <!-- Tabel untuk Aksesoris -->
+                <!-- Tabel untuk Aksesoris -->
+                <div class="table-responsive" id="aksesorisTableContainer">
                   <table class="table table-hover" id="tableAksesorisDetail">
                     <thead class="table-light">
                       <tr>
-                        <th style="width:10%">Kode</th>
-                        <th style="width:35%">Nama Barang</th>
-                        <th style="width:10%">Jumlah</th>
-                        <th style="width:10%">Berat</th>
-                        <th style="width:15%">Harga Per Gram</th>
-                        <th style="width:15%">Total Harga</th>
-                        <th style="width:5%">Aksi</th>
+                        <th style="width: 10%">Kode</th>
+                        <th style="width: 35%">Nama Barang</th>
+                        <th style="width: 10%">Jumlah</th>
+                        <th style="width: 10%">Berat</th>
+                        <th style="width: 15%">Harga Per Gram</th>
+                        <th style="width: 15%">Total Harga</th>
+                        <th style="width: 5%">Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -294,17 +257,19 @@
                       </tr>
                     </tfoot>
                   </table>
+                </div>
 
-                  <!-- Tabel untuk Kotak -->
-                  <table class="table table-hover" id="tableKotakDetail" style="display: none;">
+                <!-- Tabel untuk Kotak -->
+                <div class="table-responsive" id="kotakTableContainer" style="display: none">
+                  <table class="table table-hover" id="tableKotakDetail">
                     <thead class="table-light">
                       <tr>
-                        <th style="width:10%">Kode</th>
-                        <th style="width:35%">Jenis Kotak</th>
-                        <th style="width:10%">Jumlah</th>
-                        <th style="width:30%">Harga Satuan</th>
-                        <th style="width:10%">Total Harga</th>
-                        <th style="width:5%">Aksi</th>
+                        <th style="width: 10%">Kode</th>
+                        <th style="width: 35%">Jenis Kotak</th>
+                        <th style="width: 10%">Jumlah</th>
+                        <th style="width: 30%">Harga Satuan</th>
+                        <th style="width: 10%">Total Harga</th>
+                        <th style="width: 5%">Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -314,6 +279,60 @@
                       <tr>
                         <th colspan="4" class="text-end">Total:</th>
                         <th id="grand-total-kotak">0</th>
+                        <th></th>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                <!-- Tabel untuk Ganti Lock -->
+                <div class="table-responsive" id="lockTableContainer" style="display: none">
+                  <table class="table table-hover" id="tableLockDetail">
+                    <thead class="table-light">
+                      <tr>
+                        <th style="width: 10%">Kode</th>
+                        <th style="width: 30%">Nama Barang</th>
+                        <th style="width: 10%">Jumlah</th>
+                        <th style="width: 10%">Berat</th>
+                        <th style="width: 15%">Harga Per Gram</th>
+                        <th style="width: 15%">Total Harga</th>
+                        <th style="width: 5%">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <!-- Baris akan ditambahkan oleh JavaScript -->
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <th colspan="5" class="text-end">Total:</th>
+                        <th id="grand-total-lock">0</th>
+                        <th></th>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                <!-- Tabel untuk Penjualan Manual -->
+                <div class="table-responsive" id="manualTableContainer" style="display: none">
+                  <table class="table table-hover" id="tableManualDetail">
+                    <thead class="table-light">
+                      <tr>
+                        <th style="width: 10%">Kode</th>
+                        <th style="width: 30%">Nama Barang</th>
+                        <th style="width: 10%">Jumlah</th>
+                        <th style="width: 10%">Berat</th>
+                        <th style="width: 15%">Harga Per Gram</th>
+                        <th style="width: 15%">Total Harga</th>
+                        <th style="width: 5%">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <!-- Baris akan ditambahkan oleh JavaScript -->
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <th colspan="5" class="text-end">Total:</th>
+                        <th id="grand-total-manual">0</th>
                         <th></th>
                       </tr>
                     </tfoot>
@@ -332,37 +351,48 @@
               </div>
               <div class="card-body">
                 <form class="row g-3">
-                  <div class="col-md-3">
+                  <div class="col-md-2">
                     <label for="metodeBayar" class="form-label">Metode Pembayaran</label>
                     <select class="form-select" id="metodeBayar">
                       <option value="tunai">Tunai</option>
                       <option value="dp">DP</option>
-                      <option value="free" class="kotak-only" style="display: none;">Free</option>
+                      <option value="free" class="kotak-only" style="display: none">Free</option>
                     </select>
                   </div>
-                  <div class="col-md-3">
+                  <div class="col-md-2 dp-field" style="display: none">
+                    <label for="nominalDP" class="form-label">Nominal DP</label>
+                    <input type="text" class="form-control" id="nominalDP" placeholder="0" />
+                  </div>
+                  <div class="col-md-2">
                     <label for="totalOngkos" class="form-label">Total</label>
-                    <input type="text" class="form-control" id="totalOngkos" placeholder="0" readonly>
+                    <input type="text" class="form-control" id="totalOngkos" placeholder="0" readonly />
                   </div>
-                  <div class="col-md-3 payment-field">
+                  <div class="col-md-2 dp-field" style="display: none">
+                    <label for="sisaPembayaran" class="form-label">Sisa Pembayaran</label>
+                    <input type="text" class="form-control" id="sisaPembayaran" placeholder="0" readonly />
+                  </div>
+                  <div class="col-md-2 payment-field">
                     <label for="jumlahBayar" class="form-label">Jumlah Bayar</label>
-                    <input type="text" class="form-control" id="jumlahBayar" placeholder="Masukkan jumlah bayar">
+                    <input type="text" class="form-control" id="jumlahBayar" placeholder="Masukkan jumlah bayar" />
                   </div>
-                  <div class="col-md-3 payment-field">
+                  <div class="col-md-2 payment-field">
                     <label for="kembalian" class="form-label">Kembalian</label>
-                    <input type="text" class="form-control" id="kembalian" placeholder="0" readonly>
+                    <input type="text" class="form-control" id="kembalian" placeholder="0" readonly />
                   </div>
                 </form>
               </div>
               <div class="card-footer">
                 <button class="btn btn-primary" id="btnSimpanPenjualan">
-                  <i class="fas fa-save me-2"></i>Simpan Penjualan
+                  <i class="fas fa-save me-2"></i>
+                  Simpan Penjualan
                 </button>
                 <button class="btn btn-success" id="btnCetak">
-                  <i class="fas fa-print me-2"></i>Cetak Nota
+                  <i class="fas fa-print me-2"></i>
+                  Cetak Nota
                 </button>
                 <button class="btn btn-secondary" id="btnBatal">
-                  <i class="fas fa-times me-2"></i>Batal
+                  <i class="fas fa-times me-2"></i>
+                  Batal
                 </button>
               </div>
             </div>
@@ -372,7 +402,13 @@
     </div>
 
     <!-- Modal Pilih Aksesoris -->
-    <div class="modal fade" id="modalPilihAksesoris" tabindex="-1" aria-labelledby="modalPilihAksesorisLabel" aria-hidden="true">
+    <div
+      class="modal fade"
+      id="modalPilihAksesoris"
+      tabindex="-1"
+      aria-labelledby="modalPilihAksesorisLabel"
+      aria-hidden="true"
+    >
       <div class="modal-dialog modal-lg">
         <div class="modal-content">
           <div class="modal-header">
@@ -381,7 +417,7 @@
           </div>
           <div class="modal-body">
             <div class="mb-3">
-              <input type="text" class="form-control" id="searchAksesoris" placeholder="Cari aksesoris...">
+              <input type="text" class="form-control" id="searchAksesoris" placeholder="Cari aksesoris..." />
             </div>
             <div class="table-responsive">
               <table class="table table-hover" id="tableAksesoris">
@@ -408,7 +444,13 @@
     </div>
 
     <!-- Modal Pilih Kotak -->
-    <div class="modal fade" id="modalPilihKotak" tabindex="-1" aria-labelledby="modalPilihKotakLabel" aria-hidden="true">
+    <div
+      class="modal fade"
+      id="modalPilihKotak"
+      tabindex="-1"
+      aria-labelledby="modalPilihKotakLabel"
+      aria-hidden="true"
+    >
       <div class="modal-dialog modal-lg">
         <div class="modal-content">
           <div class="modal-header">
@@ -417,7 +459,7 @@
           </div>
           <div class="modal-body">
             <div class="mb-3">
-              <input type="text" class="form-control" id="searchKotak" placeholder="Cari kotak...">
+              <input type="text" class="form-control" id="searchKotak" placeholder="Cari kotak..." />
             </div>
             <div class="table-responsive">
               <table class="table table-hover" id="tableKotak">
@@ -450,5 +492,3 @@
     <script type="module" src="js/penjualanAksesoris.js"></script>
   </body>
 </html>
-
-
