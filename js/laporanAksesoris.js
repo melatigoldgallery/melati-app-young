@@ -159,8 +159,8 @@ prepareEmptyTables() {
     });
   },
 
-  // Attach event listeners
-  attachEventListeners() {
+// Update the attachEventListeners method to handle the reset filter button
+attachEventListeners() {
   // Filter Sales button
   const filterSalesBtn = document.getElementById("filterSalesBtn");
   if (filterSalesBtn) {
@@ -168,6 +168,14 @@ prepareEmptyTables() {
       this.loadSalesData().then(() => {
         this.filterSalesData();
       });
+    });
+  }
+
+  // Reset Filter button
+  const resetFilterBtn = document.getElementById("resetFilterBtn");
+  if (resetFilterBtn) {
+    resetFilterBtn.addEventListener("click", () => {
+      this.resetSalesFilters();
     });
   }
 
@@ -192,16 +200,46 @@ prepareEmptyTables() {
   });
 },
 
-  // Reset sales filters
-  resetSalesFilters() {
-    const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+// Add this method to populate the sales person dropdown
+populateSalesPersonDropdown() {
+  // Get unique sales persons from the data
+  const salesPersons = [...new Set(this.salesData.map(item => item.sales).filter(Boolean))];
+  
+  // Get the dropdown element
+  const dropdown = document.querySelector("#sales-tab-pane #salesPerson");
+  if (!dropdown) return;
+  
+  // Clear existing options except the first one (All Sales)
+  while (dropdown.options.length > 1) {
+    dropdown.remove(1);
+  }
+  
+  // Add options for each sales person
+  salesPersons.forEach(person => {
+    const option = document.createElement("option");
+    option.value = person;
+    option.textContent = person;
+    dropdown.appendChild(option);
+  });
+},
 
-    document.querySelector("#sales-tab-pane #startDate").value = formatDate(firstDay);
-    document.querySelector("#sales-tab-pane #endDate").value = formatDate(today);
+// Update the resetSalesFilters method
+resetSalesFilters() {
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
 
+  document.querySelector("#sales-tab-pane #startDate").value = formatDate(firstDay);
+  document.querySelector("#sales-tab-pane #endDate").value = formatDate(today);
+  
+  // Reset select dropdowns
+  document.querySelector("#sales-tab-pane #salesType").value = "all";
+  document.querySelector("#sales-tab-pane #salesPerson").value = "all";
+
+  // Reload and filter data
+  this.loadSalesData().then(() => {
     this.filterSalesData();
-  },
+  });
+},
 
   // Reset stock filters
   resetStockFilters() {
@@ -214,53 +252,57 @@ prepareEmptyTables() {
     this.filterStockData();
   },
 
-  // Load sales data from Firestore
-  async loadSalesData() {
-    try {
-      this.showLoading(true);
-  
-      // Check cache validity (cache expires after 5 minutes)
-      const now = new Date().getTime();
-      const cacheExpiry = 5 * 60 * 1000; // 5 minutes
-  
-      if (
-        this.cache.salesData.data &&
-        this.cache.salesData.lastFetched &&
-        now - this.cache.salesData.lastFetched < cacheExpiry
-      ) {
-        console.log("Using cached sales data");
-        this.salesData = this.cache.salesData.data;
-        this.showLoading(false);
-        return Promise.resolve();
-      }
-  
-      // Get sales data from Firestore
-      const salesRef = collection(firestore, "penjualanAksesoris");
-      const salesSnapshot = await getDocs(salesRef);
-  
-      this.salesData = [];
-      salesSnapshot.forEach((doc) => {
-        const data = doc.data();
-        // Add document ID to the data
-        this.salesData.push({
-          id: doc.id,
-          ...data,
-        });
-      });
-  
-      // Update cache
-      this.cache.salesData.data = this.salesData;
-      this.cache.salesData.lastFetched = now;
-  
+// Update the loadSalesData method to call populateSalesPersonDropdown
+async loadSalesData() {
+  try {
+    this.showLoading(true);
+
+    // Check cache validity (cache expires after 5 minutes)
+    const now = new Date().getTime();
+    const cacheExpiry = 5 * 60 * 1000; // 5 minutes
+
+    if (
+      this.cache.salesData.data &&
+      this.cache.salesData.lastFetched &&
+      now - this.cache.salesData.lastFetched < cacheExpiry
+    ) {
+      console.log("Using cached sales data");
+      this.salesData = this.cache.salesData.data;
+      this.populateSalesPersonDropdown(); // Add this line
       this.showLoading(false);
       return Promise.resolve();
-    } catch (error) {
-      console.error("Error loading sales data:", error);
-      this.showError("Error loading sales data: " + error.message);
-      this.showLoading(false);
-      return Promise.reject(error);
     }
-  },
+
+    // Get sales data from Firestore
+    const salesRef = collection(firestore, "penjualanAksesoris");
+    const salesSnapshot = await getDocs(salesRef);
+
+    this.salesData = [];
+    salesSnapshot.forEach((doc) => {
+      const data = doc.data();
+      // Add document ID to the data
+      this.salesData.push({
+        id: doc.id,
+        ...data,
+      });
+    });
+
+    // Update cache
+    this.cache.salesData.data = this.salesData;
+    this.cache.salesData.lastFetched = now;
+
+    // Populate sales person dropdown
+    this.populateSalesPersonDropdown(); // Add this line
+    
+    this.showLoading(false);
+    return Promise.resolve();
+  } catch (error) {
+    console.error("Error loading sales data:", error);
+    this.showError("Error loading sales data: " + error.message);
+    this.showLoading(false);
+    return Promise.reject(error);
+  }
+},
 
   // Load stock data from Firestore
   async loadStockData() {
@@ -367,47 +409,60 @@ prepareEmptyTables() {
     }
   },
 
-  // Filter sales data based on date range and search text (lanjutan)
-  filterSalesData() {
-    if (!this.salesData.length) return;
-  
-    this.showLoading(true);
-  
-    // Get filter values
-    const startDateStr = document.querySelector("#sales-tab-pane #startDate").value;
-    const endDateStr = document.querySelector("#sales-tab-pane #endDate").value;
-  
-    // Parse dates
-    const startDate = parseDate(startDateStr);
-    const endDate = parseDate(endDateStr);
-    if (endDate) {
-      // Add one day to end date to include the end date in the range
-      endDate.setDate(endDate.getDate() + 1);
+  // Modify the filterSalesData method to properly apply the sales type filter
+filterSalesData() {
+  if (!this.salesData.length) return;
+
+  this.showLoading(true);
+
+  // Get filter values
+  const startDateStr = document.querySelector("#sales-tab-pane #startDate").value;
+  const endDateStr = document.querySelector("#sales-tab-pane #endDate").value;
+  const salesType = document.querySelector("#sales-tab-pane #salesType").value;
+  const salesPerson = document.querySelector("#sales-tab-pane #salesPerson").value;
+
+  // Parse dates
+  const startDate = parseDate(startDateStr);
+  const endDate = parseDate(endDateStr);
+  if (endDate) {
+    // Add one day to end date to include the end date in the range
+    endDate.setDate(endDate.getDate() + 1);
+  }
+
+  // Filter data
+  this.filteredSalesData = this.salesData.filter((item) => {
+    // Parse transaction date
+    const transactionDate = item.timestamp ? item.timestamp.toDate() : parseDate(item.tanggal);
+
+    // Check if date is within range
+    const dateInRange = (!startDate || transactionDate >= startDate) && (!endDate || transactionDate < endDate);
+
+    // Check if sales type matches
+    let typeMatches = true;
+    if (salesType !== 'all') {
+      typeMatches = item.jenisPenjualan === salesType;
     }
-  
-    // Filter data
-    this.filteredSalesData = this.salesData.filter((item) => {
-      // Parse transaction date
-      const transactionDate = item.timestamp ? item.timestamp.toDate() : parseDate(item.tanggal);
-  
-      // Check if date is within range
-      const dateInRange = (!startDate || transactionDate >= startDate) && (!endDate || transactionDate < endDate);
-  
-      // Hapus referensi ke matchesSearch dan langsung return dateInRange
-      return dateInRange;
-    });
-  
-    // Sort by date (newest first)
-    this.filteredSalesData.sort((a, b) => {
-      const dateA = a.timestamp ? a.timestamp.toDate() : parseDate(a.tanggal);
-      const dateB = b.timestamp ? b.timestamp.toDate() : parseDate(b.tanggal);
-      return dateB - dateA;
-    });
-  
-    // Render the table
-    this.renderSalesTable();
-    this.showLoading(false);
-  },
+
+    // Check if sales person matches
+    let salesMatches = true;
+    if (salesPerson !== 'all') {
+      salesMatches = item.sales === salesPerson;
+    }
+
+    return dateInRange && typeMatches && salesMatches;
+  });
+
+  // Sort by date (newest first)
+  this.filteredSalesData.sort((a, b) => {
+    const dateA = a.timestamp ? a.timestamp.toDate() : parseDate(a.tanggal);
+    const dateB = b.timestamp ? b.timestamp.toDate() : parseDate(b.tanggal);
+    return dateB - dateA;
+  });
+
+  // Render the table
+  this.renderSalesTable();
+  this.showLoading(false);
+},
 
   async filterStockData() {
     if (!this.stockData.length) return;
@@ -803,7 +858,6 @@ prepareEmptyTables() {
     }
   },
 
-  // Render the sales table
   // Render the sales table
 renderSalesTable() {
   try {
