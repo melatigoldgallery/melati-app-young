@@ -43,6 +43,8 @@ const laporanAksesorisHandler = {
   stockData: [],
   filteredSalesData: [],
   filteredStockData: [],
+  isSummaryMode: false,
+  summaryData: [],
 
   // Cache properties
   cache: {
@@ -61,37 +63,37 @@ const laporanAksesorisHandler = {
     this.initDatePickers();
     this.attachEventListeners();
     this.setDefaultDates();
-  
+
     // Initialize DataTables
     this.initDataTables();
-  
+
     // Tidak lagi memanggil loadSalesData() dan loadStockData() secara otomatis
     // Hanya menyiapkan tabel kosong
     this.prepareEmptyTables();
   },
 
   // Tambahkan fungsi untuk menyiapkan tabel kosong
-prepareEmptyTables() {
-  // Tampilkan pesan di tabel penjualan
-  const salesTableBody = document.querySelector("#penjualanTable tbody");
-  if (salesTableBody) {
-    salesTableBody.innerHTML = `
+  prepareEmptyTables() {
+    // Tampilkan pesan di tabel penjualan
+    const salesTableBody = document.querySelector("#penjualanTable tbody");
+    if (salesTableBody) {
+      salesTableBody.innerHTML = `
       <tr>
         <td colspan="9" class="text-center">Silakan pilih filter dan klik tombol "Tampilkan" untuk melihat data</td>
       </tr>
     `;
-  }
+    }
 
-   // Tampilkan pesan di tabel stok
-   const stockTableBody = document.querySelector("#stockTable tbody");
-   if (stockTableBody) {
-     stockTableBody.innerHTML = `
+    // Tampilkan pesan di tabel stok
+    const stockTableBody = document.querySelector("#stockTable tbody");
+    if (stockTableBody) {
+      stockTableBody.innerHTML = `
        <tr>
          <td colspan="9" class="text-center">Silakan pilih filter dan klik tombol "Tampilkan" untuk melihat data</td>
        </tr>
      `;
-   }
- },
+    }
+  },
 
   // Initialize date pickers
   initDatePickers() {
@@ -159,87 +161,157 @@ prepareEmptyTables() {
     });
   },
 
-// Update the attachEventListeners method to handle the reset filter button
-attachEventListeners() {
-  // Filter Sales button
-  const filterSalesBtn = document.getElementById("filterSalesBtn");
-  if (filterSalesBtn) {
-    filterSalesBtn.addEventListener("click", () => {
-      this.loadSalesData().then(() => {
-        this.filterSalesData();
+  // Update the attachEventListeners method to handle the reset filter button
+  attachEventListeners() {
+    // Filter Sales button
+    const filterSalesBtn = document.getElementById("filterSalesBtn");
+    if (filterSalesBtn) {
+      filterSalesBtn.addEventListener("click", () => {
+        this.loadSalesData().then(() => {
+          this.filterSalesData();
+        });
       });
-    });
-  }
-
-  // Reset Filter button
-  const resetFilterBtn = document.getElementById("resetFilterBtn");
-  if (resetFilterBtn) {
-    resetFilterBtn.addEventListener("click", () => {
-      this.resetSalesFilters();
-    });
-  }
-
-  // Filter Stock button
-  const filterStockBtn = document.getElementById("filterStockBtn");
-  if (filterStockBtn) {
-    filterStockBtn.addEventListener("click", () => {
-      this.loadStockData().then(() => {
-        this.filterStockData();
-      });
-    });
-  }
-
-  // Tab change event to refresh tables
-  $('a[data-bs-toggle="tab"]').on("shown.bs.tab", (e) => {
-    const targetId = $(e.target).attr("id");
-    if (targetId === "sales-tab") {
-      this.refreshSalesTable();
-    } else if (targetId === "stock-tab") {
-      this.refreshStockTable();
     }
-  });
-},
 
-// Add this method to populate the sales person dropdown
-populateSalesPersonDropdown() {
-  // Get unique sales persons from the data
-  const salesPersons = [...new Set(this.salesData.map(item => item.sales).filter(Boolean))];
-  
-  // Get the dropdown element
-  const dropdown = document.querySelector("#sales-tab-pane #salesPerson");
-  if (!dropdown) return;
-  
-  // Clear existing options except the first one (All Sales)
-  while (dropdown.options.length > 1) {
-    dropdown.remove(1);
-  }
-  
-  // Add options for each sales person
-  salesPersons.forEach(person => {
-    const option = document.createElement("option");
-    option.value = person;
-    option.textContent = person;
-    dropdown.appendChild(option);
-  });
-},
+    // Reset Filter button
+    const resetFilterBtn = document.getElementById("resetFilterBtn");
+    if (resetFilterBtn) {
+      resetFilterBtn.addEventListener("click", () => {
+        this.resetSalesFilters();
+      });
+    }
 
-// Update the resetSalesFilters method
-resetSalesFilters() {
-  const today = new Date();
-  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    // Toggle Summary button
+    const toggleSummaryBtn = document.getElementById("toggleSummaryBtn");
+    if (toggleSummaryBtn) {
+      toggleSummaryBtn.addEventListener("click", () => {
+        this.toggleSummaryView();
+      });
+    }
+    // Filter Stock button
+    const filterStockBtn = document.getElementById("filterStockBtn");
+    if (filterStockBtn) {
+      filterStockBtn.addEventListener("click", () => {
+        this.loadStockData().then(() => {
+          this.filterStockData();
+        });
+      });
+    }
 
-  document.querySelector("#sales-tab-pane #startDate").value = formatDate(firstDay);
-  document.querySelector("#sales-tab-pane #endDate").value = formatDate(today);
-  
-  // Reset select dropdowns
-  document.querySelector("#sales-tab-pane #salesType").value = "all";
-  document.querySelector("#sales-tab-pane #salesPerson").value = "all";
+    // Tab change event to refresh tables
+    $('a[data-bs-toggle="tab"]').on("shown.bs.tab", (e) => {
+      const targetId = $(e.target).attr("id");
+      if (targetId === "sales-tab") {
+        this.refreshSalesTable();
+      } else if (targetId === "stock-tab") {
+        this.refreshStockTable();
+      }
+    });
+  },
 
-  // Reload and filter data
-  this.loadSalesData().then(() => {
-    this.filterSalesData();
-  });
-},
+  // Add this new method to toggle between detailed and summary views
+  toggleSummaryView() {
+    this.isSummaryMode = !this.isSummaryMode;
+
+    // Update button text
+    const toggleSummaryBtn = document.getElementById("toggleSummaryBtn");
+    if (toggleSummaryBtn) {
+      toggleSummaryBtn.innerHTML = this.isSummaryMode
+        ? '<i class="fas fa-list me-1"></i> Detail Penjualan'
+        : '<i class="fas fa-chart-pie me-1"></i> Summary Penjualan';
+    }
+
+    // If in summary mode, generate summary data
+    if (this.isSummaryMode) {
+      this.generateSalesSummary();
+    }
+
+    // Render the appropriate view
+    this.renderSalesTable();
+  },
+
+  // Add this method to generate summary data
+  generateSalesSummary() {
+    // Create a map to store summary data by product code
+    const summaryMap = new Map();
+
+    // Process each transaction
+    this.filteredSalesData.forEach((transaction) => {
+      // Process each item in the transaction
+      if (transaction.items && transaction.items.length > 0) {
+        transaction.items.forEach((item) => {
+          const kode = item.kodeText || "Tidak Ada Kode";
+          const nama = item.nama || "Tidak Ada Nama";
+          const jumlah = parseInt(item.jumlah || 1);
+          const totalHarga = parseInt(item.totalHarga || 0);
+
+          // Create a unique key for the product
+          const key = `${kode}|${nama}`;
+
+          // Update summary data
+          if (summaryMap.has(key)) {
+            const existing = summaryMap.get(key);
+            existing.jumlah += jumlah;
+            existing.totalHarga += totalHarga;
+          } else {
+            summaryMap.set(key, {
+              kode,
+              nama,
+              jumlah,
+              totalHarga,
+            });
+          }
+        });
+      }
+    });
+
+    // Convert map to array
+    this.summaryData = Array.from(summaryMap.values());
+
+    // Sort by total price (highest first)
+    this.summaryData.sort((a, b) => b.totalHarga - a.totalHarga);
+  },
+
+  // Add this method to populate the sales person dropdown
+  populateSalesPersonDropdown() {
+    // Get unique sales persons from the data
+    const salesPersons = [...new Set(this.salesData.map((item) => item.sales).filter(Boolean))];
+
+    // Get the dropdown element
+    const dropdown = document.querySelector("#sales-tab-pane #salesPerson");
+    if (!dropdown) return;
+
+    // Clear existing options except the first one (All Sales)
+    while (dropdown.options.length > 1) {
+      dropdown.remove(1);
+    }
+
+    // Add options for each sales person
+    salesPersons.forEach((person) => {
+      const option = document.createElement("option");
+      option.value = person;
+      option.textContent = person;
+      dropdown.appendChild(option);
+    });
+  },
+
+  // Update the resetSalesFilters method
+  resetSalesFilters() {
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    document.querySelector("#sales-tab-pane #startDate").value = formatDate(firstDay);
+    document.querySelector("#sales-tab-pane #endDate").value = formatDate(today);
+
+    // Reset select dropdowns
+    document.querySelector("#sales-tab-pane #salesType").value = "all";
+    document.querySelector("#sales-tab-pane #salesPerson").value = "all";
+
+    // Reload and filter data
+    this.loadSalesData().then(() => {
+      this.filterSalesData();
+    });
+  },
 
   // Reset stock filters
   resetStockFilters() {
@@ -252,68 +324,68 @@ resetSalesFilters() {
     this.filterStockData();
   },
 
-// Update the loadSalesData method to call populateSalesPersonDropdown
-async loadSalesData() {
-  try {
-    this.showLoading(true);
+  // Update the loadSalesData method to call populateSalesPersonDropdown
+  async loadSalesData() {
+    try {
+      this.showLoading(true);
 
-    // Check cache validity (cache expires after 5 minutes)
-    const now = new Date().getTime();
-    const cacheExpiry = 5 * 60 * 1000; // 5 minutes
+      // Check cache validity (cache expires after 5 minutes)
+      const now = new Date().getTime();
+      const cacheExpiry = 5 * 60 * 1000; // 5 minutes
 
-    if (
-      this.cache.salesData.data &&
-      this.cache.salesData.lastFetched &&
-      now - this.cache.salesData.lastFetched < cacheExpiry
-    ) {
-      console.log("Using cached sales data");
-      this.salesData = this.cache.salesData.data;
+      if (
+        this.cache.salesData.data &&
+        this.cache.salesData.lastFetched &&
+        now - this.cache.salesData.lastFetched < cacheExpiry
+      ) {
+        console.log("Using cached sales data");
+        this.salesData = this.cache.salesData.data;
+        this.populateSalesPersonDropdown(); // Add this line
+        this.showLoading(false);
+        return Promise.resolve();
+      }
+
+      // Get sales data from Firestore
+      const salesRef = collection(firestore, "penjualanAksesoris");
+      const salesSnapshot = await getDocs(salesRef);
+
+      this.salesData = [];
+      salesSnapshot.forEach((doc) => {
+        const data = doc.data();
+        // Add document ID to the data
+        this.salesData.push({
+          id: doc.id,
+          ...data,
+        });
+      });
+
+      // Update cache
+      this.cache.salesData.data = this.salesData;
+      this.cache.salesData.lastFetched = now;
+
+      // Populate sales person dropdown
       this.populateSalesPersonDropdown(); // Add this line
+
       this.showLoading(false);
       return Promise.resolve();
+    } catch (error) {
+      console.error("Error loading sales data:", error);
+      this.showError("Error loading sales data: " + error.message);
+      this.showLoading(false);
+      return Promise.reject(error);
     }
-
-    // Get sales data from Firestore
-    const salesRef = collection(firestore, "penjualanAksesoris");
-    const salesSnapshot = await getDocs(salesRef);
-
-    this.salesData = [];
-    salesSnapshot.forEach((doc) => {
-      const data = doc.data();
-      // Add document ID to the data
-      this.salesData.push({
-        id: doc.id,
-        ...data,
-      });
-    });
-
-    // Update cache
-    this.cache.salesData.data = this.salesData;
-    this.cache.salesData.lastFetched = now;
-
-    // Populate sales person dropdown
-    this.populateSalesPersonDropdown(); // Add this line
-    
-    this.showLoading(false);
-    return Promise.resolve();
-  } catch (error) {
-    console.error("Error loading sales data:", error);
-    this.showError("Error loading sales data: " + error.message);
-    this.showLoading(false);
-    return Promise.reject(error);
-  }
-},
+  },
 
   // Load stock data from Firestore
   async loadStockData() {
     try {
       this.showLoading(true);
-  
+
       // Selalu ambil data stok terbaru dari Firestore
       // Get stock data from Firestore
       const stockRef = collection(firestore, "stokAksesoris");
       const stockSnapshot = await getDocs(stockRef);
-  
+
       this.stockData = [];
       stockSnapshot.forEach((doc) => {
         const data = doc.data();
@@ -323,14 +395,14 @@ async loadSalesData() {
           ...data,
         });
       });
-  
+
       // Get all kode aksesoris from kodeAksesoris collection
       await this.loadAllKodeAksesoris();
-  
+
       // Update cache
       this.cache.stockData.data = this.stockData;
       this.cache.stockData.lastFetched = new Date().getTime();
-  
+
       this.showLoading(false);
       return Promise.resolve();
     } catch (error) {
@@ -410,77 +482,77 @@ async loadSalesData() {
   },
 
   // Modify the filterSalesData method to properly apply the sales type filter
-filterSalesData() {
-  if (!this.salesData.length) return;
+  filterSalesData() {
+    if (!this.salesData.length) return;
 
-  this.showLoading(true);
+    this.showLoading(true);
 
-  // Get filter values
-  const startDateStr = document.querySelector("#sales-tab-pane #startDate").value;
-  const endDateStr = document.querySelector("#sales-tab-pane #endDate").value;
-  const salesType = document.querySelector("#sales-tab-pane #salesType").value;
-  const salesPerson = document.querySelector("#sales-tab-pane #salesPerson").value;
+    // Get filter values
+    const startDateStr = document.querySelector("#sales-tab-pane #startDate").value;
+    const endDateStr = document.querySelector("#sales-tab-pane #endDate").value;
+    const salesType = document.querySelector("#sales-tab-pane #salesType").value;
+    const salesPerson = document.querySelector("#sales-tab-pane #salesPerson").value;
 
-  // Parse dates
-  const startDate = parseDate(startDateStr);
-  const endDate = parseDate(endDateStr);
-  if (endDate) {
-    // Add one day to end date to include the end date in the range
-    endDate.setDate(endDate.getDate() + 1);
-  }
-
-  // Filter data
-  this.filteredSalesData = this.salesData.filter((item) => {
-    // Parse transaction date
-    const transactionDate = item.timestamp ? item.timestamp.toDate() : parseDate(item.tanggal);
-
-    // Check if date is within range
-    const dateInRange = (!startDate || transactionDate >= startDate) && (!endDate || transactionDate < endDate);
-
-    // Check if sales type matches
-    let typeMatches = true;
-    if (salesType !== 'all') {
-      typeMatches = item.jenisPenjualan === salesType;
+    // Parse dates
+    const startDate = parseDate(startDateStr);
+    const endDate = parseDate(endDateStr);
+    if (endDate) {
+      // Add one day to end date to include the end date in the range
+      endDate.setDate(endDate.getDate() + 1);
     }
 
-    // Check if sales person matches
-    let salesMatches = true;
-    if (salesPerson !== 'all') {
-      salesMatches = item.sales === salesPerson;
-    }
+    // Filter data
+    this.filteredSalesData = this.salesData.filter((item) => {
+      // Parse transaction date
+      const transactionDate = item.timestamp ? item.timestamp.toDate() : parseDate(item.tanggal);
 
-    return dateInRange && typeMatches && salesMatches;
-  });
+      // Check if date is within range
+      const dateInRange = (!startDate || transactionDate >= startDate) && (!endDate || transactionDate < endDate);
 
-  // Sort by date (newest first)
-  this.filteredSalesData.sort((a, b) => {
-    const dateA = a.timestamp ? a.timestamp.toDate() : parseDate(a.tanggal);
-    const dateB = b.timestamp ? b.timestamp.toDate() : parseDate(b.tanggal);
-    return dateB - dateA;
-  });
+      // Check if sales type matches
+      let typeMatches = true;
+      if (salesType !== "all") {
+        typeMatches = item.jenisPenjualan === salesType;
+      }
 
-  // Render the table
-  this.renderSalesTable();
-  this.showLoading(false);
-},
+      // Check if sales person matches
+      let salesMatches = true;
+      if (salesPerson !== "all") {
+        salesMatches = item.sales === salesPerson;
+      }
+
+      return dateInRange && typeMatches && salesMatches;
+    });
+
+    // Sort by date (newest first)
+    this.filteredSalesData.sort((a, b) => {
+      const dateA = a.timestamp ? a.timestamp.toDate() : parseDate(a.tanggal);
+      const dateB = b.timestamp ? b.timestamp.toDate() : parseDate(b.tanggal);
+      return dateB - dateA;
+    });
+
+    // Render the table
+    this.renderSalesTable();
+    this.showLoading(false);
+  },
 
   async filterStockData() {
     if (!this.stockData.length) return;
-  
+
     this.showLoading(true);
-  
+
     try {
       // Get filter values
       const startDateStr = document.querySelector("#stock-tab-pane #startDate")?.value;
       const endDateStr = document.querySelector("#stock-tab-pane #endDate")?.value;
-  
+
       // Validasi input tanggal
       if (!startDateStr || !endDateStr) {
         this.showError("Tanggal awal dan akhir harus diisi");
         this.showLoading(false);
         return;
       }
-  
+
       // Parse dates
       const startDate = parseDate(startDateStr);
       const endDate = parseDate(endDateStr);
@@ -489,23 +561,23 @@ filterSalesData() {
         this.showLoading(false);
         return;
       }
-  
+
       // Tambahkan waktu ke tanggal akhir untuk mencakup seluruh hari
       const endDateWithTime = new Date(endDate);
       endDateWithTime.setHours(23, 59, 59, 999);
-  
+
       // Cek apakah data sudah ada di cache untuk rentang tanggal ini
       const cacheKey = `stock_${startDateStr}_${endDateStr}`;
       if (this.cache[cacheKey] && this.cache[cacheKey].data) {
         console.log(`Using cached stock data for range ${startDateStr} to ${endDateStr}`);
-        
+
         // Buat salinan data dari cache untuk menghindari masalah referensi
         try {
           this.filteredStockData = [...this.cache[cacheKey].data];
-          
+
           // Perbarui timestamp akses terakhir
           this.cache[cacheKey].lastAccessed = new Date().getTime();
-          
+
           // Render tabel dengan data dari cache
           this.renderStockTable();
           this.showLoading(false);
@@ -515,14 +587,14 @@ filterSalesData() {
           // Lanjutkan dengan mengambil data baru jika cache gagal
         }
       }
-  
+
       // Ambil data penjualan hanya sekali dan simpan dalam cache
       try {
         if (!this.cache.allSalesData) {
           // Ambil semua data penjualan (ini hanya dilakukan sekali)
           const salesRef = collection(firestore, "penjualanAksesoris");
           const salesSnapshot = await getDocs(salesRef);
-  
+
           // Proses data penjualan
           const allSalesData = [];
           salesSnapshot.forEach((doc) => {
@@ -533,7 +605,7 @@ filterSalesData() {
               ...sale,
             });
           });
-  
+
           // Simpan di cache
           this.cache.allSalesData = {
             data: allSalesData,
@@ -544,7 +616,7 @@ filterSalesData() {
         console.error("Error fetching sales data:", salesError);
         // Lanjutkan meskipun gagal mengambil data penjualan
       }
-  
+
       // Hitung stok dengan kontinuitas
       try {
         await this.calculateStockContinuity(startDate, endDateWithTime);
@@ -552,7 +624,7 @@ filterSalesData() {
         console.error("Error calculating stock continuity:", calcError);
         throw new Error("Gagal menghitung stok: " + calcError.message);
       }
-  
+
       // Simpan hasil di cache jika berhasil
       if (this.filteredStockData && this.filteredStockData.length > 0) {
         // Buat salinan data untuk disimpan di cache
@@ -562,7 +634,7 @@ filterSalesData() {
           lastAccessed: new Date().getTime(),
         };
       }
-  
+
       // Render tabel
       this.renderStockTable();
       this.showLoading(false);
@@ -570,7 +642,7 @@ filterSalesData() {
       console.error("Error dalam filterStockData:", error);
       this.showError("Error memfilter data stok: " + error.message);
       this.showLoading(false);
-      
+
       // Reset the table to a clean state
       try {
         const tableElement = document.getElementById("stockTable");
@@ -578,7 +650,7 @@ filterSalesData() {
           console.warn("Table element not found for reset");
           return;
         }
-        
+
         // Destroy existing DataTable if it exists
         try {
           if ($.fn.DataTable.isDataTable("#stockTable")) {
@@ -587,7 +659,7 @@ filterSalesData() {
         } catch (dtError) {
           console.warn("Error destroying DataTable during reset:", dtError);
         }
-        
+
         const tableBody = document.querySelector("#stockTable tbody");
         if (tableBody) {
           tableBody.innerHTML = `
@@ -596,7 +668,7 @@ filterSalesData() {
             </tr>
           `;
         }
-        
+
         // Initialize a fresh DataTable
         try {
           if (!$.fn.DataTable.isDataTable("#stockTable")) {
@@ -634,7 +706,7 @@ filterSalesData() {
     } finally {
       // Pastikan loading indicator dimatikan dalam semua kasus
       this.showLoading(false);
-      
+
       // Bersihkan cache yang sudah tidak digunakan
       setTimeout(() => this.cleanupCache(), 1000);
     }
@@ -859,151 +931,203 @@ filterSalesData() {
   },
 
   // Render the sales table
-renderSalesTable() {
-  try {
-    // Periksa apakah tabel ada di DOM
-    const tableElement = document.getElementById("penjualanTable");
-    if (!tableElement) {
-      console.error("Elemen tabel #penjualanTable tidak ditemukan di DOM");
-      return;
-    }
-
-    // Hancurkan DataTable yang ada dengan aman
+  renderSalesTable() {
     try {
-      if ($.fn.DataTable.isDataTable("#penjualanTable")) {
-        $("#penjualanTable").DataTable().destroy();
+      // Periksa apakah tabel ada di DOM
+      const tableElement = document.getElementById("penjualanTable");
+      if (!tableElement) {
+        console.error("Elemen tabel #penjualanTable tidak ditemukan di DOM");
+        return;
       }
-    } catch (error) {
-      console.warn("Error destroying DataTable:", error);
-      // Lanjutkan eksekusi meskipun destroy gagal
-    }
 
-    // Get table body
-    const tableBody = document.querySelector("#penjualanTable tbody");
-    if (!tableBody) {
-      console.error("Elemen tbody dari #penjualanTable tidak ditemukan");
-      return;
-    }
+      // Hancurkan DataTable yang ada dengan aman
+      try {
+        if ($.fn.DataTable.isDataTable("#penjualanTable")) {
+          $("#penjualanTable").DataTable().destroy();
+        }
+      } catch (error) {
+        console.warn("Error destroying DataTable:", error);
+        // Lanjutkan eksekusi meskipun destroy gagal
+      }
 
-    // Clear table body
-    tableBody.innerHTML = "";
+      // Get table body
+      const tableBody = document.querySelector("#penjualanTable tbody");
+      if (!tableBody) {
+        console.error("Elemen tbody dari #penjualanTable tidak ditemukan");
+        return;
+      }
 
-    // Check if there's data to display
-    if (this.filteredSalesData.length === 0) {
-      tableBody.innerHTML = `
+      // Clear table body
+      tableBody.innerHTML = "";
+
+      // Check if there's data to display
+      if ((this.isSummaryMode && !this.summaryData.length) || (!this.isSummaryMode && !this.filteredSalesData.length)) {
+        tableBody.innerHTML = `
         <tr>
           <td colspan="9" class="text-center">Tidak ada data yang sesuai dengan filter</td>
         </tr>
       `;
-      
-      // Inisialisasi DataTable kosong
-      $("#penjualanTable").DataTable({
-        language: {
-          url: "//cdn.datatables.net/plug-ins/1.10.25/i18n/Indonesian.json"
-        },
-        dom: 'Bfrtip',
-        buttons: ['excel', 'pdf', 'print']
-      });
-      
-      return;
-    }
 
-    // Prepare data for table
-    let totalRevenue = 0;
-    let totalTransactions = 0;
-    let rows = [];
+        // Inisialisasi DataTable kosong
+        $("#penjualanTable").DataTable({
+          language: {
+            url: "//cdn.datatables.net/plug-ins/1.10.25/i18n/Indonesian.json",
+          },
+          dom: "Bfrtip",
+          buttons: ["excel", "pdf", "print"],
+        });
 
-    // Process each transaction
-    this.filteredSalesData.forEach(transaction => {
-      const date = transaction.timestamp 
-        ? formatDate(transaction.timestamp.toDate()) 
-        : transaction.tanggal;
-      
-      const sales = transaction.sales || "Admin";
-      
-      // Modifikasi tampilan jenis penjualan untuk gantiLock
-      let jenisPenjualan = transaction.jenisPenjualan || "Tidak diketahui";
-      
-      totalRevenue += transaction.totalHarga || 0;
-      totalTransactions++;
-      
-      // Process each item in the transaction
-      if (transaction.items && transaction.items.length > 0) {
-        transaction.items.forEach(item => {
-          // Untuk jenis gantiLock, tambahkan kode lock ke tampilan jenis penjualan
-          let displayJenisPenjualan = jenisPenjualan;
-          if (jenisPenjualan === "gantiLock" && item.kodeLock) {
-            displayJenisPenjualan = `gantiLock ${item.kodeLock}`;
-          }
-          
+        return;
+      }
+
+      // Prepare data for table
+      let totalRevenue = 0;
+      let totalTransactions = 0;
+
+      if (this.isSummaryMode) {
+        // Render summary view
+        // Modify table header for summary view
+        const tableHeader = document.querySelector("#penjualanTable thead tr");
+        if (tableHeader) {
+          tableHeader.innerHTML = `
+          <th>Kode Barang</th>
+          <th>Nama Barang</th>
+          <th>Total Jumlah</th>
+          <th>Total Harga</th>
+        `;
+        }
+
+        // Calculate total revenue
+        totalRevenue = this.summaryData.reduce((sum, item) => sum + item.totalHarga, 0);
+
+        // Render summary rows
+        this.summaryData.forEach((item) => {
           const row = document.createElement("tr");
           row.innerHTML = `
+          <td>${item.kode}</td>
+          <td>${item.nama}</td>
+          <td class="text-center">${item.jumlah}</td>
+          <td>Rp ${item.totalHarga.toLocaleString("id-ID")}</td>
+        `;
+          tableBody.appendChild(row);
+        });
+
+        // Set total transactions to number of unique items
+        totalTransactions = this.summaryData.length;
+      } else {
+        // Render detailed view
+        // Restore original table header
+        const tableHeader = document.querySelector("#penjualanTable thead tr");
+        if (tableHeader) {
+          tableHeader.innerHTML = `
+          <th>Tanggal</th>
+          <th>Sales</th>
+          <th style="width: 1%">Jenis</th>
+          <th>Kode Barang</th>
+          <th>Nama Barang</th>
+          <th>Jumlah</th>
+          <th>Berat</th>
+          <th>Harga</th>
+          <th>Aksi</th>
+        `;
+        }
+
+        // Process each transaction
+        this.filteredSalesData.forEach((transaction) => {
+          const date = transaction.timestamp ? formatDate(transaction.timestamp.toDate()) : transaction.tanggal;
+
+          const sales = transaction.sales || "Admin";
+
+          // Modifikasi tampilan jenis penjualan untuk gantiLock
+          let jenisPenjualan = transaction.jenisPenjualan || "Tidak diketahui";
+
+          totalRevenue += transaction.totalHarga || 0;
+          totalTransactions++;
+
+          // Process each item in the transaction
+          if (transaction.items && transaction.items.length > 0) {
+            transaction.items.forEach((item) => {
+              // Untuk jenis gantiLock, tambahkan kode lock ke tampilan jenis penjualan
+              let displayJenisPenjualan = jenisPenjualan;
+              if (jenisPenjualan === "gantiLock" && item.kodeLock) {
+                displayJenisPenjualan = `gantiLock ${item.kodeLock}`;
+              }
+
+              const row = document.createElement("tr");
+              row.innerHTML = `
+              <td>${date}</td>
+              <td>${sales}</td>
+              <td>${displayJenisPenjualan}</td>
+              <td>${item.kodeText || "-"}</td>
+              <td>${item.nama || "-"}</td>
+              <td>${item.jumlah || 1}</td>
+              <td>${item.berat ? item.berat + " gr" : "-"}</td>
+              <td>Rp ${parseInt(item.totalHarga || 0).toLocaleString("id-ID")}</td>
+              <td>
+                <button class="btn btn-sm btn-info btn-detail" data-id="${transaction.id}">
+                  <i class="fas fa-eye"></i>
+                </button>
+              </td>
+            `;
+              tableBody.appendChild(row);
+            });
+          } else {
+            // Fallback if no items
+            const row = document.createElement("tr");
+            row.innerHTML = `
             <td>${date}</td>
             <td>${sales}</td>
-            <td>${displayJenisPenjualan}</td>
-            <td>${item.kodeText || "-"}</td>
-            <td>${item.nama || "-"}</td>
-            <td>${item.jumlah || 1}</td>
-            <td>${item.berat ? item.berat + " gr" : "-"}</td>
-            <td>Rp ${parseInt(item.totalHarga || 0).toLocaleString("id-ID")}</td>
+            <td>${jenisPenjualan}</td>
+            <td colspan="4" class="text-center">Tidak ada detail item</td>
+            <td>Rp ${parseInt(transaction.totalHarga || 0).toLocaleString("id-ID")}</td>
             <td>
               <button class="btn btn-sm btn-info btn-detail" data-id="${transaction.id}">
                 <i class="fas fa-eye"></i>
               </button>
             </td>
           `;
-          tableBody.appendChild(row);
+            tableBody.appendChild(row);
+          }
         });
-      } else {
-        // Fallback if no items
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${date}</td>
-          <td>${sales}</td>
-          <td>${jenisPenjualan}</td>
-          <td colspan="4" class="text-center">Tidak ada detail item</td>
-          <td>Rp ${parseInt(transaction.totalHarga || 0).toLocaleString("id-ID")}</td>
-          <td>
-            <button class="btn btn-sm btn-info btn-detail" data-id="${transaction.id}">
-              <i class="fas fa-eye"></i>
-            </button>
-          </td>
-        `;
-        tableBody.appendChild(row);
       }
-    });
 
-    // Update summary
-    document.getElementById("totalTransactions").textContent = `Total Transaksi: ${totalTransactions}`;
-    document.getElementById("totalRevenue").textContent = `Total Pendapatan: Rp ${parseInt(totalRevenue).toLocaleString("id-ID")}`;
+      // Update summary
+      document.getElementById("totalTransactions").textContent = this.isSummaryMode
+        ? `Total Jenis Barang: ${totalTransactions}`
+        : `Total Transaksi: ${totalTransactions}`;
+      document.getElementById("totalRevenue").textContent = `Total Pendapatan: Rp ${parseInt(
+        totalRevenue
+      ).toLocaleString("id-ID")}`;
 
-    // Initialize DataTable with a delay to ensure DOM is ready
-    setTimeout(() => {
-      try {
-        $("#penjualanTable").DataTable({
-          language: {
-            url: "//cdn.datatables.net/plug-ins/1.10.25/i18n/Indonesian.json"
-          },
-          dom: 'Bfrtip',
-          buttons: ['excel', 'pdf', 'print'],
-          order: [[0, 'desc']] // Sort by date descending
+      // Initialize DataTable with a delay to ensure DOM is ready
+      setTimeout(() => {
+        try {
+          $("#penjualanTable").DataTable({
+            language: {
+              url: "//cdn.datatables.net/plug-ins/1.10.25/i18n/Indonesian.json",
+            },
+            dom: "Bfrtip",
+            buttons: ["excel", "pdf", "print"],
+            order: this.isSummaryMode ? [[3, "desc"]] : [[0, "desc"]], // Sort by total price in summary mode, date in detail mode
+          });
+        } catch (error) {
+          console.error("Error initializing DataTable:", error);
+        }
+      }, 100);
+
+      // Attach event handlers for detail buttons (only in detailed view)
+      if (!this.isSummaryMode) {
+        document.querySelectorAll(".btn-detail").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const transactionId = btn.getAttribute("data-id");
+            this.showTransactionDetails(transactionId);
+          });
         });
-      } catch (error) {
-        console.error("Error initializing DataTable:", error);
       }
-    }, 100);
-
-    // Attach event handlers for detail buttons
-    document.querySelectorAll(".btn-detail").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const transactionId = btn.getAttribute("data-id");
-        this.showTransactionDetails(transactionId);
-      });
-    });
-  } catch (error) {
-    console.error("Error rendering sales table:", error);
-  }
-},
+    } catch (error) {
+      console.error("Error rendering sales table:", error);
+    }
+  },
 
   renderStockTable() {
     try {
@@ -1013,7 +1137,7 @@ renderSalesTable() {
         console.error("Elemen tabel #stockTable tidak ditemukan di DOM");
         return;
       }
-  
+
       // Hancurkan DataTable yang ada dengan aman
       try {
         if ($.fn.DataTable.isDataTable("#stockTable")) {
@@ -1023,14 +1147,14 @@ renderSalesTable() {
         console.warn("Error destroying DataTable:", error);
         // Lanjutkan eksekusi meskipun destroy gagal
       }
-  
+
       // Get table body
       const tableBody = document.querySelector("#stockTable tbody");
       if (!tableBody) {
         console.error("Elemen tbody dari #stockTable tidak ditemukan");
         return;
       }
-  
+
       // Check if there's data to display
       if (!this.filteredStockData || this.filteredStockData.length === 0) {
         tableBody.innerHTML = `
@@ -1038,7 +1162,7 @@ renderSalesTable() {
                 <td colspan="9" class="text-center">Tidak ada data yang sesuai dengan filter</td>
             </tr>
         `;
-  
+
         // Initialize empty DataTable
         try {
           $("#stockTable").DataTable({
@@ -1052,23 +1176,23 @@ renderSalesTable() {
         }
         return;
       }
-  
+
       // Kelompokkan data berdasarkan kategori
       const kotakItems = this.filteredStockData.filter((item) => item.kategori === "kotak");
       const aksesorisItems = this.filteredStockData.filter((item) => item.kategori === "aksesoris");
       const otherItems = this.filteredStockData.filter(
         (item) => item.kategori !== "kotak" && item.kategori !== "aksesoris"
       );
-  
+
       // Buat HTML untuk tabel tanpa header kategori
       let html = "";
       let rowIndex = 1;
-  
+
       // Tambahkan semua item tanpa header kategori
       [...kotakItems, ...aksesorisItems, ...otherItems].forEach((item) => {
         const categoryClass =
           item.kategori === "kotak" ? "kotak-item" : item.kategori === "aksesoris" ? "aksesoris-item" : "other-item";
-  
+
         html += `
             <tr class="${categoryClass}">
                 <td class="text-center">${rowIndex++}</td>
@@ -1083,7 +1207,7 @@ renderSalesTable() {
             </tr>
         `;
       });
-  
+
       // Pastikan HTML tidak kosong sebelum menetapkannya ke tableBody
       if (html.trim() === "") {
         tableBody.innerHTML = `
@@ -1094,18 +1218,18 @@ renderSalesTable() {
       } else {
         tableBody.innerHTML = html;
       }
-  
+
       // Get current date for title
       const today = new Date();
       const formattedDate = formatDate(today);
-  
+
       // Add CSS for text wrapping and equal column widths
       try {
         const existingStyle = document.getElementById("stockTableStyle");
         if (existingStyle) {
           existingStyle.remove();
         }
-        
+
         const styleElement = document.createElement("style");
         styleElement.id = "stockTableStyle";
         styleElement.textContent = `
@@ -1143,7 +1267,7 @@ renderSalesTable() {
       } catch (styleError) {
         console.warn("Error adding style element:", styleError);
       }
-  
+
       // Inisialisasi DataTable dengan tombol export
       try {
         const dataTable = $("#stockTable").DataTable({
@@ -1182,7 +1306,17 @@ renderSalesTable() {
                 doc.defaultStyle.fontSize = 8;
                 doc.styles.tableHeader.fontSize = 9;
                 // Set column widths for PDF
-                doc.content[1].table.widths = ["5%", "10%", "35%", "8.33%", "8.33%", "8.33%", "8.33%", "8.33%", "8.33%"];
+                doc.content[1].table.widths = [
+                  "5%",
+                  "10%",
+                  "35%",
+                  "8.33%",
+                  "8.33%",
+                  "8.33%",
+                  "8.33%",
+                  "8.33%",
+                  "8.33%",
+                ];
                 // Enable text wrapping
                 doc.styles.tableHeader.alignment = "center";
                 doc.styles.tableBodyEven.alignment = "center";
@@ -1276,7 +1410,7 @@ renderSalesTable() {
             },
           },
         });
-  
+
         // Tambahkan header kategori dan catatan kontinuitas setelah DataTable diinisialisasi
         this.addCategoryHeadersAndContinuityNote(kotakItems, aksesorisItems, otherItems);
       } catch (dtError) {
@@ -1287,7 +1421,7 @@ renderSalesTable() {
     } catch (error) {
       console.error("Error dalam renderStockTable:", error);
       this.showError("Terjadi kesalahan saat menampilkan data stok: " + error.message);
-      
+
       // Pastikan tabel dalam keadaan bersih
       try {
         const tableBody = document.querySelector("#stockTable tbody");
@@ -1298,14 +1432,14 @@ renderSalesTable() {
             </tr>
           `;
         }
-        
+
         // Inisialisasi DataTable kosong jika terjadi error
         if (!$.fn.DataTable.isDataTable("#stockTable")) {
           $("#stockTable").DataTable({
             responsive: true,
             language: {
               emptyTable: "Tidak ada data yang tersedia",
-            }
+            },
           });
         }
       } catch (innerError) {
@@ -1452,7 +1586,6 @@ renderSalesTable() {
       alert(message);
     }
   },
-  
 
   // Helper method to create table row HTML
   createTableRow(item, index) {

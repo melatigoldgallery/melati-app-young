@@ -28,6 +28,90 @@
     <link rel="stylesheet" href="css/pages/absensi-modern.css" />
     <!-- Favicon sederhana -->
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
+    <style>
+      @media print {
+        body * {
+          visibility: hidden;
+        }
+        #printArea,
+        #printArea * {
+          visibility: visible;
+        }
+        #printArea {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+        }
+
+        /* Styling untuk struk kasir */
+        .receipt {
+          width: 7.2cm;
+          font-size: 10px;
+          font-family: monospace;
+          margin: 0;
+          padding: 5px;
+        }
+        .receipt h3,
+        .receipt h4 {
+          text-align: center;
+          margin: 5px 0;
+        }
+        .receipt table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        .receipt hr {
+          border-top: 1px dashed #000;
+        }
+
+        /* Styling untuk invoice customer */
+        .invoice {
+          width: 21cm;
+          font-family: Arial, sans-serif;
+          padding: 1cm;
+        }
+        .invoice table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        .invoice table,
+        .invoice th,
+        .invoice td {
+          border: 1px solid #000;
+        }
+        .invoice th,
+        .invoice td {
+          padding: 5px;
+        }
+      }
+
+      .is-invalid {
+        border-color: #dc3545;
+        padding-right: calc(1.5em + 0.75rem);
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right calc(0.375em + 0.1875rem) center;
+        background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+      }
+
+      .is-valid {
+        border-color: #198754;
+        padding-right: calc(1.5em + 0.75rem);
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right calc(0.375em + 0.1875rem) center;
+        background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+      }
+
+      .invalid-feedback {
+        display: block;
+        width: 100%;
+        margin-top: 0.25rem;
+        font-size: 0.875em;
+        color: #dc3545;
+      }
+    </style>
     <title>Penjualan - Melati Gold Shop</title>
   </head>
   <body>
@@ -203,8 +287,11 @@
                     </div>
                   </div>
                   <div class="col-md-3">
-                    <label for="sales" class="form-label">Sales</label>
-                    <input type="text" class="form-control" id="sales" placeholder="Masukkan nama sales" />
+                    <label for="sales" class="form-label">
+                      Sales
+                      <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" class="form-control" id="sales" placeholder="Masukkan nama sales" required />
                   </div>
                 </form>
               </div>
@@ -240,6 +327,7 @@
                         <th style="width: 10%">Kode</th>
                         <th style="width: 35%">Nama Barang</th>
                         <th style="width: 10%">Jumlah</th>
+                        <th style="width: 10%">Kadar</th>
                         <th style="width: 10%">Berat</th>
                         <th style="width: 15%">Harga Per Gram</th>
                         <th style="width: 15%">Total Harga</th>
@@ -293,6 +381,7 @@
                         <th style="width: 12%">Kode</th>
                         <th style="width: 25%">Nama Barang</th>
                         <th style="width: 12%">Kode Lock</th>
+                        <th style="width: 10%">Kadar</th>
                         <th style="width: 10%">Berat</th>
                         <th style="width: 15%">Harga Per Gram</th>
                         <th style="width: 15%">Total Harga</th>
@@ -319,6 +408,7 @@
                       <tr>
                         <th style="width: 15%">Kode</th>
                         <th style="width: 30%">Nama Barang</th>
+                        <th style="width: 10%">Kadar</th>
                         <th style="width: 10%">Berat</th>
                         <th style="width: 20%">Harga Per Gram</th>
                         <th style="width: 20%">Total Harga</th>
@@ -384,10 +474,6 @@
                 <button class="btn btn-primary" id="btnSimpanPenjualan">
                   <i class="fas fa-save me-2"></i>
                   Simpan Penjualan
-                </button>
-                <button class="btn btn-success" id="btnCetak">
-                  <i class="fas fa-print me-2"></i>
-                  Cetak Nota
                 </button>
                 <button class="btn btn-secondary" id="btnBatal">
                   <i class="fas fa-times me-2"></i>
@@ -518,6 +604,32 @@
         </div>
       </div>
     </div>
+    <!-- Print Modal -->
+<div class="modal fade" id="printModal" tabindex="-1" aria-labelledby="printModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="printModalLabel">Cetak Nota</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Pilih jenis nota yang akan dicetak:</p>
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-primary" id="btnPrintReceipt">
+            <i class="fas fa-receipt me-2"></i>Struk Kasir
+          </button>
+          <button type="button" class="btn btn-success" id="btnPrintInvoice">
+            <i class="fas fa-file-invoice me-2"></i>Invoice Customer
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
     <!-- Scripts -->
     <script type="module" src="js/main.js"></script>
