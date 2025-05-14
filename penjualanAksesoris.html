@@ -378,7 +378,7 @@
                   <table class="table table-hover" id="tableLockDetail">
                     <thead class="table-light">
                       <tr>
-                        <th style="width: 12%">Kode</th>
+                        <th style="width: 17%">Kode</th>
                         <th style="width: 25%">Nama Barang</th>
                         <th style="width: 12%">Kode Lock</th>
                         <th style="width: 10%">Kadar</th>
@@ -406,12 +406,13 @@
                   <table class="table table-hover" id="tableManualDetail">
                     <thead class="table-light">
                       <tr>
-                        <th style="width: 15%">Kode</th>
-                        <th style="width: 30%">Nama Barang</th>
+                        <th style="width: 13%">Kode</th>
+                        <th style="width: 20%">Nama Barang</th>
                         <th style="width: 10%">Kadar</th>
                         <th style="width: 10%">Berat</th>
-                        <th style="width: 20%">Harga Per Gram</th>
-                        <th style="width: 20%">Total Harga</th>
+                        <th style="width: 12%">Harga Per Gram</th>
+                        <th style="width: 12%">Total Harga</th>
+                        <th style="width: 17%">Keterangan</th>
                         <th style="width: 5%">Aksi</th>
                       </tr>
                     </thead>
@@ -422,7 +423,7 @@
                       <tr>
                         <th colspan="5" class="text-end">Total:</th>
                         <th id="grand-total-manual">0</th>
-                        <th></th>
+                        <th colspan="2"></th>
                       </tr>
                     </tfoot>
                   </table>
@@ -605,31 +606,32 @@
       </div>
     </div>
     <!-- Print Modal -->
-<div class="modal fade" id="printModal" tabindex="-1" aria-labelledby="printModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="printModalLabel">Cetak Nota</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p>Pilih jenis nota yang akan dicetak:</p>
-        <div class="d-grid gap-2">
-          <button type="button" class="btn btn-primary" id="btnPrintReceipt">
-            <i class="fas fa-receipt me-2"></i>Struk Kasir
-          </button>
-          <button type="button" class="btn btn-success" id="btnPrintInvoice">
-            <i class="fas fa-file-invoice me-2"></i>Invoice Customer
-          </button>
+    <div class="modal fade" id="printModal" tabindex="-1" aria-labelledby="printModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="printModalLabel">Cetak Nota</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>Pilih jenis nota yang akan dicetak:</p>
+            <div class="d-grid gap-2">
+              <button type="button" class="btn btn-primary" id="btnPrintReceipt">
+                <i class="fas fa-receipt me-2"></i>
+                Struk Kasir
+              </button>
+              <button type="button" class="btn btn-success" id="btnPrintInvoice">
+                <i class="fas fa-file-invoice me-2"></i>
+                Invoice Customer
+              </button>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+          </div>
         </div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
-      </div>
     </div>
-  </div>
-</div>
-
 
     <!-- Scripts -->
     <script type="module" src="js/main.js"></script>

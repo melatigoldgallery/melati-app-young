@@ -8,6 +8,8 @@ import {
   limit,
   doc,
   getDoc,
+  updateDoc,
+  deleteDoc,
   Timestamp,
   startAt,
   endAt,
@@ -35,6 +37,139 @@ const formatDate = (date) => {
   const year = date.getFullYear();
   return `${day}/${month}/${year}`;
 };
+
+// Tambahkan fungsi baru untuk mencetak laporan summary dengan ukuran struk kasir
+function printSummaryReceiptFormat(summaryData) {
+  // Ambil informasi tanggal filter
+  const startDateStr = document.querySelector("#sales-tab-pane #startDate").value;
+  const endDateStr = document.querySelector("#sales-tab-pane #endDate").value;
+
+  // Ambil total pendapatan
+  const totalRevenue = summaryData.reduce((sum, item) => sum + item.totalHarga, 0);
+
+  // Buat jendela baru untuk print
+  const printWindow = window.open("", "_blank");
+
+  // Buat konten HTML untuk struk
+  let receiptHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Summary Penjualan</title>
+      <style>
+        @page {
+          size: 80mm auto;  /* Lebar 8cm, tinggi menyesuaikan */
+          margin: 0;
+        }
+        body {
+          font-family: 'Courier New', monospace;
+          font-size: 10px;
+          margin: 0;
+          padding: 5mm;
+          width: 73mm;  /* 7.3cm */
+        }
+        .receipt {
+          width: 100%;
+        }
+        .receipt h3, .receipt h4 {
+          text-align: center;
+          margin: 2mm 0;
+          font-size: 12px;
+        }
+        .receipt hr {
+          border-top: 1px dashed #000;
+          margin: 2mm 0;
+        }
+        .receipt table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 2mm 0;
+        }
+        .receipt th, .receipt td {
+          text-align: left;
+          padding: 1mm;
+          font-size: 9px;
+        }
+        .receipt th {
+          border-bottom: 1px solid #000;
+        }
+        .text-center {
+          text-align: center;
+        }
+        .text-right {
+          text-align: right;
+        }
+        .date-range {
+          text-align: center;
+          margin: 2mm 0;
+          font-size: 9px;
+        }
+        .total-row {
+          font-weight: bold;
+          border-top: 1px solid #000;
+          padding-top: 1mm;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="receipt">
+        <h3>MELATI GOLD SHOP</h3>
+        <h4>SUMMARY PENJUALAN</h4>
+        <hr>
+         <div class="date-range">
+          Periode: ${startDateStr} - ${endDateStr}
+        </div>
+        <hr>
+        <table>
+          <thead>
+            <tr>
+              <th>Kode</th>
+              <th>Nama</th>
+              <th class="text-center">Jml</th>
+              <th class="text-right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+  `;
+
+  // Tambahkan data summary
+  summaryData.forEach((item) => {
+    receiptHTML += `
+            <tr>
+              <td>${item.kode}</td>
+              <td>${item.nama.length > 15 ? item.nama.substring(0, 15) + "..." : item.nama}</td>
+              <td class="text-center">${item.jumlah}</td>
+              <td class="text-right">${item.totalHarga.toLocaleString("id-ID")}</td>
+            </tr>
+    `;
+  });
+
+  // Tambahkan total
+  receiptHTML += `
+            <tr class="total-row">
+              <td colspan="2">TOTAL</td>
+              <td class="text-center">${summaryData.reduce((sum, item) => sum + item.jumlah, 0)}</td>
+              <td class="text-right">${totalRevenue.toLocaleString("id-ID")}</td>
+            </tr>
+          </tbody>
+        </table>
+        <hr>
+        <p class="text-center">Dicetak pada: ${new Date().toLocaleString("id-ID")}</p>
+      </div>
+      <script>
+        window.onload = function() {
+          window.print();
+          setTimeout(function() { window.close(); }, 500);
+        };
+      </script>
+    </body>
+    </html>
+  `;
+
+  // Tulis HTML ke jendela baru
+  printWindow.document.write(receiptHTML);
+  printWindow.document.close();
+}
 
 // Main handler object
 const laporanAksesorisHandler = {
@@ -209,6 +344,26 @@ const laporanAksesorisHandler = {
     });
   },
 
+  // Add this method to toggle between detailed and summary views
+  toggleSummaryView() {
+    this.isSummaryMode = !this.isSummaryMode;
+
+    // Update button text
+    const toggleSummaryBtn = document.getElementById("toggleSummaryBtn");
+    if (toggleSummaryBtn) {
+      toggleSummaryBtn.innerHTML = this.isSummaryMode
+        ? '<i class="fas fa-list me-1"></i> Detail Penjualan'
+        : '<i class="fas fa-chart-pie me-1"></i> Summary Penjualan';
+    }
+    // If in summary mode, generate summary data
+    if (this.isSummaryMode) {
+      this.generateSalesSummary();
+    }
+
+    // Re-render the table
+    this.renderSalesTable();
+  },
+
   // Add this new method to toggle between detailed and summary views
   toggleSummaryView() {
     this.isSummaryMode = !this.isSummaryMode;
@@ -220,56 +375,64 @@ const laporanAksesorisHandler = {
         ? '<i class="fas fa-list me-1"></i> Detail Penjualan'
         : '<i class="fas fa-chart-pie me-1"></i> Summary Penjualan';
     }
-
     // If in summary mode, generate summary data
     if (this.isSummaryMode) {
       this.generateSalesSummary();
     }
 
-    // Render the appropriate view
+    // Re-render the table
     this.renderSalesTable();
   },
 
   // Add this method to generate summary data
   generateSalesSummary() {
-    // Create a map to store summary data by product code
-    const summaryMap = new Map();
+    try {
+      // Reset summary data
+      this.summaryData = [];
 
-    // Process each transaction
-    this.filteredSalesData.forEach((transaction) => {
-      // Process each item in the transaction
-      if (transaction.items && transaction.items.length > 0) {
-        transaction.items.forEach((item) => {
-          const kode = item.kodeText || "Tidak Ada Kode";
-          const nama = item.nama || "Tidak Ada Nama";
-          const jumlah = parseInt(item.jumlah || 1);
-          const totalHarga = parseInt(item.totalHarga || 0);
+      // Create a map to store summary data
+      const summaryMap = new Map();
 
-          // Create a unique key for the product
-          const key = `${kode}|${nama}`;
+      // Process each transaction
+      this.filteredSalesData.forEach((transaction) => {
+        // Process each item in the transaction
+        if (transaction.items && transaction.items.length > 0) {
+          transaction.items.forEach((item) => {
+            const kode = item.kodeText || "-";
+            const nama = item.nama || "Tidak diketahui";
+            const jumlah = parseInt(item.jumlah || 1);
+            const totalHarga = parseInt(item.totalHarga || 0);
 
-          // Update summary data
-          if (summaryMap.has(key)) {
-            const existing = summaryMap.get(key);
-            existing.jumlah += jumlah;
-            existing.totalHarga += totalHarga;
-          } else {
-            summaryMap.set(key, {
-              kode,
-              nama,
-              jumlah,
-              totalHarga,
-            });
-          }
-        });
-      }
-    });
+            // Create a unique key for this item
+            const key = `${kode}-${nama}`;
 
-    // Convert map to array
-    this.summaryData = Array.from(summaryMap.values());
+            // Update summary map
+            if (summaryMap.has(key)) {
+              const existingItem = summaryMap.get(key);
+              existingItem.jumlah += jumlah;
+              existingItem.totalHarga += totalHarga;
+            } else {
+              summaryMap.set(key, {
+                kode,
+                nama,
+                jumlah,
+                totalHarga,
+              });
+            }
+          });
+        }
+      });
 
-    // Sort by total price (highest first)
-    this.summaryData.sort((a, b) => b.totalHarga - a.totalHarga);
+      // Convert map to array
+      this.summaryData = Array.from(summaryMap.values());
+
+      // Sort by total price (descending)
+      this.summaryData.sort((a, b) => b.totalHarga - a.totalHarga);
+
+      console.log("Summary data generated:", this.summaryData);
+    } catch (error) {
+      console.error("Error generating sales summary:", error);
+    }
   },
 
   // Add this method to populate the sales person dropdown
@@ -963,10 +1126,10 @@ const laporanAksesorisHandler = {
       // Check if there's data to display
       if ((this.isSummaryMode && !this.summaryData.length) || (!this.isSummaryMode && !this.filteredSalesData.length)) {
         tableBody.innerHTML = `
-        <tr>
-          <td colspan="9" class="text-center">Tidak ada data yang sesuai dengan filter</td>
-        </tr>
-      `;
+          <tr>
+            <td colspan="9" class="text-center">Tidak ada data yang sesuai dengan filter</td>
+          </tr>
+        `;
 
         // Inisialisasi DataTable kosong
         $("#penjualanTable").DataTable({
@@ -990,11 +1153,11 @@ const laporanAksesorisHandler = {
         const tableHeader = document.querySelector("#penjualanTable thead tr");
         if (tableHeader) {
           tableHeader.innerHTML = `
-          <th>Kode Barang</th>
-          <th>Nama Barang</th>
-          <th>Total Jumlah</th>
-          <th>Total Harga</th>
-        `;
+            <th>Kode Barang</th>
+            <th>Nama Barang</th>
+            <th>Total Jumlah</th>
+            <th>Total Harga</th>
+          `;
         }
 
         // Calculate total revenue
@@ -1004,32 +1167,53 @@ const laporanAksesorisHandler = {
         this.summaryData.forEach((item) => {
           const row = document.createElement("tr");
           row.innerHTML = `
-          <td>${item.kode}</td>
-          <td>${item.nama}</td>
-          <td class="text-center">${item.jumlah}</td>
-          <td>Rp ${item.totalHarga.toLocaleString("id-ID")}</td>
-        `;
+            <td>${item.kode}</td>
+            <td>${item.nama}</td>
+            <td class="text-center">${item.jumlah}</td>
+            <td>Rp ${item.totalHarga.toLocaleString("id-ID")}</td>
+          `;
           tableBody.appendChild(row);
         });
 
         // Set total transactions to number of unique items
         totalTransactions = this.summaryData.length;
+
+        // Tambahkan tombol print struk di samping tombol summary
+        const salesSummary = document.querySelector(".sales-summary");
+        if (salesSummary) {
+          // Periksa apakah tombol sudah ada
+          if (!document.getElementById("printReceiptBtn")) {
+            const printReceiptBtn = document.createElement("button");
+            printReceiptBtn.id = "printReceiptBtn";
+            printReceiptBtn.className = "btn btn-sm btn-warning me-2";
+            printReceiptBtn.innerHTML = '<i class="fas fa-print me-1"></i> Print Struk';
+
+            // Gunakan fungsi global printSummaryReceiptFormat
+            printReceiptBtn.addEventListener("click", () => {
+              // Panggil fungsi print dengan mengakses handler
+              printSummaryReceiptFormat(this.summaryData);
+            });
+
+            // Tambahkan tombol setelah tombol summary
+            salesSummary.insertBefore(printReceiptBtn, document.getElementById("totalTransactions"));
+          }
+        }
       } else {
         // Render detailed view
         // Restore original table header
         const tableHeader = document.querySelector("#penjualanTable thead tr");
         if (tableHeader) {
           tableHeader.innerHTML = `
-          <th>Tanggal</th>
-          <th>Sales</th>
-          <th style="width: 1%">Jenis</th>
-          <th>Kode Barang</th>
-          <th>Nama Barang</th>
-          <th>Jumlah</th>
-          <th>Berat</th>
-          <th>Harga</th>
-          <th>Aksi</th>
-        `;
+            <th>Tanggal</th>
+            <th>Sales</th>
+            <th style="width: 1%">Jenis</th>
+            <th>Kode Barang</th>
+            <th>Nama Barang</th>
+            <th>Jumlah</th>
+            <th>Berat</th>
+            <th>Harga</th>
+            <th>Aksi</th>
+          `;
         }
 
         // Process each transaction
@@ -1064,9 +1248,26 @@ const laporanAksesorisHandler = {
               <td>${item.berat ? item.berat + " gr" : "-"}</td>
               <td>Rp ${parseInt(item.totalHarga || 0).toLocaleString("id-ID")}</td>
               <td>
-                <button class="btn btn-sm btn-info btn-detail" data-id="${transaction.id}">
-                  <i class="fas fa-eye"></i>
-                </button>
+                <div class="dropdown">
+                  <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-cog"></i>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li><button class="dropdown-item btn-detail" data-id="${
+                      transaction.id
+                    }"><i class="fas fa-eye me-2"></i>Detail</button></li>
+                    <li><button class="dropdown-item btn-reprint" data-id="${
+                      transaction.id
+                    }"><i class="fas fa-print me-2"></i>Cetak Ulang</button></li>
+                    <li><button class="dropdown-item btn-edit" data-id="${
+                      transaction.id
+                    }"><i class="fas fa-edit me-2"></i>Edit</button></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><button class="dropdown-item btn-delete text-danger" data-id="${
+                      transaction.id
+                    }"><i class="fas fa-trash-alt me-2"></i>Hapus</button></li>
+                  </ul>
+                </div>
               </td>
             `;
               tableBody.appendChild(row);
@@ -1075,20 +1276,26 @@ const laporanAksesorisHandler = {
             // Fallback if no items
             const row = document.createElement("tr");
             row.innerHTML = `
-            <td>${date}</td>
-            <td>${sales}</td>
-            <td>${jenisPenjualan}</td>
-            <td colspan="4" class="text-center">Tidak ada detail item</td>
-            <td>Rp ${parseInt(transaction.totalHarga || 0).toLocaleString("id-ID")}</td>
-            <td>
-              <button class="btn btn-sm btn-info btn-detail" data-id="${transaction.id}">
-                <i class="fas fa-eye"></i>
-              </button>
-            </td>
-          `;
+              <td>${date}</td>
+              <td>${sales}</td>
+              <td>${jenisPenjualan}</td>
+              <td colspan="4" class="text-center">Tidak ada detail item</td>
+              <td>Rp ${parseInt(transaction.totalHarga || 0).toLocaleString("id-ID")}</td>
+              <td>
+                <button class="btn btn-sm btn-info btn-detail" data-id="${transaction.id}">
+                  <i class="fas fa-eye"></i>
+                </button>
+              </td>
+            `;
             tableBody.appendChild(row);
           }
         });
+
+        // Hapus tombol print struk jika ada
+        const printReceiptBtn = document.getElementById("printReceiptBtn");
+        if (printReceiptBtn) {
+          printReceiptBtn.remove();
+        }
       }
 
       // Update summary
@@ -1117,10 +1324,35 @@ const laporanAksesorisHandler = {
 
       // Attach event handlers for detail buttons (only in detailed view)
       if (!this.isSummaryMode) {
+        // Detail button handler
         document.querySelectorAll(".btn-detail").forEach((btn) => {
           btn.addEventListener("click", () => {
             const transactionId = btn.getAttribute("data-id");
             this.showTransactionDetails(transactionId);
+          });
+        });
+      
+        // Reprint button handler
+        document.querySelectorAll(".btn-reprint").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const transactionId = btn.getAttribute("data-id");
+            this.reprintInvoice(transactionId);
+          });
+        });
+      
+        // Edit button handler
+        document.querySelectorAll(".btn-edit").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const transactionId = btn.getAttribute("data-id");
+            this.showEditForm(transactionId);
+          });
+        });
+      
+        // Delete button handler
+        document.querySelectorAll(".btn-delete").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const transactionId = btn.getAttribute("data-id");
+            this.confirmDelete(transactionId);
           });
         });
       }
@@ -1128,6 +1360,529 @@ const laporanAksesorisHandler = {
       console.error("Error rendering sales table:", error);
     }
   },
+
+  // Show transaction details (existing method, but let's add it for reference)
+async showTransactionDetails(transactionId) {
+  try {
+    this.showLoading(true);
+    
+    // Get transaction data from Firestore
+    const transactionDoc = await getDoc(doc(firestore, "penjualanAksesoris", transactionId));
+    
+    if (!transactionDoc.exists()) {
+      throw new Error("Transaksi tidak ditemukan");
+    }
+    
+    const transaction = transactionDoc.data();
+    
+    // Format the transaction date
+    const date = transaction.timestamp ? 
+      formatDate(transaction.timestamp.toDate()) : 
+      transaction.tanggal;
+    
+    // Create HTML for modal
+    let detailHTML = `
+      <div class="transaction-details">
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <p><strong>Tanggal:</strong> ${date}</p>
+            <p><strong>Sales:</strong> ${transaction.sales || "Admin"}</p>
+          </div>
+          <div class="col-md-6">
+            <p><strong>Jenis Penjualan:</strong> ${transaction.jenisPenjualan || "Tidak diketahui"}</p>
+            <p><strong>Total Harga:</strong> Rp ${parseInt(transaction.totalHarga || 0).toLocaleString("id-ID")}</p>
+          </div>
+        </div>
+        
+        <h5 class="mb-3">Detail Item</h5>
+        <div class="table-responsive">
+          <table class="table table-bordered">
+            <thead>
+              <tr>
+                <th>Kode</th>
+                <th>Nama</th>
+                <th>Jumlah</th>
+                <th>Berat</th>
+                <th>Harga</th>
+              </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    // Add items to the detail
+    if (transaction.items && transaction.items.length > 0) {
+      transaction.items.forEach(item => {
+        detailHTML += `
+          <tr>
+            <td>${item.kodeText || "-"}</td>
+            <td>${item.nama || "-"}</td>
+            <td>${item.jumlah || 1}</td>
+            <td>${item.berat ? item.berat + " gr" : "-"}</td>
+            <td>Rp ${parseInt(item.totalHarga || 0).toLocaleString("id-ID")}</td>
+          </tr>
+        `;
+      });
+    } else {
+      detailHTML += `
+        <tr>
+          <td colspan="5" class="text-center">Tidak ada detail item</td>
+        </tr>
+      `;
+    }
+    
+    detailHTML += `
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    
+    // Set modal content
+    document.querySelector("#detailModal .modal-body").innerHTML = detailHTML;
+    
+    // Show modal
+    const detailModal = new bootstrap.Modal(document.getElementById("detailModal"));
+    detailModal.show();
+    
+    this.showLoading(false);
+  } catch (error) {
+    console.error("Error showing transaction details:", error);
+    this.showError("Error menampilkan detail transaksi: " + error.message);
+    this.showLoading(false);
+  }
+},
+
+// Reprint invoice
+async reprintInvoice(transactionId) {
+  try {
+    this.showLoading(true);
+    
+    // Get transaction data from Firestore
+    const transactionDoc = await getDoc(doc(firestore, "penjualanAksesoris", transactionId));
+    
+    if (!transactionDoc.exists()) {
+      throw new Error("Transaksi tidak ditemukan");
+    }
+    
+    const transaction = transactionDoc.data();
+    
+    // Format the transaction date
+    const date = transaction.timestamp ? 
+      formatDate(transaction.timestamp.toDate()) : 
+      transaction.tanggal;
+    
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank');
+    
+    // Create HTML content for the invoice
+    let invoiceHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice Penjualan</title>
+        <style>
+          body {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin: 0;
+            padding: 5mm;
+            width: 80mm;
+          }
+          .receipt {
+            width: 100%;
+          }
+          .receipt h3, .receipt h4 {
+            text-align: center;
+            margin: 2mm 0;
+          }
+          .receipt hr {
+            border-top: 1px dashed #000;
+            margin: 2mm 0;
+          }
+          .receipt table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2mm 0;
+          }
+          .receipt td {
+            padding: 1mm;
+            font-size: 12px;
+          }
+          .text-center {
+            text-align: center;
+          }
+          .text-right {
+            text-align: right;
+          }
+          .date-info {
+            margin: 2mm 0;
+          }
+          .total-row {
+            font-weight: bold;
+            border-top: 1px solid #000;
+            padding-top: 1mm;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="receipt">
+          <h3>MELATI GOLD SHOP</h3>
+          <h4>STRUK PENJUALAN</h4>
+          <hr>
+          <div class="date-info">
+            <p>Tanggal: ${date}</p>
+            <p>Sales: ${transaction.sales || "Admin"}</p>
+            <p>Jenis: ${transaction.jenisPenjualan || "Aksesoris"}</p>
+          </div>
+          <hr>
+          <table>
+            <tbody>
+    `;
+    
+    // Add items to the invoice
+    if (transaction.items && transaction.items.length > 0) {
+      transaction.items.forEach(item => {
+        invoiceHTML += `
+          <tr>
+            <td>${item.kodeText || "-"}</td>
+            <td>${item.nama || "-"}</td>
+            <td class="text-center">${item.jumlah || 1}</td>
+<td class="text-right">Rp ${parseInt(item.totalHarga || 0).toLocaleString("id-ID")}</td>
+          </tr>
+        `;
+      });
+    }
+    
+    // Add total row
+    invoiceHTML += `
+            <tr class="total-row">
+              <td colspan="3" class="text-right">Total:</td>
+              <td class="text-right">Rp ${parseInt(transaction.totalHarga || 0).toLocaleString("id-ID")}</td>
+            </tr>
+          </tbody>
+        </table>
+        <hr>
+        <p class="text-center">Terima Kasih Atas Kunjungan Anda</p>
+      </div>
+      <script>
+        window.onload = function() {
+          window.print();
+          setTimeout(function() { window.close(); }, 500);
+        };
+      </script>
+    </body>
+    </html>
+    `;
+    
+    // Write to the new window and print
+    printWindow.document.write(invoiceHTML);
+    printWindow.document.close();
+    
+    this.showLoading(false);
+  } catch (error) {
+    console.error("Error reprinting invoice:", error);
+    this.showError("Error mencetak ulang invoice: " + error.message);
+    this.showLoading(false);
+  }
+},
+
+// Show edit form
+async showEditForm(transactionId) {
+  try {
+    this.showLoading(true);
+    
+    // Get transaction data from Firestore
+    const transactionDoc = await getDoc(doc(firestore, "penjualanAksesoris", transactionId));
+    
+    if (!transactionDoc.exists()) {
+      throw new Error("Transaksi tidak ditemukan");
+    }
+    
+    const transaction = transactionDoc.data();
+    
+    // Store the transaction ID for later use
+    this.currentEditId = transactionId;
+    
+    // Fill the edit form with transaction data
+    document.getElementById("editSales").value = transaction.sales || "";
+    document.getElementById("editJenisPenjualan").value = transaction.jenisPenjualan || "aksesoris";
+    
+    // Clear previous items
+    const itemsContainer = document.getElementById("editItemsContainer");
+    itemsContainer.innerHTML = "";
+    
+    // Add items to the form
+    if (transaction.items && transaction.items.length > 0) {
+      transaction.items.forEach((item, index) => {
+        const itemRow = document.createElement("div");
+        itemRow.className = "card mb-3 edit-item";
+        itemRow.dataset.index = index;
+        
+        itemRow.innerHTML = `
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Kode</label>
+                <input type="text" class="form-control item-kode" value="${item.kodeText || ""}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Nama</label>
+                <input type="text" class="form-control item-nama" value="${item.nama || ""}">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Jumlah</label>
+                <input type="number" class="form-control item-jumlah" value="${item.jumlah || 1}" min="1">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Berat (gr)</label>
+                <input type="number" class="form-control item-berat" value="${item.berat || 0}" step="0.01">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Harga</label>
+                <input type="text" class="form-control item-harga" value="${parseInt(item.totalHarga || 0)}">
+              </div>
+            </div>
+            <div class="mt-2 text-end">
+              <button type="button" class="btn btn-sm btn-danger btn-remove-item">
+                <i class="fas fa-trash-alt"></i> Hapus Item
+              </button>
+            </div>
+          </div>
+        `;
+        
+        itemsContainer.appendChild(itemRow);
+        
+        // Add event listener for remove button
+        itemRow.querySelector(".btn-remove-item").addEventListener("click", function() {
+          itemRow.remove();
+        });
+        
+        // Add event listener for formatting price
+        const hargaInput = itemRow.querySelector(".item-harga");
+        hargaInput.addEventListener("blur", function() {
+          const value = this.value.replace(/\D/g, "");
+          this.value = parseInt(value || 0).toLocaleString("id-ID");
+        });
+        
+        hargaInput.addEventListener("focus", function() {
+          this.value = this.value.replace(/\./g, "");
+        });
+      });
+    }
+    
+    // Add button to add new item
+    const addItemBtn = document.createElement("button");
+    addItemBtn.type = "button";
+    addItemBtn.className = "btn btn-success mt-2";
+    addItemBtn.innerHTML = '<i class="fas fa-plus"></i> Tambah Item';
+    addItemBtn.addEventListener("click", () => {
+      this.addNewItemRow();
+    });
+    
+    itemsContainer.appendChild(addItemBtn);
+    
+    // Show modal
+    const editModal = new bootstrap.Modal(document.getElementById("editModal"));
+    editModal.show();
+    
+    this.showLoading(false);
+  } catch (error) {
+    console.error("Error showing edit form:", error);
+    this.showError("Error menampilkan form edit: " + error.message);
+    this.showLoading(false);
+  }
+},
+
+// Add new item row to edit form
+addNewItemRow() {
+  const itemsContainer = document.getElementById("editItemsContainer");
+  const itemCount = document.querySelectorAll(".edit-item").length;
+  
+  const itemRow = document.createElement("div");
+  itemRow.className = "card mb-3 edit-item";
+  itemRow.dataset.index = itemCount;
+  
+  itemRow.innerHTML = `
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Kode</label>
+          <input type="text" class="form-control item-kode" value="">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Nama</label>
+          <input type="text" class="form-control item-nama" value="">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Jumlah</label>
+          <input type="number" class="form-control item-jumlah" value="1" min="1">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Berat (gr)</label>
+          <input type="number" class="form-control item-berat" value="0" step="0.01">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Harga</label>
+          <input type="text" class="form-control item-harga" value="0">
+        </div>
+      </div>
+      <div class="mt-2 text-end">
+        <button type="button" class="btn btn-sm btn-danger btn-remove-item">
+          <i class="fas fa-trash-alt"></i> Hapus Item
+        </button>
+      </div>
+    </div>
+  `;
+  
+  // Insert before the add button
+  const addButton = itemsContainer.querySelector("button");
+  itemsContainer.insertBefore(itemRow, addButton);
+  
+  // Add event listener for remove button
+  itemRow.querySelector(".btn-remove-item").addEventListener("click", function() {
+    itemRow.remove();
+  });
+  
+  // Add event listener for formatting price
+  const hargaInput = itemRow.querySelector(".item-harga");
+  hargaInput.addEventListener("blur", function() {
+    const value = this.value.replace(/\D/g, "");
+    this.value = parseInt(value || 0).toLocaleString("id-ID");
+  });
+  
+  hargaInput.addEventListener("focus", function() {
+    this.value = this.value.replace(/\./g, "");
+  });
+},
+
+// Save edited transaction
+async saveEditedTransaction() {
+  try {
+    this.showLoading(true);
+    
+    if (!this.currentEditId) {
+      throw new Error("ID transaksi tidak ditemukan");
+    }
+    
+    // Get form data
+    const sales = document.getElementById("editSales").value.trim();
+    const jenisPenjualan = document.getElementById("editJenisPenjualan").value;
+    
+    if (!sales) {
+      throw new Error("Nama sales harus diisi");
+    }
+    
+    // Get items data
+    const itemElements = document.querySelectorAll(".edit-item");
+    const items = [];
+    
+    let totalHarga = 0;
+    
+    itemElements.forEach(itemEl => {
+      const kodeText = itemEl.querySelector(".item-kode").value.trim();
+      const nama = itemEl.querySelector(".item-nama").value.trim();
+      const jumlah = parseInt(itemEl.querySelector(".item-jumlah").value) || 1;
+      const berat = parseFloat(itemEl.querySelector(".item-berat").value) || 0;
+      const hargaStr = itemEl.querySelector(".item-harga").value.replace(/\./g, "");
+      const totalHargaItem = parseInt(hargaStr) || 0;
+      
+      if (!nama) {
+        throw new Error("Nama barang harus diisi");
+      }
+      
+      items.push({
+        kodeText,
+        nama,
+        jumlah,
+        berat,
+        totalHarga: totalHargaItem
+      });
+      
+      totalHarga += totalHargaItem;
+    });
+    
+    if (items.length === 0) {
+      throw new Error("Minimal harus ada satu item");
+    }
+    
+    // Update transaction in Firestore
+    await updateDoc(doc(firestore, "penjualanAksesoris", this.currentEditId), {
+      sales,
+      jenisPenjualan,
+      totalHarga,
+      items,
+      lastEdited: new Date()
+    });
+    
+    // Close modal
+    const editModal = bootstrap.Modal.getInstance(document.getElementById("editModal"));
+    editModal.hide();
+    
+    // Show success message
+    this.showSuccess("Transaksi berhasil diperbarui");
+    
+    // Refresh data
+    this.loadSalesData();
+    
+    this.showLoading(false);
+  } catch (error) {
+    console.error("Error saving edited transaction:", error);
+    this.showError("Error menyimpan perubahan: " + error.message);
+    this.showLoading(false);
+  }
+},
+
+// Confirm delete
+confirmDelete(transactionId) {
+  // Store the ID for the delete operation
+  this.currentDeleteId = transactionId;
+  
+  // Show confirmation modal
+  const confirmationModal = new bootstrap.Modal(document.getElementById("confirmationModal"));
+  confirmationModal.show();
+},
+
+// Delete transaction
+async deleteTransaction() {
+  try {
+    this.showLoading(true);
+    
+    if (!this.currentDeleteId) {
+      throw new Error("ID transaksi tidak ditemukan");
+    }
+    
+    // Delete transaction from Firestore
+    await deleteDoc(doc(firestore, "penjualanAksesoris", this.currentDeleteId));
+    
+    // Close modal
+    const confirmationModal = bootstrap.Modal.getInstance(document.getElementById("confirmationModal"));
+    confirmationModal.hide();
+    
+    // Show success message
+    this.showSuccess("Transaksi berhasil dihapus");
+    
+    // Refresh data
+    this.loadSalesData();
+    
+    this.showLoading(false);
+  } catch (error) {
+    console.error("Error deleting transaction:", error);
+    this.showError("Error menghapus transaksi: " + error.message);
+    this.showLoading(false);
+  }
+},
+
+// Show success message
+showSuccess(message) {
+  // You can implement this with a toast notification or alert
+  alert(message);
+},
+
+// Show error message
+showError(message) {
+  // You can implement this with a toast notification or alert
+  alert(message);
+},
 
   renderStockTable() {
     try {
@@ -1747,6 +2502,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Initialize the handler
   laporanAksesorisHandler.init();
+
+  // Save edit button handler
+document.getElementById("saveEditBtn").addEventListener("click", () => {
+  this.saveEditedTransaction();
+});
+
+// Confirm delete button handler
+document.getElementById("confirmDeleteBtn").addEventListener("click", () => {
+  this.deleteTransaction();
+});
 
   // Set interval to clean up cache periodically
   setInterval(() => {
