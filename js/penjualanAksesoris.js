@@ -1820,19 +1820,18 @@ function printReceipt() {
   printWindow.document.close();
 }
 
-// Fungsi untuk print invoice customer
 function printInvoice() {
   if (!currentTransactionData) {
     alert("Tidak ada data transaksi untuk dicetak!");
     return;
   }
-
+  
   const transaction = currentTransactionData;
   console.log("Printing invoice with data:", transaction);
-
+  
   // Buat jendela baru untuk print
   const printWindow = window.open("", "_blank");
-
+  
   // Buat konten HTML untuk invoice
   let invoiceHTML = `
     <!DOCTYPE html>
@@ -1840,105 +1839,126 @@ function printInvoice() {
     <head>
       <title>Invoice Customer</title>
       <style>
+        @page {
+          size: 10cm 20cm;
+          margin: 0;
+        }
         body {
           font-family: Arial, sans-serif;
-          font-size: 12px;
+          font-size: 8px;
           margin: 0;
-          padding: 0;
+          padding: 5mm;
+          width: 10cm;
+          box-sizing: border-box;
         }
         .invoice {
-          width: 210mm;
-          margin: 0 auto;
-          padding: 10mm;
-        }
-        .invoice h2, .invoice h3 {
-          text-align: center;
-          margin: 5mm 0;
-        }
-        .invoice table {
           width: 100%;
-          border-collapse: collapse;
-          margin: 5mm 0;
         }
-        .invoice table, .invoice td {
-          border: 1px solid #000;
-        }
-        .invoice td {
-          padding: 2mm;
-          text-align: left;
-        }
-        .text-center {
-          text-align: center;
-        }
-        .text-right {
+        .header-info {
           text-align: right;
+          margin-bottom: 5mm;
         }
-        .signature-area {
-          display: flex;
-          justify-content: space-between;
-          margin-top: 30px;
+        hr {
+          margin: 3mm 0;
         }
-        .signature-box {
-          text-align: center;
-          width: 40%;
+        .total-row {
+          margin-top: 2mm;
+          text-align: right;
+          font-weight: bold;
         }
         .keterangan {
-          margin-top: 5mm;
-          padding: 2mm;
-          border: 1px solid #000;
           font-style: italic;
+          font-size: 8px;
+          margin-top: 2mm;
+          padding-top: 2mm;
+        }
+        .item-info {
+          margin-bottom: 3mm;
+          padding-bottom: 1mm;
+        }
+        .item-details {
+          display: flex;
+          flex-wrap: wrap;
+          margin-bottom: 2mm;
+        }
+        .item-price {
+          width: 100%;
+          text-align: right;
+          font-weight: bold;
+        }
+        .item-data {
+          display: grid;
+          grid-template-columns: 1cm 3cm 1cm 1cm 1cm;
+          width: 100%;
+          column-gap: 0.2cm;
+        }
+        .item-data span {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
       </style>
     </head>
     <body>
-     <div class="invoice">
-        <h2>MELATI GOLD SHOP</h2>
-        <h3>INVOICE PENJUALAN ${transaction.salesType.toUpperCase()}</h3>
-        
-        <div>
-          <p><strong>Tanggal:</strong> ${transaction.tanggal}</p>
-          <p><strong>Sales:</strong> ${transaction.sales}</p>
+      <div class="invoice">
+        <div class="header-info">
+          <p>Tanggal: ${transaction.tanggal}<br>Sales: ${transaction.sales}</p>
         </div>
-        
-        <table>
-          <tbody>
+        <hr>
   `;
-
+  
   // Tambahkan item ke invoice
   let hasKeterangan = false;
-
+  let keteranganText = "";
+  let totalHarga = 0;
+  
   transaction.items.forEach((item) => {
+    const itemHarga = parseInt(item.totalHarga) || 0;
+    totalHarga += itemHarga;
+    
+    invoiceHTML += `
+      <div class="item-info">
+        <div class="item-details">
+          <div class="item-data">
+            <span>${item.kodeText || "-"}</span>
+            <span>${item.nama || "-"}</span>
+            <span>${item.jumlah || "1"}pcs</span>
+            <span>${item.berat || "-"}gr</span>
+            <span>${item.kadar || "-"}</span>
+          </div>
+          <div class="item-price">Rp ${itemHarga.toLocaleString("id-ID")}</div>
+        </div>
+      </div>
+    `;
+    
+    // Simpan keterangan jika ada
     if (item.keterangan && item.keterangan.trim() !== "") {
       hasKeterangan = true;
+      keteranganText += `${item.nama}: ${item.keterangan}; `;
     }
-
-    invoiceHTML += `
-      <tr>
-        <td>${item.kodeText || "-"}</td>
-        <td>${item.jumlah || "1"}</td>
-        <td>${item.nama || "-"}</td>
-        <td>${item.kadar || "-"}</td>
-        <td>${item.berat || "-"}</td>
-        <td class="text-right">${parseInt(item.totalHarga).toLocaleString("id-ID")}</td>
-        ${transaction.salesType === "manual" ? `<td>${item.keterangan || "-"}</td>` : ""}
-      </tr>
-    `;
   });
-
-  // Tambahkan total
+  
+  // Tambahkan garis pemisah
+  invoiceHTML += `<hr>`;
+  
+  // Tambahkan total di pojok kanan bawah
   invoiceHTML += `
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colspan="${
-                transaction.salesType === "manual" ? "6" : "5"
-              }" class="text-right"><strong>Total:</strong></td>
-              <td class="text-right"><strong>${transaction.totalHarga}</strong></td>
-              ${transaction.salesType === "manual" ? "<td></td>" : ""}
-            </tr>
-          </tfoot>
-        </table>
-        
+        <div class="total-row">
+          Rp ${totalHarga.toLocaleString("id-ID")}
+        </div>
+  `;
+  
+  // Tambahkan keterangan jika ada
+  if (hasKeterangan && transaction.salesType === "manual") {
+    invoiceHTML += `
+        <div class="keterangan">
+          ${keteranganText}
+        </div>
+    `;
+  }
+  
+  invoiceHTML += `
+      </div>
       <script>
         window.onload = function() {
           window.print();
@@ -1948,12 +1968,11 @@ function printInvoice() {
     </body>
     </html>
   `;
-
+  
   // Tulis HTML ke jendela baru
   printWindow.document.write(invoiceHTML);
   printWindow.document.close();
 }
-
 
 // Manual print button handler
 $("#btnCetak").on("click", function () {

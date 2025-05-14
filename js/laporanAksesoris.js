@@ -1253,9 +1253,6 @@ const laporanAksesorisHandler = {
                     <i class="fas fa-cog"></i>
                   </button>
                   <ul class="dropdown-menu dropdown-menu-end">
-                    <li><button class="dropdown-item btn-detail" data-id="${
-                      transaction.id
-                    }"><i class="fas fa-eye me-2"></i>Detail</button></li>
                     <li><button class="dropdown-item btn-reprint" data-id="${
                       transaction.id
                     }"><i class="fas fa-print me-2"></i>Cetak Ulang</button></li>
@@ -1331,7 +1328,7 @@ const laporanAksesorisHandler = {
             this.showTransactionDetails(transactionId);
           });
         });
-      
+
         // Reprint button handler
         document.querySelectorAll(".btn-reprint").forEach((btn) => {
           btn.addEventListener("click", () => {
@@ -1339,7 +1336,7 @@ const laporanAksesorisHandler = {
             this.reprintInvoice(transactionId);
           });
         });
-      
+
         // Edit button handler
         document.querySelectorAll(".btn-edit").forEach((btn) => {
           btn.addEventListener("click", () => {
@@ -1347,7 +1344,7 @@ const laporanAksesorisHandler = {
             this.showEditForm(transactionId);
           });
         });
-      
+
         // Delete button handler
         document.querySelectorAll(".btn-delete").forEach((btn) => {
           btn.addEventListener("click", () => {
@@ -1362,97 +1359,486 @@ const laporanAksesorisHandler = {
   },
 
   // Show transaction details (existing method, but let's add it for reference)
-async showTransactionDetails(transactionId) {
-  try {
-    this.showLoading(true);
-    
-    // Get transaction data from Firestore
-    const transactionDoc = await getDoc(doc(firestore, "penjualanAksesoris", transactionId));
-    
-    if (!transactionDoc.exists()) {
-      throw new Error("Transaksi tidak ditemukan");
-    }
-    
-    const transaction = transactionDoc.data();
-    
-    // Format the transaction date
-    const date = transaction.timestamp ? 
-      formatDate(transaction.timestamp.toDate()) : 
-      transaction.tanggal;
-    
-    // Create HTML for modal
-    let detailHTML = `
-      <div class="transaction-details">
-        <div class="row mb-3">
-          <div class="col-md-6">
-            <p><strong>Tanggal:</strong> ${date}</p>
-            <p><strong>Sales:</strong> ${transaction.sales || "Admin"}</p>
+  showTransactionDetail(transactionId) {
+    try {
+      const transaction = this.salesData.find((item) => item.id === transactionId);
+      if (!transaction) {
+        throw new Error("Transaksi tidak ditemukan");
+      }
+
+      const modalBody = document.querySelector("#detailModal .modal-body");
+
+      // Format tanggal
+      const tanggal = transaction.tanggal || this.formatTimestamp(transaction.timestamp);
+
+      // Buat HTML untuk detail transaksi
+      let detailHTML = `
+        <div class="transaction-detail">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <p><strong>Tanggal:</strong> ${tanggal}</p>
+              <p><strong>Sales:</strong> ${transaction.sales || "-"}</p>
+              <p><strong>Jenis Penjualan:</strong> ${this.formatSalesType(transaction.jenisPenjualan)}</p>
+            </div>
+            <div class="col-md-6">
+              <p><strong>Metode Bayar:</strong> ${this.formatPaymentMethod(transaction.metodeBayar)}</p>
+              <p><strong>Status Pembayaran:</strong> ${transaction.statusPembayaran || "Lunas"}</p>
+              <p><strong>Total Harga:</strong> Rp ${this.formatNumber(transaction.totalHarga)}</p>
+            </div>
           </div>
-          <div class="col-md-6">
-            <p><strong>Jenis Penjualan:</strong> ${transaction.jenisPenjualan || "Tidak diketahui"}</p>
-            <p><strong>Total Harga:</strong> Rp ${parseInt(transaction.totalHarga || 0).toLocaleString("id-ID")}</p>
-          </div>
-        </div>
-        
-        <h5 class="mb-3">Detail Item</h5>
-        <div class="table-responsive">
-          <table class="table table-bordered">
-            <thead>
-              <tr>
-                <th>Kode</th>
-                <th>Nama</th>
-                <th>Jumlah</th>
-                <th>Berat</th>
-                <th>Harga</th>
-              </tr>
-            </thead>
-            <tbody>
-    `;
-    
-    // Add items to the detail
-    if (transaction.items && transaction.items.length > 0) {
-      transaction.items.forEach(item => {
+          
+          <h5 class="mb-3">Detail Item</h5>
+          <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+              <thead>
+                <tr>
+                  <th>Kode</th>
+                  <th>Nama Barang</th>
+                  <th>Jumlah</th>
+                  <th>Kadar</th>
+                  <th>Berat</th>
+                  <th>Harga</th>
+                </tr>
+              </thead>
+              <tbody>
+      `;
+
+      // Tambahkan baris untuk setiap item
+      transaction.items.forEach((item) => {
         detailHTML += `
           <tr>
             <td>${item.kodeText || "-"}</td>
             <td>${item.nama || "-"}</td>
-            <td>${item.jumlah || 1}</td>
-            <td>${item.berat ? item.berat + " gr" : "-"}</td>
-            <td>Rp ${parseInt(item.totalHarga || 0).toLocaleString("id-ID")}</td>
+            <td>${item.jumlah || "1"}</td>
+            <td>${item.kadar || "-"}</td>
+            <td>${item.berat || "-"}</td>
+            <td>Rp ${this.formatNumber(item.totalHarga)}</td>
           </tr>
         `;
       });
-    } else {
+
       detailHTML += `
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="5" class="text-end"><strong>Total:</strong></td>
+                  <td><strong>Rp ${this.formatNumber(transaction.totalHarga)}</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      `;
+
+      // Tambahkan tombol cetak di footer modal
+      const modalFooter = document.querySelector("#detailModal .modal-footer");
+      modalFooter.innerHTML = `
+        <div class="btn-group me-2">
+          <button type="button" class="btn btn-primary" id="btnPrintInvoice">
+            <i class="fas fa-file-invoice me-1"></i> Cetak Invoice
+          </button>
+          <button type="button" class="btn btn-info" id="btnPrintReceipt">
+            <i class="fas fa-receipt me-1"></i> Cetak Struk
+          </button>
+        </div>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+      `;
+
+      // Set HTML ke modal body
+      modalBody.innerHTML = detailHTML;
+
+      // Simpan data transaksi saat ini untuk digunakan saat mencetak
+      this.currentTransaction = transaction;
+
+      // Tampilkan modal
+      const detailModal = new bootstrap.Modal(document.getElementById("detailModal"));
+      detailModal.show();
+
+      // Tambahkan event listener untuk tombol cetak
+      document.getElementById("btnPrintInvoice").addEventListener("click", () => {
+        this.printInvoice(transaction);
+      });
+
+      document.getElementById("btnPrintReceipt").addEventListener("click", () => {
+        this.printReceipt(transaction);
+      });
+    } catch (error) {
+      console.error("Error showing transaction detail:", error);
+      this.showError("Error menampilkan detail transaksi: " + error.message);
+    }
+  },
+
+  // Fungsi untuk mencetak struk kasir
+  printReceipt(transaction) {
+    try {
+      console.log("Printing receipt with data:", transaction);
+  
+      // Buat jendela baru untuk print
+      const printWindow = window.open("", "_blank");
+      
+      // Periksa apakah jendela berhasil dibuka
+      if (!printWindow) {
+        throw new Error("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak struk.");
+      }
+  
+      // Format tanggal
+      const tanggal = transaction.tanggal || this.formatTimestamp(transaction.timestamp);
+      const salesType = transaction.jenisPenjualan || "aksesoris";
+  
+      // Buat konten HTML untuk struk
+      let receiptHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Struk Kasir</title>
+          <style>
+            body {
+              font-family: 'Courier New', monospace;
+              font-size: 12px;
+              margin: 0;
+              padding: 0;
+            }
+            .receipt {
+              width: 80mm;
+              margin: 0 auto;
+              padding: 5mm;
+            }
+            .receipt h3, .receipt h4 {
+              text-align: center;
+              margin: 2mm 0;
+            }
+            .receipt hr {
+              border-top: 1px dashed #000;
+            }
+            .receipt table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            .receipt th, .receipt td {
+              text-align: left;
+              padding: 1mm 2mm;
+            }
+            .text-center {
+              text-align: center;
+            }
+            .text-right {
+              text-align: right;
+            }
+            .keterangan {
+              font-style: italic;
+              font-size: 10px;
+              margin-top: 2mm;
+              border-top: 1px dotted #000;
+              padding-top: 2mm;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="receipt">
+            <h3>MELATI 3</h3>
+            <h4>JL. DIPONEGORO NO. 116</h4>
+            <h4>NOTA PENJUALAN ${salesType.toUpperCase()}</h4>
+            <hr>
+            <p>Tanggal: ${tanggal}<br>Sales: ${transaction.sales || "-"}</p>
+            <hr>
+            <table>
+              <tr>
+                <th>Kode</th>
+                <th>Nama</th>
+                <th>Kadar</th>
+                <th>Gr</th>
+                <th>Harga</th>
+              </tr>
+      `;
+  
+      // Tambahkan item ke struk
+      let hasKeterangan = false;
+      let keteranganText = "";
+  
+      transaction.items.forEach((item) => {
+        receiptHTML += `
+          <tr>
+            <td>${item.kodeText || "-"}</td>
+            <td>${item.nama || "-"}</td>
+            <td>${item.kadar || "-"}</td>
+            <td>${item.berat || "-"}</td>
+            <td class="text-right">${formatRupiah(item.totalHarga)}</td>
+          </tr>
+        `;
+  
+        // Simpan keterangan jika ada
+        if (item.keterangan && item.keterangan.trim() !== "") {
+          hasKeterangan = true;
+          keteranganText += item.keterangan + " ";
+        }
+      });
+  
+      // Tambahkan total
+      receiptHTML += `
+              <tr>
+                <td colspan="4" class="text-right"><strong>Total:</strong></td>
+                <td class="text-right"><strong>${formatRupiah(transaction.totalHarga)}</strong></td>
+              </tr>
+            </table>
+            <hr>
+      `;
+  
+      // Tambahkan keterangan jika ada
+      if (hasKeterangan && transaction.jenisPenjualan === "manual") {
+        receiptHTML += `
+            <div class="keterangan">
+              <strong>Keterangan:</strong> ${keteranganText}
+            </div>
+        `;
+      }
+  
+      receiptHTML += `
+            <p class="text-center">Terima Kasih<br>Atas Kunjungan Anda</p>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+        </html>
+      `;
+  
+      // Tulis HTML ke jendela baru dengan penanganan error yang lebih baik
+      try {
+        // Tunggu sebentar untuk memastikan jendela sudah siap
+        setTimeout(() => {
+          if (printWindow.document) {
+            printWindow.document.write(receiptHTML);
+            printWindow.document.close();
+          } else {
+            console.error("Dokumen jendela cetak tidak tersedia");
+            this.showError("Gagal mencetak struk: Dokumen jendela cetak tidak tersedia");
+          }
+        }, 100);
+      } catch (writeError) {
+        console.error("Error writing to print window:", writeError);
+        this.showError("Gagal menulis ke jendela cetak: " + writeError.message);
+      }
+    } catch (error) {
+      console.error("Error printing receipt:", error);
+      this.showError("Error mencetak struk: " + error.message);
+    }
+  },
+
+  // Fungsi untuk mencetak invoice customer
+  printInvoice(transaction) {
+    try {
+      console.log("Printing invoice with data:", transaction);
+
+      // Buat jendela baru untuk print
+      const printWindow = window.open("", "_blank");
+
+      // Format tanggal
+      const tanggal = transaction.tanggal || this.formatTimestamp(transaction.timestamp);
+      const salesType = transaction.jenisPenjualan || "aksesoris";
+
+      // Buat konten HTML untuk invoice
+      let invoiceHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice Customer</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            margin: 0;
+            padding: 0;
+          }
+          .invoice {
+            width: 210mm;
+            margin: 0 auto;
+            padding: 10mm;
+          }
+          .invoice h2, .invoice h3 {
+            text-align: center;
+            margin: 5mm 0;
+          }
+          .invoice table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 5mm 0;
+          }
+          .invoice table, .invoice th, .invoice td {
+            border: 1px solid #000;
+          }
+          .invoice th, .invoice td {
+            padding: 2mm;
+            text-align: left;
+          }
+          .text-center {
+            text-align: center;
+          }
+          .text-right {
+            text-align: right;
+          }
+          .signature-area {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+          }
+          .signature-box {
+            text-align: center;
+            width: 40%;
+          }
+          .keterangan {
+            margin-top: 5mm;
+            padding: 2mm;
+            border: 1px solid #000;
+            font-style: italic;
+          }
+        </style>
+      </head>
+      <body>
+       <div class="invoice">
+          <h2>MELATI GOLD SHOP</h2>
+          <h3>INVOICE PENJUALAN ${salesType.toUpperCase()}</h3>
+          
+          <div>
+            <p><strong>Tanggal:</strong> ${tanggal}</p>
+            <p><strong>Sales:</strong> ${transaction.sales || "-"}</p>
+          </div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Kode Barang</th>
+                <th>Ptg</th>
+                <th>Nama Barang</th>
+                <th>Kadar</th>
+                <th>Berat</th>
+                <th>Harga</th>
+                ${salesType === "manual" ? "<th>Keterangan</th>" : ""}
+              </tr>
+            </thead>
+            <tbody>
+    `;
+
+      // Tambahkan item ke invoice
+      let hasKeterangan = false;
+
+      transaction.items.forEach((item) => {
+        if (item.keterangan && item.keterangan.trim() !== "") {
+          hasKeterangan = true;
+        }
+
+        invoiceHTML += `
         <tr>
-          <td colspan="5" class="text-center">Tidak ada detail item</td>
+          <td>${item.kodeText || "-"}</td>
+          <td>${item.jumlah || "1"}</td>
+          <td>${item.nama || "-"}</td>
+          <td>${item.kadar || "-"}</td>
+          <td>${item.berat || "-"}</td>
+          <td class="text-right">${this.formatNumber(item.totalHarga)}</td>
+          ${salesType === "manual" ? `<td>${item.keterangan || "-"}</td>` : ""}
         </tr>
       `;
-    }
-    
-    detailHTML += `
+      });
+
+      // Tambahkan total
+      invoiceHTML += `
             </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="${salesType === "manual" ? "6" : "5"}" class="text-right"><strong>Total:</strong></td>
+                <td class="text-right"><strong>${this.formatNumber(transaction.totalHarga)}</strong></td>
+                ${salesType === "manual" ? "<td></td>" : ""}
+              </tr>
+            </tfoot>
           </table>
+          
+          <div class="signature-area">
+            <div class="signature-box">
+              <p>Customer</p>
+              <br><br><br>
+              <p>(______________)</p>
+            </div>
+            <div class="signature-box">
+              <p>Hormat Kami</p>
+              <br><br><br>
+              <p>(______________)</p>
+            </div>
+          </div>
         </div>
-      </div>
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          };
+        </script>
+      </body>
+      </html>
     `;
-    
-    // Set modal content
-    document.querySelector("#detailModal .modal-body").innerHTML = detailHTML;
-    
-    // Show modal
-    const detailModal = new bootstrap.Modal(document.getElementById("detailModal"));
-    detailModal.show();
-    
-    this.showLoading(false);
-  } catch (error) {
-    console.error("Error showing transaction details:", error);
-    this.showError("Error menampilkan detail transaksi: " + error.message);
-    this.showLoading(false);
+
+      // Tulis HTML ke jendela baru
+      printWindow.document.write(invoiceHTML);
+      printWindow.document.close();
+    } catch (error) {
+      console.error("Error printing invoice:", error);
+      this.showError("Error mencetak invoice: " + error.message);
+    }
+  },
+
+  // Fungsi untuk memformat timestamp menjadi string tanggal
+  formatTimestamp(timestamp) {
+    if (!timestamp) return "-";
+
+    try {
+      // Jika timestamp adalah objek Timestamp dari Firestore
+      if (timestamp.toDate) {
+        const date = timestamp.toDate();
+        return formatDate(date);
+      }
+      // Jika timestamp sudah dalam bentuk Date
+      else if (timestamp instanceof Date) {
+        return formatDate(timestamp);
+      }
+      // Jika timestamp dalam format string
+      else {
+        return timestamp;
+      }
+    } catch (error) {
+      console.error("Error formatting timestamp:", error);
+      return "-";
+    }
+  },
+
+  // Fungsi untuk memformat jenis penjualan
+formatSalesType(type) {
+  if (!type) return "-";
+  
+  switch (type.toLowerCase()) {
+    case "aksesoris":
+      return "Aksesoris";
+    case "kotak":
+      return "Kotak Perhiasan";
+    case "gantilock":
+      return "Ganti Lock";
+    case "manual":
+      return "Manual";
+    default:
+      return type;
   }
 },
 
-// Reprint invoice
+// Fungsi untuk memformat angka menjadi format rupiah
+formatNumber(number) {
+  if (number === undefined || number === null) return "0";
+  
+  // Pastikan number adalah angka
+  const num = typeof number === "string" ? parseInt(number.replace(/\D/g, "")) : number;
+  
+  return num.toLocaleString("id-ID");
+},
+
+  // Reprint invoice - modifikasi fungsi yang sudah ada
 async reprintInvoice(transactionId) {
   try {
     this.showLoading(true);
@@ -1465,160 +1851,107 @@ async reprintInvoice(transactionId) {
     }
     
     const transaction = transactionDoc.data();
+    transaction.id = transactionId; // Tambahkan ID ke objek transaksi
     
-    // Format the transaction date
-    const date = transaction.timestamp ? 
-      formatDate(transaction.timestamp.toDate()) : 
-      transaction.tanggal;
+    // Tampilkan dropdown untuk memilih jenis cetak
+    const printOptions = [
+      { id: 'invoice', name: 'Invoice Customer (A4)', icon: 'file-invoice' },
+      { id: 'receipt', name: 'Struk Kasir (Thermal)', icon: 'receipt' }
+    ];
     
-    // Create a new window for printing
-    const printWindow = window.open('', '_blank');
-    
-    // Create HTML content for the invoice
-    let invoiceHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Invoice Penjualan</title>
-        <style>
-          body {
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            margin: 0;
-            padding: 5mm;
-            width: 80mm;
-          }
-          .receipt {
-            width: 100%;
-          }
-          .receipt h3, .receipt h4 {
-            text-align: center;
-            margin: 2mm 0;
-          }
-          .receipt hr {
-            border-top: 1px dashed #000;
-            margin: 2mm 0;
-          }
-          .receipt table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 2mm 0;
-          }
-          .receipt td {
-            padding: 1mm;
-            font-size: 12px;
-          }
-          .text-center {
-            text-align: center;
-          }
-          .text-right {
-            text-align: right;
-          }
-          .date-info {
-            margin: 2mm 0;
-          }
-          .total-row {
-            font-weight: bold;
-            border-top: 1px solid #000;
-            padding-top: 1mm;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="receipt">
-          <h3>MELATI GOLD SHOP</h3>
-          <h4>STRUK PENJUALAN</h4>
-          <hr>
-          <div class="date-info">
-            <p>Tanggal: ${date}</p>
-            <p>Sales: ${transaction.sales || "Admin"}</p>
-            <p>Jenis: ${transaction.jenisPenjualan || "Aksesoris"}</p>
+    // Buat modal untuk memilih jenis cetak
+    const modalHTML = `
+      <div class="modal fade" id="printOptionsModal" tabindex="-1" aria-labelledby="printOptionsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="printOptionsModalLabel">Pilih Jenis Cetak</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="list-group">
+                ${printOptions.map(option => `
+                  <button type="button" class="list-group-item list-group-item-action print-option" data-option="${option.id}">
+                    <i class="fas fa-${option.icon} me-2"></i> ${option.name}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            </div>
           </div>
-          <hr>
-          <table>
-            <tbody>
+        </div>
+      </div>
     `;
     
-    // Add items to the invoice
-    if (transaction.items && transaction.items.length > 0) {
-      transaction.items.forEach(item => {
-        invoiceHTML += `
-          <tr>
-            <td>${item.kodeText || "-"}</td>
-            <td>${item.nama || "-"}</td>
-            <td class="text-center">${item.jumlah || 1}</td>
-<td class="text-right">Rp ${parseInt(item.totalHarga || 0).toLocaleString("id-ID")}</td>
-          </tr>
-        `;
-      });
+    // Tambahkan modal ke body jika belum ada
+    if (!document.getElementById('printOptionsModal')) {
+      const modalContainer = document.createElement('div');
+      modalContainer.innerHTML = modalHTML;
+      document.body.appendChild(modalContainer);
     }
     
-    // Add total row
-    invoiceHTML += `
-            <tr class="total-row">
-              <td colspan="3" class="text-right">Total:</td>
-              <td class="text-right">Rp ${parseInt(transaction.totalHarga || 0).toLocaleString("id-ID")}</td>
-            </tr>
-          </tbody>
-        </table>
-        <hr>
-        <p class="text-center">Terima Kasih Atas Kunjungan Anda</p>
-      </div>
-      <script>
-        window.onload = function() {
-          window.print();
-          setTimeout(function() { window.close(); }, 500);
-        };
-      </script>
-    </body>
-    </html>
-    `;
+    // Tampilkan modal
+    const printOptionsModal = new bootstrap.Modal(document.getElementById('printOptionsModal'));
+    printOptionsModal.show();
     
-    // Write to the new window and print
-    printWindow.document.write(invoiceHTML);
-    printWindow.document.close();
+    // Tambahkan event listener untuk opsi cetak
+    document.querySelectorAll('.print-option').forEach(button => {
+      button.addEventListener('click', () => {
+        const option = button.getAttribute('data-option');
+        printOptionsModal.hide();
+        
+        // Cetak sesuai opsi yang dipilih
+        if (option === 'invoice') {
+          this.printInvoice(transaction);
+        } else if (option === 'receipt') {
+          this.printReceipt(transaction);
+        }
+      });
+    });
     
     this.showLoading(false);
   } catch (error) {
     console.error("Error reprinting invoice:", error);
-    this.showError("Error mencetak ulang invoice: " + error.message);
+    this.showError("Error mencetak ulang: " + error.message);
     this.showLoading(false);
   }
 },
 
-// Show edit form
-async showEditForm(transactionId) {
-  try {
-    this.showLoading(true);
-    
-    // Get transaction data from Firestore
-    const transactionDoc = await getDoc(doc(firestore, "penjualanAksesoris", transactionId));
-    
-    if (!transactionDoc.exists()) {
-      throw new Error("Transaksi tidak ditemukan");
-    }
-    
-    const transaction = transactionDoc.data();
-    
-    // Store the transaction ID for later use
-    this.currentEditId = transactionId;
-    
-    // Fill the edit form with transaction data
-    document.getElementById("editSales").value = transaction.sales || "";
-    document.getElementById("editJenisPenjualan").value = transaction.jenisPenjualan || "aksesoris";
-    
-    // Clear previous items
-    const itemsContainer = document.getElementById("editItemsContainer");
-    itemsContainer.innerHTML = "";
-    
-    // Add items to the form
-    if (transaction.items && transaction.items.length > 0) {
-      transaction.items.forEach((item, index) => {
-        const itemRow = document.createElement("div");
-        itemRow.className = "card mb-3 edit-item";
-        itemRow.dataset.index = index;
-        
-        itemRow.innerHTML = `
+  // Show edit form
+  async showEditForm(transactionId) {
+    try {
+      this.showLoading(true);
+
+      // Get transaction data from Firestore
+      const transactionDoc = await getDoc(doc(firestore, "penjualanAksesoris", transactionId));
+
+      if (!transactionDoc.exists()) {
+        throw new Error("Transaksi tidak ditemukan");
+      }
+
+      const transaction = transactionDoc.data();
+
+      // Store the transaction ID for later use
+      this.currentEditId = transactionId;
+
+      // Fill the edit form with transaction data
+      document.getElementById("editSales").value = transaction.sales || "";
+      document.getElementById("editJenisPenjualan").value = transaction.jenisPenjualan || "aksesoris";
+
+      // Clear previous items
+      const itemsContainer = document.getElementById("editItemsContainer");
+      itemsContainer.innerHTML = "";
+
+      // Add items to the form
+      if (transaction.items && transaction.items.length > 0) {
+        transaction.items.forEach((item, index) => {
+          const itemRow = document.createElement("div");
+          itemRow.className = "card mb-3 edit-item";
+          itemRow.dataset.index = index;
+
+          itemRow.innerHTML = `
           <div class="card-body">
             <div class="row g-3">
               <div class="col-md-6">
@@ -1649,60 +1982,60 @@ async showEditForm(transactionId) {
             </div>
           </div>
         `;
-        
-        itemsContainer.appendChild(itemRow);
-        
-        // Add event listener for remove button
-        itemRow.querySelector(".btn-remove-item").addEventListener("click", function() {
-          itemRow.remove();
-        });
-        
-        // Add event listener for formatting price
-        const hargaInput = itemRow.querySelector(".item-harga");
-        hargaInput.addEventListener("blur", function() {
-          const value = this.value.replace(/\D/g, "");
-          this.value = parseInt(value || 0).toLocaleString("id-ID");
-        });
-        
-        hargaInput.addEventListener("focus", function() {
-          this.value = this.value.replace(/\./g, "");
-        });
-      });
-    }
-    
-    // Add button to add new item
-    const addItemBtn = document.createElement("button");
-    addItemBtn.type = "button";
-    addItemBtn.className = "btn btn-success mt-2";
-    addItemBtn.innerHTML = '<i class="fas fa-plus"></i> Tambah Item';
-    addItemBtn.addEventListener("click", () => {
-      this.addNewItemRow();
-    });
-    
-    itemsContainer.appendChild(addItemBtn);
-    
-    // Show modal
-    const editModal = new bootstrap.Modal(document.getElementById("editModal"));
-    editModal.show();
-    
-    this.showLoading(false);
-  } catch (error) {
-    console.error("Error showing edit form:", error);
-    this.showError("Error menampilkan form edit: " + error.message);
-    this.showLoading(false);
-  }
-},
 
-// Add new item row to edit form
-addNewItemRow() {
-  const itemsContainer = document.getElementById("editItemsContainer");
-  const itemCount = document.querySelectorAll(".edit-item").length;
-  
-  const itemRow = document.createElement("div");
-  itemRow.className = "card mb-3 edit-item";
-  itemRow.dataset.index = itemCount;
-  
-  itemRow.innerHTML = `
+          itemsContainer.appendChild(itemRow);
+
+          // Add event listener for remove button
+          itemRow.querySelector(".btn-remove-item").addEventListener("click", function () {
+            itemRow.remove();
+          });
+
+          // Add event listener for formatting price
+          const hargaInput = itemRow.querySelector(".item-harga");
+          hargaInput.addEventListener("blur", function () {
+            const value = this.value.replace(/\D/g, "");
+            this.value = parseInt(value || 0).toLocaleString("id-ID");
+          });
+
+          hargaInput.addEventListener("focus", function () {
+            this.value = this.value.replace(/\./g, "");
+          });
+        });
+      }
+
+      // Add button to add new item
+      const addItemBtn = document.createElement("button");
+      addItemBtn.type = "button";
+      addItemBtn.className = "btn btn-success mt-2";
+      addItemBtn.innerHTML = '<i class="fas fa-plus"></i> Tambah Item';
+      addItemBtn.addEventListener("click", () => {
+        this.addNewItemRow();
+      });
+
+      itemsContainer.appendChild(addItemBtn);
+
+      // Show modal
+      const editModal = new bootstrap.Modal(document.getElementById("editModal"));
+      editModal.show();
+
+      this.showLoading(false);
+    } catch (error) {
+      console.error("Error showing edit form:", error);
+      this.showError("Error menampilkan form edit: " + error.message);
+      this.showLoading(false);
+    }
+  },
+
+  // Add new item row to edit form
+  addNewItemRow() {
+    const itemsContainer = document.getElementById("editItemsContainer");
+    const itemCount = document.querySelectorAll(".edit-item").length;
+
+    const itemRow = document.createElement("div");
+    itemRow.className = "card mb-3 edit-item";
+    itemRow.dataset.index = itemCount;
+
+    itemRow.innerHTML = `
     <div class="card-body">
       <div class="row g-3">
         <div class="col-md-6">
@@ -1733,156 +2066,187 @@ addNewItemRow() {
       </div>
     </div>
   `;
-  
-  // Insert before the add button
-  const addButton = itemsContainer.querySelector("button");
-  itemsContainer.insertBefore(itemRow, addButton);
-  
-  // Add event listener for remove button
-  itemRow.querySelector(".btn-remove-item").addEventListener("click", function() {
-    itemRow.remove();
-  });
-  
-  // Add event listener for formatting price
-  const hargaInput = itemRow.querySelector(".item-harga");
-  hargaInput.addEventListener("blur", function() {
-    const value = this.value.replace(/\D/g, "");
-    this.value = parseInt(value || 0).toLocaleString("id-ID");
-  });
-  
-  hargaInput.addEventListener("focus", function() {
-    this.value = this.value.replace(/\./g, "");
-  });
-},
 
-// Save edited transaction
-async saveEditedTransaction() {
-  try {
-    this.showLoading(true);
-    
-    if (!this.currentEditId) {
-      throw new Error("ID transaksi tidak ditemukan");
-    }
-    
-    // Get form data
-    const sales = document.getElementById("editSales").value.trim();
-    const jenisPenjualan = document.getElementById("editJenisPenjualan").value;
-    
-    if (!sales) {
-      throw new Error("Nama sales harus diisi");
-    }
-    
-    // Get items data
-    const itemElements = document.querySelectorAll(".edit-item");
-    const items = [];
-    
-    let totalHarga = 0;
-    
-    itemElements.forEach(itemEl => {
-      const kodeText = itemEl.querySelector(".item-kode").value.trim();
-      const nama = itemEl.querySelector(".item-nama").value.trim();
-      const jumlah = parseInt(itemEl.querySelector(".item-jumlah").value) || 1;
-      const berat = parseFloat(itemEl.querySelector(".item-berat").value) || 0;
-      const hargaStr = itemEl.querySelector(".item-harga").value.replace(/\./g, "");
-      const totalHargaItem = parseInt(hargaStr) || 0;
-      
-      if (!nama) {
-        throw new Error("Nama barang harus diisi");
+    // Insert before the add button
+    const addButton = itemsContainer.querySelector("button");
+    itemsContainer.insertBefore(itemRow, addButton);
+
+    // Add event listener for remove button
+    itemRow.querySelector(".btn-remove-item").addEventListener("click", function () {
+      itemRow.remove();
+    });
+
+    // Add event listener for formatting price
+    const hargaInput = itemRow.querySelector(".item-harga");
+    hargaInput.addEventListener("blur", function () {
+      const value = this.value.replace(/\D/g, "");
+      this.value = parseInt(value || 0).toLocaleString("id-ID");
+    });
+
+    hargaInput.addEventListener("focus", function () {
+      this.value = this.value.replace(/\./g, "");
+    });
+  },
+
+  // Save edited transaction
+  async saveEditedTransaction() {
+    try {
+      this.showLoading(true);
+
+      if (!this.currentEditId) {
+        throw new Error("ID transaksi tidak ditemukan");
       }
-      
-      items.push({
-        kodeText,
-        nama,
-        jumlah,
-        berat,
-        totalHarga: totalHargaItem
+
+      // Get form data
+      const sales = document.getElementById("editSales").value.trim();
+      const jenisPenjualan = document.getElementById("editJenisPenjualan").value;
+
+      if (!sales) {
+        throw new Error("Nama sales harus diisi");
+      }
+
+      // Get items data
+      const itemElements = document.querySelectorAll(".edit-item");
+      const items = [];
+
+      let totalHarga = 0;
+
+      itemElements.forEach((itemEl) => {
+        const kodeText = itemEl.querySelector(".item-kode").value.trim();
+        const nama = itemEl.querySelector(".item-nama").value.trim();
+        const jumlah = parseInt(itemEl.querySelector(".item-jumlah").value) || 1;
+        const berat = parseFloat(itemEl.querySelector(".item-berat").value) || 0;
+        const hargaStr = itemEl.querySelector(".item-harga").value.replace(/\./g, "");
+        const totalHargaItem = parseInt(hargaStr) || 0;
+
+        if (!nama) {
+          throw new Error("Nama barang harus diisi");
+        }
+
+        items.push({
+          kodeText,
+          nama,
+          jumlah,
+          berat,
+          totalHarga: totalHargaItem,
+        });
+
+        totalHarga += totalHargaItem;
       });
-      
-      totalHarga += totalHargaItem;
-    });
-    
-    if (items.length === 0) {
-      throw new Error("Minimal harus ada satu item");
+
+      if (items.length === 0) {
+        throw new Error("Minimal harus ada satu item");
+      }
+
+      // Buat objek data yang akan diupdate
+      const updatedData = {
+        sales,
+        jenisPenjualan,
+        totalHarga,
+        items,
+        lastEdited: new Date(),
+      };
+
+      // Update transaction in Firestore
+      await updateDoc(doc(firestore, "penjualanAksesoris", this.currentEditId), updatedData);
+
+      // PERUBAHAN: Update data lokal
+      // Cari indeks data yang diedit di salesData
+      const salesDataIndex = this.salesData.findIndex((item) => item.id === this.currentEditId);
+      if (salesDataIndex !== -1) {
+        // Update data di salesData dengan mempertahankan properti lain yang tidak diubah
+        this.salesData[salesDataIndex] = {
+          ...this.salesData[salesDataIndex], // Pertahankan properti lain
+          ...updatedData, // Terapkan perubahan baru
+        };
+      }
+
+      // Cari indeks data yang diedit di filteredSalesData
+      const filteredDataIndex = this.filteredSalesData.findIndex((item) => item.id === this.currentEditId);
+      if (filteredDataIndex !== -1) {
+        // Update data di filteredSalesData
+        this.filteredSalesData[filteredDataIndex] = {
+          ...this.filteredSalesData[filteredDataIndex], // Pertahankan properti lain
+          ...updatedData, // Terapkan perubahan baru
+        };
+      }
+
+      // Render ulang tabel dengan data yang sudah diperbarui
+      this.renderSalesTable();
+
+      // Close modal
+      const editModal = bootstrap.Modal.getInstance(document.getElementById("editModal"));
+      editModal.hide();
+
+      // Show success message
+      this.showSuccess("Transaksi berhasil diperbarui");
+
+      // Refresh data
+      this.loadSalesData();
+
+      this.showLoading(false);
+    } catch (error) {
+      console.error("Error saving edited transaction:", error);
+      this.showError("Error menyimpan perubahan: " + error.message);
+      this.showLoading(false);
     }
-    
-    // Update transaction in Firestore
-    await updateDoc(doc(firestore, "penjualanAksesoris", this.currentEditId), {
-      sales,
-      jenisPenjualan,
-      totalHarga,
-      items,
-      lastEdited: new Date()
-    });
-    
-    // Close modal
-    const editModal = bootstrap.Modal.getInstance(document.getElementById("editModal"));
-    editModal.hide();
-    
-    // Show success message
-    this.showSuccess("Transaksi berhasil diperbarui");
-    
-    // Refresh data
-    this.loadSalesData();
-    
-    this.showLoading(false);
-  } catch (error) {
-    console.error("Error saving edited transaction:", error);
-    this.showError("Error menyimpan perubahan: " + error.message);
-    this.showLoading(false);
-  }
-},
+  },
 
-// Confirm delete
-confirmDelete(transactionId) {
-  // Store the ID for the delete operation
-  this.currentDeleteId = transactionId;
-  
-  // Show confirmation modal
-  const confirmationModal = new bootstrap.Modal(document.getElementById("confirmationModal"));
-  confirmationModal.show();
-},
+  // Confirm delete
+  confirmDelete(transactionId) {
+    // Store the ID for the delete operation
+    this.currentDeleteId = transactionId;
 
-// Delete transaction
-async deleteTransaction() {
-  try {
-    this.showLoading(true);
-    
-    if (!this.currentDeleteId) {
-      throw new Error("ID transaksi tidak ditemukan");
+    // Show confirmation modal
+    const confirmationModal = new bootstrap.Modal(document.getElementById("confirmationModal"));
+    confirmationModal.show();
+  },
+
+  // Delete transaction
+  async deleteTransaction() {
+    try {
+      this.showLoading(true);
+
+      if (!this.currentDeleteId) {
+        throw new Error("ID transaksi tidak ditemukan");
+      }
+
+      // Delete transaction from Firestore
+      await deleteDoc(doc(firestore, "penjualanAksesoris", this.currentDeleteId));
+
+      // Close modal
+      const confirmationModal = bootstrap.Modal.getInstance(document.getElementById("confirmationModal"));
+      confirmationModal.hide();
+
+      // PERUBAHAN: Update data lokal dengan menghapus item dari array
+      this.salesData = this.salesData.filter((item) => item.id !== this.currentDeleteId);
+      this.filteredSalesData = this.filteredSalesData.filter((item) => item.id !== this.currentDeleteId);
+
+      // Render ulang tabel dengan data yang sudah diperbarui
+      this.renderSalesTable();
+
+      // Show success message
+      this.showSuccess("Transaksi berhasil dihapus");
+
+      this.showLoading(false);
+    } catch (error) {
+      console.error("Error deleting transaction:", error);
+      this.showError("Error menghapus transaksi: " + error.message);
+      this.showLoading(false);
     }
-    
-    // Delete transaction from Firestore
-    await deleteDoc(doc(firestore, "penjualanAksesoris", this.currentDeleteId));
-    
-    // Close modal
-    const confirmationModal = bootstrap.Modal.getInstance(document.getElementById("confirmationModal"));
-    confirmationModal.hide();
-    
-    // Show success message
-    this.showSuccess("Transaksi berhasil dihapus");
-    
-    // Refresh data
-    this.loadSalesData();
-    
-    this.showLoading(false);
-  } catch (error) {
-    console.error("Error deleting transaction:", error);
-    this.showError("Error menghapus transaksi: " + error.message);
-    this.showLoading(false);
-  }
-},
+  },
 
-// Show success message
-showSuccess(message) {
-  // You can implement this with a toast notification or alert
-  alert(message);
-},
+  // Show success message
+  showSuccess(message) {
+    // You can implement this with a toast notification or alert
+    alert(message);
+  },
 
-// Show error message
-showError(message) {
-  // You can implement this with a toast notification or alert
-  alert(message);
-},
+  // Show error message
+  showError(message) {
+    // You can implement this with a toast notification or alert
+    alert(message);
+  },
 
   renderStockTable() {
     try {
@@ -2504,14 +2868,14 @@ document.addEventListener("DOMContentLoaded", function () {
   laporanAksesorisHandler.init();
 
   // Save edit button handler
-document.getElementById("saveEditBtn").addEventListener("click", () => {
-  this.saveEditedTransaction();
-});
+  document.getElementById("saveEditBtn").addEventListener("click", () => {
+    laporanAksesorisHandler.saveEditedTransaction();
+  });
 
-// Confirm delete button handler
-document.getElementById("confirmDeleteBtn").addEventListener("click", () => {
-  this.deleteTransaction();
-});
+  // Confirm delete button handler
+  document.getElementById("confirmDeleteBtn").addEventListener("click", () => {
+    laporanAksesorisHandler.deleteTransaction();
+  });
 
   // Set interval to clean up cache periodically
   setInterval(() => {
