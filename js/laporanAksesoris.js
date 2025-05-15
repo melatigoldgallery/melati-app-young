@@ -61,6 +61,7 @@ function printSummaryReceiptFormat(summaryData) {
           size: 80mm auto;  /* Lebar 8cm, tinggi menyesuaikan */
           margin: 0;
         }
+
         body {
           font-family: 'Courier New', monospace;
           font-size: 10px;
@@ -1469,209 +1470,59 @@ const laporanAksesorisHandler = {
   },
 
   // Fungsi untuk mencetak struk kasir
-  printReceipt(transaction) {
-    try {
-      console.log("Printing receipt with data:", transaction);
-  
-      // Buat jendela baru untuk print
-      const printWindow = window.open("", "_blank");
-      
-      // Periksa apakah jendela berhasil dibuka
-      if (!printWindow) {
-        throw new Error("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak struk.");
-      }
-  
-      // Format tanggal
-      const tanggal = transaction.tanggal || this.formatTimestamp(transaction.timestamp);
-      const salesType = transaction.jenisPenjualan || "aksesoris";
-  
-      // Buat konten HTML untuk struk
-      let receiptHTML = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Struk Kasir</title>
-          <style>
-            body {
-              font-family: 'Courier New', monospace;
-              font-size: 12px;
-              margin: 0;
-              padding: 0;
-            }
-            .receipt {
-              width: 80mm;
-              margin: 0 auto;
-              padding: 5mm;
-            }
-            .receipt h3, .receipt h4 {
-              text-align: center;
-              margin: 2mm 0;
-            }
-            .receipt hr {
-              border-top: 1px dashed #000;
-            }
-            .receipt table {
-              width: 100%;
-              border-collapse: collapse;
-            }
-            .receipt th, .receipt td {
-              text-align: left;
-              padding: 1mm 2mm;
-            }
-            .text-center {
-              text-align: center;
-            }
-            .text-right {
-              text-align: right;
-            }
-            .keterangan {
-              font-style: italic;
-              font-size: 10px;
-              margin-top: 2mm;
-              border-top: 1px dotted #000;
-              padding-top: 2mm;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="receipt">
-            <h3>MELATI 3</h3>
-            <h4>JL. DIPONEGORO NO. 116</h4>
-            <h4>NOTA PENJUALAN ${salesType.toUpperCase()}</h4>
-            <hr>
-            <p>Tanggal: ${tanggal}<br>Sales: ${transaction.sales || "-"}</p>
-            <hr>
-            <table>
-              <tr>
-                <th>Kode</th>
-                <th>Nama</th>
-                <th>Kadar</th>
-                <th>Gr</th>
-                <th>Harga</th>
-              </tr>
-      `;
-  
-      // Tambahkan item ke struk
-      let hasKeterangan = false;
-      let keteranganText = "";
-  
-      transaction.items.forEach((item) => {
-        receiptHTML += `
-          <tr>
-            <td>${item.kodeText || "-"}</td>
-            <td>${item.nama || "-"}</td>
-            <td>${item.kadar || "-"}</td>
-            <td>${item.berat || "-"}</td>
-            <td class="text-right">${formatRupiah(item.totalHarga)}</td>
-          </tr>
-        `;
-  
-        // Simpan keterangan jika ada
-        if (item.keterangan && item.keterangan.trim() !== "") {
-          hasKeterangan = true;
-          keteranganText += item.keterangan + " ";
-        }
-      });
-  
-      // Tambahkan total
-      receiptHTML += `
-              <tr>
-                <td colspan="4" class="text-right"><strong>Total:</strong></td>
-                <td class="text-right"><strong>${formatRupiah(transaction.totalHarga)}</strong></td>
-              </tr>
-            </table>
-            <hr>
-      `;
-  
-      // Tambahkan keterangan jika ada
-      if (hasKeterangan && transaction.jenisPenjualan === "manual") {
-        receiptHTML += `
-            <div class="keterangan">
-              <strong>Keterangan:</strong> ${keteranganText}
-            </div>
-        `;
-      }
-  
-      receiptHTML += `
-            <p class="text-center">Terima Kasih<br>Atas Kunjungan Anda</p>
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
-        </body>
-        </html>
-      `;
-  
-      // Tulis HTML ke jendela baru dengan penanganan error yang lebih baik
-      try {
-        // Tunggu sebentar untuk memastikan jendela sudah siap
-        setTimeout(() => {
-          if (printWindow.document) {
-            printWindow.document.write(receiptHTML);
-            printWindow.document.close();
-          } else {
-            console.error("Dokumen jendela cetak tidak tersedia");
-            this.showError("Gagal mencetak struk: Dokumen jendela cetak tidak tersedia");
-          }
-        }, 100);
-      } catch (writeError) {
-        console.error("Error writing to print window:", writeError);
-        this.showError("Gagal menulis ke jendela cetak: " + writeError.message);
-      }
-    } catch (error) {
-      console.error("Error printing receipt:", error);
-      this.showError("Error mencetak struk: " + error.message);
+printReceipt(transaction) {
+  try {
+    if (!transaction) {
+      alert("Tidak ada data transaksi untuk dicetak!");
+      return;
     }
-  },
-
-  // Fungsi untuk mencetak invoice customer
-  printInvoice(transaction) {
-    try {
-      console.log("Printing invoice with data:", transaction);
-
-      // Buat jendela baru untuk print
-      const printWindow = window.open("", "_blank");
-
-      // Format tanggal
-      const tanggal = transaction.tanggal || this.formatTimestamp(transaction.timestamp);
-      const salesType = transaction.jenisPenjualan || "aksesoris";
-
-      // Buat konten HTML untuk invoice
-      let invoiceHTML = `
+    
+    console.log("Printing receipt with data:", transaction);
+  
+    // Buat jendela baru untuk print
+    const printWindow = window.open("", "_blank");
+    
+    // Periksa apakah jendela berhasil dibuka
+    if (!printWindow) {
+      throw new Error("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak struk.");
+    }
+  
+    // Format tanggal
+    const tanggal = transaction.tanggal || this.formatTimestamp(transaction.timestamp);
+    const salesType = transaction.jenisPenjualan || "aksesoris";
+  
+    // Buat konten HTML untuk struk
+    let receiptHTML = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Invoice Customer</title>
+        <title>Struk Kasir</title>
         <style>
           body {
-            font-family: Arial, sans-serif;
+            font-family: 'Courier New', monospace;
             font-size: 12px;
             margin: 0;
             padding: 0;
+            width: 80mm;
           }
-          .invoice {
-            width: 210mm;
+          .receipt {
             margin: 0 auto;
-            padding: 10mm;
+            padding: 5mm;
           }
-          .invoice h2, .invoice h3 {
+          .receipt h3, .receipt h4 {
             text-align: center;
-            margin: 5mm 0;
+            margin: 2mm 0;
           }
-          .invoice table {
+          .receipt hr {
+            border-top: 1px dashed #000;
+          }
+          .receipt table {
             width: 100%;
             border-collapse: collapse;
-            margin: 5mm 0;
           }
-          .invoice table, .invoice th, .invoice td {
-            border: 1px solid #000;
-          }
-          .invoice th, .invoice td {
-            padding: 2mm;
+          .receipt th, .receipt td {
             text-align: left;
+            padding: 1mm 2mm;
           }
           .text-center {
             text-align: center;
@@ -1679,93 +1530,76 @@ const laporanAksesorisHandler = {
           .text-right {
             text-align: right;
           }
-          .signature-area {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 30px;
-          }
-          .signature-box {
-            text-align: center;
-            width: 40%;
-          }
           .keterangan {
-            margin-top: 5mm;
-            padding: 2mm;
-            border: 1px solid #000;
             font-style: italic;
+            font-size: 10px;
+            margin-top: 2mm;
+            border-top: 1px dotted #000;
+            padding-top: 2mm;
           }
         </style>
       </head>
       <body>
-       <div class="invoice">
-          <h2>MELATI GOLD SHOP</h2>
-          <h3>INVOICE PENJUALAN ${salesType.toUpperCase()}</h3>
-          
-          <div>
-            <p><strong>Tanggal:</strong> ${tanggal}</p>
-            <p><strong>Sales:</strong> ${transaction.sales || "-"}</p>
-          </div>
-          
+        <div class="receipt">
+          <h3>MELATI 3</h3>
+          <h4>JL. DIPONEGORO NO. 116</h4>
+          <h4>NOTA PENJUALAN ${salesType.toUpperCase()}</h4>
+          <hr>
+          <p>Tanggal: ${tanggal}<br>Sales: ${transaction.sales || "-"}</p>
+          <hr>
           <table>
-            <thead>
-              <tr>
-                <th>Kode Barang</th>
-                <th>Ptg</th>
-                <th>Nama Barang</th>
-                <th>Kadar</th>
-                <th>Berat</th>
-                <th>Harga</th>
-                ${salesType === "manual" ? "<th>Keterangan</th>" : ""}
-              </tr>
-            </thead>
-            <tbody>
+            <tr>
+              <th>Kode</th>
+              <th>Nama</th>
+              <th>Kadar</th>
+              <th>Gr</th>
+              <th>Harga</th>
+            </tr>
     `;
-
-      // Tambahkan item ke invoice
-      let hasKeterangan = false;
-
-      transaction.items.forEach((item) => {
-        if (item.keterangan && item.keterangan.trim() !== "") {
-          hasKeterangan = true;
-        }
-
-        invoiceHTML += `
+  
+    // Tambahkan item ke struk
+    let hasKeterangan = false;
+    let keteranganText = "";
+  
+    transaction.items.forEach((item) => {
+      receiptHTML += `
         <tr>
           <td>${item.kodeText || "-"}</td>
-          <td>${item.jumlah || "1"}</td>
           <td>${item.nama || "-"}</td>
           <td>${item.kadar || "-"}</td>
           <td>${item.berat || "-"}</td>
-          <td class="text-right">${this.formatNumber(item.totalHarga)}</td>
-          ${salesType === "manual" ? `<td>${item.keterangan || "-"}</td>` : ""}
+          <td class="text-right">${parseInt(item.totalHarga || 0).toLocaleString("id-ID")}</td>
         </tr>
       `;
-      });
-
-      // Tambahkan total
-      invoiceHTML += `
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colspan="${salesType === "manual" ? "6" : "5"}" class="text-right"><strong>Total:</strong></td>
-                <td class="text-right"><strong>${this.formatNumber(transaction.totalHarga)}</strong></td>
-                ${salesType === "manual" ? "<td></td>" : ""}
-              </tr>
-            </tfoot>
+  
+      // Simpan keterangan jika ada
+      if (item.keterangan && item.keterangan.trim() !== "") {
+        hasKeterangan = true;
+        keteranganText += item.keterangan + " ";
+      }
+    });
+  
+    // Tambahkan total
+    receiptHTML += `
+            <tr>
+              <td colspan="4" class="text-right"><strong>Total:</strong></td>
+              <td class="text-right"><strong>${parseInt(transaction.totalHarga || 0).toLocaleString("id-ID")}</strong></td>
+            </tr>
           </table>
-          
-          <div class="signature-area">
-            <div class="signature-box">
-              <p>Customer</p>
-              <br><br><br>
-              <p>(______________)</p>
-            </div>
-            <div class="signature-box">
-              <p>Hormat Kami</p>
-              <br><br><br>
-              <p>(______________)</p>
-            </div>
+          <hr>
+    `;
+  
+    // Tambahkan keterangan jika ada
+    if (hasKeterangan && transaction.jenisPenjualan === "manual") {
+      receiptHTML += `
+          <div class="keterangan">
+            <strong>Keterangan:</strong> ${keteranganText}
           </div>
+      `;
+    }
+  
+    receiptHTML += `
+          <p class="text-center">Terima Kasih<br>Atas Kunjungan Anda</p>
         </div>
         <script>
           window.onload = function() {
@@ -1776,15 +1610,187 @@ const laporanAksesorisHandler = {
       </body>
       </html>
     `;
-
-      // Tulis HTML ke jendela baru
-      printWindow.document.write(invoiceHTML);
-      printWindow.document.close();
-    } catch (error) {
-      console.error("Error printing invoice:", error);
-      this.showError("Error mencetak invoice: " + error.message);
+  
+    // Tulis HTML ke jendela baru dengan penanganan error yang lebih baik
+    try {
+      // Tunggu sebentar untuk memastikan jendela sudah siap
+      setTimeout(() => {
+        if (printWindow.document) {
+          printWindow.document.write(receiptHTML);
+          printWindow.document.close();
+        } else {
+          console.error("Dokumen jendela cetak tidak tersedia");
+          this.showError("Gagal mencetak struk: Dokumen jendela cetak tidak tersedia");
+        }
+      }, 100);
+    } catch (writeError) {
+      console.error("Error writing to print window:", writeError);
+      this.showError("Gagal menulis ke jendela cetak: " + writeError.message);
     }
-  },
+  } catch (error) {
+    console.error("Error printing receipt:", error);
+    this.showError("Error mencetak struk: " + error.message);
+  }
+},
+
+  // Fungsi untuk mencetak invoice customer
+printInvoice(transaction) {
+  try {
+    const currentTransactionData = transaction;
+    if (!currentTransactionData) {
+      alert("Tidak ada data transaksi untuk dicetak!");
+      return;
+    }
+    
+    console.log("Printing invoice with data:", currentTransactionData);
+    
+    // Buat jendela baru untuk print
+    const printWindow = window.open("", "_blank");
+    
+    // Buat konten HTML untuk invoice
+    let invoiceHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice Customer</title>
+        <style>
+          @page {
+            size: 20cm 10cm;
+            margin: 0;
+          }
+          body {
+            font-family: Arial, sans-serif;
+            font-size: 8px;
+            margin: 0;
+            padding: 5mm;
+            width: 20cm;
+            box-sizing: border-box;
+          }
+          .invoice {
+            width: 100%;
+          }
+          .header-info {
+            text-align: right;
+            margin-bottom: 2cm;
+          }
+          hr {
+            margin: 3mm 0;
+          }
+          .total-row {
+            margin-top: 2cm;
+            text-align: right;
+            font-weight: bold;
+          }
+          .sales{
+          text-align: right;
+          margin-top: 2cm;
+          }
+          .keterangan {
+            font-style: italic;
+            font-size: 10px;
+            margin-top: 2mm;
+            padding-top: 2mm;
+          }
+          
+          .item-details {
+            display: flex;
+            flex-wrap: wrap;
+          }
+          .item-price {
+            width: 100%;
+            text-align: right;
+            font-weight: bold;
+          }
+          .item-data {
+            display: grid;
+            grid-template-columns: 2cm 2cm 4cm 3cm 3cm;
+            width: 100%;
+            column-gap: 0.2cm;
+          }
+          .item-data span {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="invoice">
+          <div class="header-info">
+            <p>${transaction.tanggal || this.formatTimestamp(transaction.timestamp)}</p>
+          </div>
+          <hr>
+    `;
+    
+    // Tambahkan item ke invoice
+    let hasKeterangan = false;
+    let keteranganText = "";
+    let totalHarga = 0;
+    
+    transaction.items.forEach((item) => {
+      const itemHarga = parseInt(item.totalHarga) || 0;
+      totalHarga += itemHarga;
+      
+      invoiceHTML += `
+          <div class="item-details">
+            <div class="item-data">
+              <span>${item.kodeText || "-"}</span>
+              <span>${item.jumlah || "1"}pcs</span>
+              <span>${item.nama || "-"}</span>
+              <span>${item.berat || "-"}gr</span>
+              <span>${item.kadar || "-"}</span>
+            </div>
+            <div class="item-price">Rp ${itemHarga.toLocaleString("id-ID")}</div>
+          </div>
+      `;
+      
+      // Simpan keterangan jika ada
+      if (item.keterangan && item.keterangan.trim() !== "") {
+        hasKeterangan = true;
+        keteranganText += `${item.nama}: ${item.keterangan}; `;
+      }
+    });
+    
+    // Tambahkan garis pemisah
+    invoiceHTML += `<hr>`;
+    
+    // Tambahkan total di pojok kanan bawah
+    invoiceHTML += `
+          <div class="total-row">
+            Rp ${totalHarga.toLocaleString("id-ID")}
+          </div>
+        <div class="sales">${transaction.sales || "-"}</div>
+    `;
+    
+    // Tambahkan keterangan jika ada
+    if (hasKeterangan && transaction.jenisPenjualan === "manual") {
+      invoiceHTML += `
+          <div class="keterangan">
+            ${keteranganText}
+          </div>
+      `;
+    }
+    
+    invoiceHTML += `
+        </div>
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+    
+    // Tulis HTML ke jendela baru
+    printWindow.document.write(invoiceHTML);
+    printWindow.document.close();
+  } catch (error) {
+    console.error("Error printing invoice:", error);
+    this.showError("Error mencetak invoice: " + error.message);
+  }
+},
 
   // Fungsi untuk memformat timestamp menjadi string tanggal
   formatTimestamp(timestamp) {

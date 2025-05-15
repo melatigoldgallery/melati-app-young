@@ -1707,9 +1707,9 @@ function printReceipt() {
           font-size: 12px;
           margin: 0;
           padding: 0;
-        }
-        .receipt {
           width: 80mm;
+        }
+        .receipt {          
           margin: 0 auto;
           padding: 5mm;
         }
@@ -1840,7 +1840,7 @@ function printInvoice() {
       <title>Invoice Customer</title>
       <style>
         @page {
-          size: 10cm 20cm;
+          size: 20cm 10cm;
           margin: 0;
         }
         body {
@@ -1848,7 +1848,7 @@ function printInvoice() {
           font-size: 8px;
           margin: 0;
           padding: 5mm;
-          width: 10cm;
+          width: 20cm;
           box-sizing: border-box;
         }
         .invoice {
@@ -1856,30 +1856,30 @@ function printInvoice() {
         }
         .header-info {
           text-align: right;
-          margin-bottom: 5mm;
+          margin-bottom: 2cm;
         }
         hr {
           margin: 3mm 0;
         }
         .total-row {
-          margin-top: 2mm;
+          margin-top: 2cm;
           text-align: right;
           font-weight: bold;
         }
+        .sales{
+        text-align: right;
+        margin-top: 2cm;
+        }
         .keterangan {
           font-style: italic;
-          font-size: 8px;
+          font-size: 10px;
           margin-top: 2mm;
           padding-top: 2mm;
         }
-        .item-info {
-          margin-bottom: 3mm;
-          padding-bottom: 1mm;
-        }
+        
         .item-details {
           display: flex;
           flex-wrap: wrap;
-          margin-bottom: 2mm;
         }
         .item-price {
           width: 100%;
@@ -1888,7 +1888,7 @@ function printInvoice() {
         }
         .item-data {
           display: grid;
-          grid-template-columns: 1cm 3cm 1cm 1cm 1cm;
+          grid-template-columns: 2cm 2cm 4cm 3cm 3cm;
           width: 100%;
           column-gap: 0.2cm;
         }
@@ -1902,7 +1902,7 @@ function printInvoice() {
     <body>
       <div class="invoice">
         <div class="header-info">
-          <p>Tanggal: ${transaction.tanggal}<br>Sales: ${transaction.sales}</p>
+          <p>${transaction.tanggal}</p>
         </div>
         <hr>
   `;
@@ -1917,18 +1917,18 @@ function printInvoice() {
     totalHarga += itemHarga;
     
     invoiceHTML += `
-      <div class="item-info">
+
         <div class="item-details">
           <div class="item-data">
             <span>${item.kodeText || "-"}</span>
-            <span>${item.nama || "-"}</span>
             <span>${item.jumlah || "1"}pcs</span>
+            <span>${item.nama || "-"}</span>
             <span>${item.berat || "-"}gr</span>
             <span>${item.kadar || "-"}</span>
           </div>
           <div class="item-price">Rp ${itemHarga.toLocaleString("id-ID")}</div>
         </div>
-      </div>
+
     `;
     
     // Simpan keterangan jika ada
@@ -1946,6 +1946,7 @@ function printInvoice() {
         <div class="total-row">
           Rp ${totalHarga.toLocaleString("id-ID")}
         </div>
+      <div class="sales">${transaction.sales}</div>
   `;
   
   // Tambahkan keterangan jika ada
