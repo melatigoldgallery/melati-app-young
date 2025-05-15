@@ -1499,8 +1499,8 @@ printReceipt(transaction) {
         <title>Struk Kasir</title>
         <style>
           body {
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
+            font-family: roboto;
+            font-size: 13px;
             margin: 0;
             padding: 0;
             width: 80mm;
@@ -1532,7 +1532,7 @@ printReceipt(transaction) {
           }
           .keterangan {
             font-style: italic;
-            font-size: 10px;
+            font-size: 13px;
             margin-top: 2mm;
             border-top: 1px dotted #000;
             padding-top: 2mm;
@@ -1655,12 +1655,12 @@ printInvoice(transaction) {
         <title>Invoice Customer</title>
         <style>
           @page {
-            size: 20cm 10cm;
+            size: 10cm 20cm;
             margin: 0;
           }
           body {
             font-family: Arial, sans-serif;
-            font-size: 8px;
+            font-size: 12px;
             margin: 0;
             padding: 5mm;
             width: 20cm;
@@ -1672,18 +1672,22 @@ printInvoice(transaction) {
           .header-info {
             text-align: right;
             margin-bottom: 2cm;
+            margin-right:3cm:
+            margin-top:1cm;
           }
           hr {
             margin: 3mm 0;
           }
           .total-row {
-            margin-top: 2cm;
+            margin-top: 1.9cm;
             text-align: right;
             font-weight: bold;
+            margin-right: 3cm;
           }
           .sales{
           text-align: right;
-          margin-top: 2cm;
+          margin-top: 0.6cm;
+          margin-right:2cm;
           }
           .keterangan {
             font-style: italic;
@@ -1703,9 +1707,12 @@ printInvoice(transaction) {
           }
           .item-data {
             display: grid;
-            grid-template-columns: 2cm 2cm 4cm 3cm 3cm;
+            grid-template-columns: 2cm 1.8cm 5cm 2cm 2cm 2cm;
             width: 100%;
             column-gap: 0.2cm;
+            margin-left: 1cm;
+            margin-top: 1.5cm;
+            margin-right: 3cm;
           }
           .item-data span {
             white-space: nowrap;
@@ -1737,10 +1744,10 @@ printInvoice(transaction) {
               <span>${item.kodeText || "-"}</span>
               <span>${item.jumlah || "1"}pcs</span>
               <span>${item.nama || "-"}</span>
-              <span>${item.berat || "-"}gr</span>
               <span>${item.kadar || "-"}</span>
+              <span>${item.berat || "-"}gr</span>
+              <span>${itemHarga.toLocaleString("id-ID")}</span>
             </div>
-            <div class="item-price">Rp ${itemHarga.toLocaleString("id-ID")}</div>
           </div>
       `;
       
