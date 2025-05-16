@@ -1470,29 +1470,29 @@ const laporanAksesorisHandler = {
   },
 
   // Fungsi untuk mencetak struk kasir
-printReceipt(transaction) {
-  try {
-    if (!transaction) {
-      alert("Tidak ada data transaksi untuk dicetak!");
-      return;
-    }
-    
-    console.log("Printing receipt with data:", transaction);
-  
-    // Buat jendela baru untuk print
-    const printWindow = window.open("", "_blank");
-    
-    // Periksa apakah jendela berhasil dibuka
-    if (!printWindow) {
-      throw new Error("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak struk.");
-    }
-  
-    // Format tanggal
-    const tanggal = transaction.tanggal || this.formatTimestamp(transaction.timestamp);
-    const salesType = transaction.jenisPenjualan || "aksesoris";
-  
-    // Buat konten HTML untuk struk
-    let receiptHTML = `
+  printReceipt(transaction) {
+    try {
+      if (!transaction) {
+        this.showError("Tidak ada data transaksi untuk dicetak!");
+        return;
+      }
+
+      console.log("Printing receipt with data:", transaction);
+
+      // Buat jendela baru untuk print
+      const printWindow = window.open("", "_blank");
+
+      // Periksa apakah jendela berhasil dibuka
+      if (!printWindow) {
+        throw new Error("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak struk.");
+      }
+
+      // Format tanggal
+      const tanggal = transaction.tanggal || this.formatTimestamp(transaction.timestamp);
+      const salesType = transaction.jenisPenjualan || "aksesoris";
+
+      // Buat konten HTML untuk struk
+      let receiptHTML = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -1556,13 +1556,13 @@ printReceipt(transaction) {
               <th>Harga</th>
             </tr>
     `;
-  
-    // Tambahkan item ke struk
-    let hasKeterangan = false;
-    let keteranganText = "";
-  
-    transaction.items.forEach((item) => {
-      receiptHTML += `
+
+      // Tambahkan item ke struk
+      let hasKeterangan = false;
+      let keteranganText = "";
+
+      transaction.items.forEach((item) => {
+        receiptHTML += `
         <tr>
           <td>${item.kodeText || "-"}</td>
           <td>${item.nama || "-"}</td>
@@ -1571,34 +1571,36 @@ printReceipt(transaction) {
           <td class="text-right">${parseInt(item.totalHarga || 0).toLocaleString("id-ID")}</td>
         </tr>
       `;
-  
-      // Simpan keterangan jika ada
-      if (item.keterangan && item.keterangan.trim() !== "") {
-        hasKeterangan = true;
-        keteranganText += item.keterangan + " ";
-      }
-    });
-  
-    // Tambahkan total
-    receiptHTML += `
+
+        // Simpan keterangan jika ada
+        if (item.keterangan && item.keterangan.trim() !== "") {
+          hasKeterangan = true;
+          keteranganText += item.keterangan + " ";
+        }
+      });
+
+      // Tambahkan total
+      receiptHTML += `
             <tr>
               <td colspan="4" class="text-right"><strong>Total:</strong></td>
-              <td class="text-right"><strong>${parseInt(transaction.totalHarga || 0).toLocaleString("id-ID")}</strong></td>
+              <td class="text-right"><strong>${parseInt(transaction.totalHarga || 0).toLocaleString(
+                "id-ID"
+              )}</strong></td>
             </tr>
           </table>
           <hr>
     `;
-  
-    // Tambahkan keterangan jika ada
-    if (hasKeterangan && transaction.jenisPenjualan === "manual") {
-      receiptHTML += `
+
+      // Tambahkan keterangan jika ada
+      if (hasKeterangan && transaction.jenisPenjualan === "manual") {
+        receiptHTML += `
           <div class="keterangan">
             <strong>Keterangan:</strong> ${keteranganText}
           </div>
       `;
-    }
-  
-    receiptHTML += `
+      }
+
+      receiptHTML += `
           <p class="text-center">Terima Kasih<br>Atas Kunjungan Anda</p>
         </div>
         <script>
@@ -1610,45 +1612,45 @@ printReceipt(transaction) {
       </body>
       </html>
     `;
-  
-    // Tulis HTML ke jendela baru dengan penanganan error yang lebih baik
-    try {
-      // Tunggu sebentar untuk memastikan jendela sudah siap
-      setTimeout(() => {
-        if (printWindow.document) {
-          printWindow.document.write(receiptHTML);
-          printWindow.document.close();
-        } else {
-          console.error("Dokumen jendela cetak tidak tersedia");
-          this.showError("Gagal mencetak struk: Dokumen jendela cetak tidak tersedia");
-        }
-      }, 100);
-    } catch (writeError) {
-      console.error("Error writing to print window:", writeError);
-      this.showError("Gagal menulis ke jendela cetak: " + writeError.message);
+
+      // Tulis HTML ke jendela baru dengan penanganan error yang lebih baik
+      try {
+        // Tunggu sebentar untuk memastikan jendela sudah siap
+        setTimeout(() => {
+          if (printWindow.document) {
+            printWindow.document.write(receiptHTML);
+            printWindow.document.close();
+          } else {
+            console.error("Dokumen jendela cetak tidak tersedia");
+            this.showError("Gagal mencetak struk: Dokumen jendela cetak tidak tersedia");
+          }
+        }, 100);
+      } catch (writeError) {
+        console.error("Error writing to print window:", writeError);
+        this.showError("Gagal menulis ke jendela cetak: " + writeError.message);
+      }
+    } catch (error) {
+      console.error("Error printing receipt:", error);
+      this.showError("Error mencetak struk: " + error.message);
     }
-  } catch (error) {
-    console.error("Error printing receipt:", error);
-    this.showError("Error mencetak struk: " + error.message);
-  }
-},
+  },
 
   // Fungsi untuk mencetak invoice customer
-printInvoice(transaction) {
-  try {
-    const currentTransactionData = transaction;
-    if (!currentTransactionData) {
-      alert("Tidak ada data transaksi untuk dicetak!");
-      return;
-    }
-    
-    console.log("Printing invoice with data:", currentTransactionData);
-    
-    // Buat jendela baru untuk print
-    const printWindow = window.open("", "_blank");
-    
-    // Buat konten HTML untuk invoice
-    let invoiceHTML = `
+  printInvoice(transaction) {
+    try {
+      const currentTransactionData = transaction;
+      if (!currentTransactionData) {
+        this.showError("Tidak ada data transaksi untuk dicetak!");
+        return;
+      }
+
+      console.log("Printing invoice with data:", currentTransactionData);
+
+      // Buat jendela baru untuk print
+      const printWindow = window.open("", "_blank");
+
+      // Buat konten HTML untuk invoice
+      let invoiceHTML = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -1674,10 +1676,7 @@ printInvoice(transaction) {
             margin-bottom: 2cm;
             margin-right:3cm:
             margin-top:1cm;
-          }
-          hr {
-            margin: 3mm 0;
-          }
+          }         
           .total-row {
             margin-top: 1.9cm;
             text-align: right;
@@ -1728,17 +1727,17 @@ printInvoice(transaction) {
           </div>
           <hr>
     `;
-    
-    // Tambahkan item ke invoice
-    let hasKeterangan = false;
-    let keteranganText = "";
-    let totalHarga = 0;
-    
-    transaction.items.forEach((item) => {
-      const itemHarga = parseInt(item.totalHarga) || 0;
-      totalHarga += itemHarga;
-      
-      invoiceHTML += `
+
+      // Tambahkan item ke invoice
+      let hasKeterangan = false;
+      let keteranganText = "";
+      let totalHarga = 0;
+
+      transaction.items.forEach((item) => {
+        const itemHarga = parseInt(item.totalHarga) || 0;
+        totalHarga += itemHarga;
+
+        invoiceHTML += `
           <div class="item-details">
             <div class="item-data">
               <span>${item.kodeText || "-"}</span>
@@ -1750,35 +1749,32 @@ printInvoice(transaction) {
             </div>
           </div>
       `;
-      
-      // Simpan keterangan jika ada
-      if (item.keterangan && item.keterangan.trim() !== "") {
-        hasKeterangan = true;
-        keteranganText += `${item.nama}: ${item.keterangan}; `;
-      }
-    });
-    
-    // Tambahkan garis pemisah
-    invoiceHTML += `<hr>`;
-    
-    // Tambahkan total di pojok kanan bawah
-    invoiceHTML += `
+
+        // Simpan keterangan jika ada
+        if (item.keterangan && item.keterangan.trim() !== "") {
+          hasKeterangan = true;
+          keteranganText += `${item.nama}: ${item.keterangan}; `;
+        }
+      });
+
+      // Tambahkan total di pojok kanan bawah
+      invoiceHTML += `
           <div class="total-row">
             Rp ${totalHarga.toLocaleString("id-ID")}
           </div>
         <div class="sales">${transaction.sales || "-"}</div>
     `;
-    
-    // Tambahkan keterangan jika ada
-    if (hasKeterangan && transaction.jenisPenjualan === "manual") {
-      invoiceHTML += `
+
+      // Tambahkan keterangan jika ada
+      if (hasKeterangan && transaction.jenisPenjualan === "manual") {
+        invoiceHTML += `
           <div class="keterangan">
             ${keteranganText}
           </div>
       `;
-    }
-    
-    invoiceHTML += `
+      }
+
+      invoiceHTML += `
         </div>
         <script>
           window.onload = function() {
@@ -1789,15 +1785,15 @@ printInvoice(transaction) {
       </body>
       </html>
     `;
-    
-    // Tulis HTML ke jendela baru
-    printWindow.document.write(invoiceHTML);
-    printWindow.document.close();
-  } catch (error) {
-    console.error("Error printing invoice:", error);
-    this.showError("Error mencetak invoice: " + error.message);
-  }
-},
+
+      // Tulis HTML ke jendela baru
+      printWindow.document.write(invoiceHTML);
+      printWindow.document.close();
+    } catch (error) {
+      console.error("Error printing invoice:", error);
+      this.showError("Error mencetak invoice: " + error.message);
+    }
+  },
 
   // Fungsi untuk memformat timestamp menjadi string tanggal
   formatTimestamp(timestamp) {
@@ -1824,56 +1820,56 @@ printInvoice(transaction) {
   },
 
   // Fungsi untuk memformat jenis penjualan
-formatSalesType(type) {
-  if (!type) return "-";
-  
-  switch (type.toLowerCase()) {
-    case "aksesoris":
-      return "Aksesoris";
-    case "kotak":
-      return "Kotak Perhiasan";
-    case "gantilock":
-      return "Ganti Lock";
-    case "manual":
-      return "Manual";
-    default:
-      return type;
-  }
-},
+  formatSalesType(type) {
+    if (!type) return "-";
 
-// Fungsi untuk memformat angka menjadi format rupiah
-formatNumber(number) {
-  if (number === undefined || number === null) return "0";
-  
-  // Pastikan number adalah angka
-  const num = typeof number === "string" ? parseInt(number.replace(/\D/g, "")) : number;
-  
-  return num.toLocaleString("id-ID");
-},
+    switch (type.toLowerCase()) {
+      case "aksesoris":
+        return "Aksesoris";
+      case "kotak":
+        return "Kotak Perhiasan";
+      case "gantilock":
+        return "Ganti Lock";
+      case "manual":
+        return "Manual";
+      default:
+        return type;
+    }
+  },
+
+  // Fungsi untuk memformat angka menjadi format rupiah
+  formatNumber(number) {
+    if (number === undefined || number === null) return "0";
+
+    // Pastikan number adalah angka
+    const num = typeof number === "string" ? parseInt(number.replace(/\D/g, "")) : number;
+
+    return num.toLocaleString("id-ID");
+  },
 
   // Reprint invoice - modifikasi fungsi yang sudah ada
-async reprintInvoice(transactionId) {
-  try {
-    this.showLoading(true);
-    
-    // Get transaction data from Firestore
-    const transactionDoc = await getDoc(doc(firestore, "penjualanAksesoris", transactionId));
-    
-    if (!transactionDoc.exists()) {
-      throw new Error("Transaksi tidak ditemukan");
-    }
-    
-    const transaction = transactionDoc.data();
-    transaction.id = transactionId; // Tambahkan ID ke objek transaksi
-    
-    // Tampilkan dropdown untuk memilih jenis cetak
-    const printOptions = [
-      { id: 'invoice', name: 'Invoice Customer (A4)', icon: 'file-invoice' },
-      { id: 'receipt', name: 'Struk Kasir (Thermal)', icon: 'receipt' }
-    ];
-    
-    // Buat modal untuk memilih jenis cetak
-    const modalHTML = `
+  async reprintInvoice(transactionId) {
+    try {
+      this.showLoading(true);
+
+      // Get transaction data from Firestore
+      const transactionDoc = await getDoc(doc(firestore, "penjualanAksesoris", transactionId));
+
+      if (!transactionDoc.exists()) {
+        throw new Error("Transaksi tidak ditemukan");
+      }
+
+      const transaction = transactionDoc.data();
+      transaction.id = transactionId; // Tambahkan ID ke objek transaksi
+
+      // Tampilkan dropdown untuk memilih jenis cetak
+      const printOptions = [
+        { id: "invoice", name: "Invoice Customer (A4)", icon: "file-invoice" },
+        { id: "receipt", name: "Struk Kasir (Thermal)", icon: "receipt" },
+      ];
+
+      // Buat modal untuk memilih jenis cetak
+      const modalHTML = `
       <div class="modal fade" id="printOptionsModal" tabindex="-1" aria-labelledby="printOptionsModalLabel" aria-hidden="true">
         <div class="modal-dialog">
           <div class="modal-content">
@@ -1883,11 +1879,15 @@ async reprintInvoice(transactionId) {
             </div>
             <div class="modal-body">
               <div class="list-group">
-                ${printOptions.map(option => `
+                ${printOptions
+                  .map(
+                    (option) => `
                   <button type="button" class="list-group-item list-group-item-action print-option" data-option="${option.id}">
                     <i class="fas fa-${option.icon} me-2"></i> ${option.name}
                   </button>
-                `).join('')}
+                `
+                  )
+                  .join("")}
               </div>
             </div>
             <div class="modal-footer">
@@ -1897,40 +1897,40 @@ async reprintInvoice(transactionId) {
         </div>
       </div>
     `;
-    
-    // Tambahkan modal ke body jika belum ada
-    if (!document.getElementById('printOptionsModal')) {
-      const modalContainer = document.createElement('div');
-      modalContainer.innerHTML = modalHTML;
-      document.body.appendChild(modalContainer);
-    }
-    
-    // Tampilkan modal
-    const printOptionsModal = new bootstrap.Modal(document.getElementById('printOptionsModal'));
-    printOptionsModal.show();
-    
-    // Tambahkan event listener untuk opsi cetak
-    document.querySelectorAll('.print-option').forEach(button => {
-      button.addEventListener('click', () => {
-        const option = button.getAttribute('data-option');
-        printOptionsModal.hide();
-        
-        // Cetak sesuai opsi yang dipilih
-        if (option === 'invoice') {
-          this.printInvoice(transaction);
-        } else if (option === 'receipt') {
-          this.printReceipt(transaction);
-        }
+
+      // Tambahkan modal ke body jika belum ada
+      if (!document.getElementById("printOptionsModal")) {
+        const modalContainer = document.createElement("div");
+        modalContainer.innerHTML = modalHTML;
+        document.body.appendChild(modalContainer);
+      }
+
+      // Tampilkan modal
+      const printOptionsModal = new bootstrap.Modal(document.getElementById("printOptionsModal"));
+      printOptionsModal.show();
+
+      // Tambahkan event listener untuk opsi cetak
+      document.querySelectorAll(".print-option").forEach((button) => {
+        button.addEventListener("click", () => {
+          const option = button.getAttribute("data-option");
+          printOptionsModal.hide();
+
+          // Cetak sesuai opsi yang dipilih
+          if (option === "invoice") {
+            this.printInvoice(transaction);
+          } else if (option === "receipt") {
+            this.printReceipt(transaction);
+          }
+        });
       });
-    });
-    
-    this.showLoading(false);
-  } catch (error) {
-    console.error("Error reprinting invoice:", error);
-    this.showError("Error mencetak ulang: " + error.message);
-    this.showLoading(false);
-  }
-},
+
+      this.showLoading(false);
+    } catch (error) {
+      console.error("Error reprinting invoice:", error);
+      this.showError("Error mencetak ulang: " + error.message);
+      this.showLoading(false);
+    }
+  },
 
   // Show edit form
   async showEditForm(transactionId) {
@@ -2206,13 +2206,15 @@ async reprintInvoice(transactionId) {
   },
 
   // Confirm delete
-  confirmDelete(transactionId) {
+  async confirmDelete(transactionId) {
     // Store the ID for the delete operation
     this.currentDeleteId = transactionId;
 
-    // Show confirmation modal
-    const confirmationModal = new bootstrap.Modal(document.getElementById("confirmationModal"));
-    confirmationModal.show();
+    // Show confirmation dialog
+    const confirmed = await this.showConfirm("Apakah Anda yakin ingin menghapus transaksi ini?");
+    if (confirmed) {
+      this.deleteTransaction();
+    }
   },
 
   // Delete transaction
@@ -2227,9 +2229,10 @@ async reprintInvoice(transactionId) {
       // Delete transaction from Firestore
       await deleteDoc(doc(firestore, "penjualanAksesoris", this.currentDeleteId));
 
-      // Close modal
-      const confirmationModal = bootstrap.Modal.getInstance(document.getElementById("confirmationModal"));
-      confirmationModal.hide();
+      // Tidak perlu menutup modal karena kita menggunakan SweetAlert2
+      // Hapus baris berikut:
+      // const confirmationModal = bootstrap.Modal.getInstance(document.getElementById("confirmationModal"));
+      // confirmationModal.hide();
 
       // PERUBAHAN: Update data lokal dengan menghapus item dari array
       this.salesData = this.salesData.filter((item) => item.id !== this.currentDeleteId);
@@ -2251,14 +2254,63 @@ async reprintInvoice(transactionId) {
 
   // Show success message
   showSuccess(message) {
-    // You can implement this with a toast notification or alert
-    alert(message);
+    if (typeof Swal !== "undefined") {
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        html: message,
+        confirmButtonColor: "#28a745",
+        timer: 3000,
+        timerProgressBar: true,
+        showClass: {
+          popup: "animate__animated animate__fadeInDown",
+        },
+        hideClass: {
+          popup: "animate__animated animate__fadeOutUp",
+        },
+      });
+    } else {
+      alert(message);
+    }
   },
 
   // Show error message
   showError(message) {
-    // You can implement this with a toast notification or alert
-    alert(message);
+    if (typeof Swal !== "undefined") {
+      Swal.fire({
+        icon: "error",
+        title: "Error!",
+        html: message,
+        confirmButtonColor: "#dc3545",
+        showClass: {
+          popup: "animate__animated animate__shakeX",
+        },
+      });
+    } else {
+      alert(message);
+    }
+  },
+
+  // Show confirmation dialog
+  showConfirm(message, title = "Konfirmasi") {
+    return new Promise((resolve) => {
+      if (typeof Swal !== "undefined") {
+        Swal.fire({
+          title: title,
+          html: message,
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonColor: "#28a745",
+          cancelButtonColor: "#dc3545",
+          confirmButtonText: "Ya",
+          cancelButtonText: "Batal",
+        }).then((result) => {
+          resolve(result.isConfirmed);
+        });
+      } else {
+        resolve(confirm(message));
+      }
+    });
   },
 
   renderStockTable() {
@@ -2759,7 +2811,7 @@ async reprintInvoice(transactionId) {
   // Export sales data to Excel
   exportSalesData() {
     if (!this.filteredSalesData.length) {
-      alert("Tidak ada data untuk diekspor");
+      this.showError("Tidak ada data untuk diekspor");
       return;
     }
 
@@ -2816,7 +2868,7 @@ async reprintInvoice(transactionId) {
   // Export stock data to Excel (fungsi ini bisa dihapus karena sudah digantikan oleh DataTables Buttons)
   exportStockData() {
     if (!this.filteredStockData.length) {
-      alert("Tidak ada data untuk diekspor");
+      this.showError("Tidak ada data untuk diekspor");
       return;
     }
 

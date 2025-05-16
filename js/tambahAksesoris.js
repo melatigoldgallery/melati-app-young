@@ -11,7 +11,7 @@ import {
   where,
   orderBy,
   Timestamp,
-  serverTimestamp
+  serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
 // Utility functions
@@ -21,18 +21,18 @@ export const aksesorisSaleHandler = {
     kodeAksesoris: {
       kotak: null,
       aksesoris: null,
-      lastFetched: null
+      lastFetched: null,
     },
     stockAdditions: {
       data: {},
-      lastFetched: {}
+      lastFetched: {},
     },
     stockData: {
       data: null,
-      lastFetched: null
-    }
+      lastFetched: null,
+    },
   },
-  
+
   // Other properties
   OPSI_KOTAK: [],
   OPSI_AKSESORIS: [],
@@ -59,10 +59,10 @@ export const aksesorisSaleHandler = {
     const selectKategori = document.getElementById("jenis-aksesoris");
     const tbody = document.querySelector("#tableTambahAksesoris tbody");
     this.handleCategoryChange(selectKategori.value, tbody);
-     
+
     // Set tanggal hari ini
     this.setTodayDate();
-    
+
     // Load riwayat penambahan stok
     this.loadStockAdditionHistory();
   },
@@ -70,21 +70,21 @@ export const aksesorisSaleHandler = {
   // Fungsi untuk mengisi tanggal hari ini
   setTodayDate() {
     const today = new Date();
-    const day = String(today.getDate()).padStart(2, '0');
-    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, "0");
+    const month = String(today.getMonth() + 1).padStart(2, "0");
     const year = today.getFullYear();
-    
+
     const formattedDate = `${day}/${month}/${year}`;
     const tanggalInput = document.getElementById("tanggal");
-    
+
     if (tanggalInput) {
-        tanggalInput.value = formattedDate;
+      tanggalInput.value = formattedDate;
     }
-    
+
     // Set tanggal filter riwayat juga
     const filterDateInput = document.getElementById("filterDate");
     if (filterDateInput) {
-        filterDateInput.value = formattedDate;
+      filterDateInput.value = formattedDate;
     }
   },
 
@@ -98,7 +98,7 @@ export const aksesorisSaleHandler = {
       btnBatal: document.getElementById("btnBatal"),
       btnKelolaKode: document.getElementById("btnKelolaKode"),
       btnFilterHistory: document.getElementById("btnFilterHistory"),
-      filterDate: document.getElementById("filterDate")
+      filterDate: document.getElementById("filterDate"),
     };
 
     // Validasi elemen DOM
@@ -168,7 +168,7 @@ export const aksesorisSaleHandler = {
         this.showKelolaKodeModal();
       });
     }
-    
+
     // Event listener untuk tombol filter riwayat
     if (this.elements.btnFilterHistory) {
       this.elements.btnFilterHistory.addEventListener("click", () => {
@@ -220,21 +220,21 @@ export const aksesorisSaleHandler = {
         this.simpanKodeBarang();
       });
     }
-    
+
     // Initialize datepicker for filter date
     if (this.elements.filterDate) {
       $(this.elements.filterDate).datepicker({
-        format: 'dd/mm/yyyy',
+        format: "dd/mm/yyyy",
         autoclose: true,
-        language: 'id',
-        todayHighlight: true
+        language: "id",
+        todayHighlight: true,
       });
-      
+
       // Calendar icon click handler
-      const filterDateIcon = document.getElementById('filterDateIcon');
+      const filterDateIcon = document.getElementById("filterDateIcon");
       if (filterDateIcon) {
-        filterDateIcon.addEventListener('click', () => {
-          $(this.elements.filterDate).datepicker('show');
+        filterDateIcon.addEventListener("click", () => {
+          $(this.elements.filterDate).datepicker("show");
         });
       }
     }
@@ -243,217 +243,221 @@ export const aksesorisSaleHandler = {
   // Fungsi untuk memasang event listener pencarian
   attachSearchListeners() {
     // Search untuk kotak
-    const searchKotak = document.getElementById('searchKotak');
-    const clearSearchKotak = document.getElementById('clearSearchKotak');
-    
+    const searchKotak = document.getElementById("searchKotak");
+    const clearSearchKotak = document.getElementById("clearSearchKotak");
+
     if (searchKotak) {
-        searchKotak.addEventListener('input', () => {
-            this.filterTable('kotak', searchKotak.value);
-        });
+      searchKotak.addEventListener("input", () => {
+        this.filterTable("kotak", searchKotak.value);
+      });
     }
-    
+
     if (clearSearchKotak) {
-        clearSearchKotak.addEventListener('click', () => {
-            if (searchKotak) {
-                searchKotak.value = '';
-                this.filterTable('kotak', '');
-            }
-        });
+      clearSearchKotak.addEventListener("click", () => {
+        if (searchKotak) {
+          searchKotak.value = "";
+          this.filterTable("kotak", "");
+        }
+      });
     }
-    
+
     // Search untuk aksesoris
-    const searchAksesoris = document.getElementById('searchAksesoris');
-    const clearSearchAksesoris = document.getElementById('clearSearchAksesoris');
-    
+    const searchAksesoris = document.getElementById("searchAksesoris");
+    const clearSearchAksesoris = document.getElementById("clearSearchAksesoris");
+
     if (searchAksesoris) {
-        searchAksesoris.addEventListener('input', () => {
-            this.filterTable('aksesoris', searchAksesoris.value);
-        });
+      searchAksesoris.addEventListener("input", () => {
+        this.filterTable("aksesoris", searchAksesoris.value);
+      });
     }
-    
+
     if (clearSearchAksesoris) {
-        clearSearchAksesoris.addEventListener('click', () => {
-            if (searchAksesoris) {
-                searchAksesoris.value = '';
-                this.filterTable('aksesoris', '');
-            }
-        });
+      clearSearchAksesoris.addEventListener("click", () => {
+        if (searchAksesoris) {
+          searchAksesoris.value = "";
+          this.filterTable("aksesoris", "");
+        }
+      });
     }
   },
 
   // Fungsi untuk memfilter tabel berdasarkan input pencarian
   filterTable(kategori, searchText) {
-    const tableId = kategori === 'kotak' ? 'tableKodeKotak' : 'tableKodeAksesoris';
+    const tableId = kategori === "kotak" ? "tableKodeKotak" : "tableKodeAksesoris";
     const table = document.getElementById(tableId);
-    
+
     if (!table) return;
-    
-    const rows = table.querySelectorAll('tbody tr');
+
+    const rows = table.querySelectorAll("tbody tr");
     const lowerSearchText = searchText.toLowerCase();
-    
-    rows.forEach(row => {
-        const kodeCell = row.cells[1]; // Kolom kode
-        const namaCell = row.cells[2]; // Kolom nama
-        
-        if (!kodeCell || !namaCell) return;
-        
-        const kodeText = kodeCell.textContent.toLowerCase();
-        const namaText = namaCell.textContent.toLowerCase();
-        
-                // Tampilkan baris jika kode atau nama mengandung teks pencarian
-                if (kodeText.includes(lowerSearchText) || namaText.includes(lowerSearchText)) {
-                  row.style.display = '';
-              } else {
-                  row.style.display = 'none';
-              }
-          });
-          
-          // Tampilkan pesan jika tidak ada hasil
-          const tbody = table.querySelector('tbody');
-          const visibleRows = [...rows].filter(row => row.style.display !== 'none');
-          
-          if (visibleRows.length === 0 && searchText) {
-              // Cek apakah sudah ada pesan "tidak ada hasil"
-              const noResultRow = [...rows].find(row => row.classList.contains('no-result-row'));
-              
-              if (!noResultRow) {
-                  const newRow = document.createElement('tr');
-                  newRow.classList.add('no-result-row');
-                  newRow.innerHTML = `<td colspan="5" class="text-center">Tidak ada hasil untuk pencarian "${searchText}"</td>`;
-                  tbody.appendChild(newRow);
-              }
-          } else {
-              // Hapus pesan "tidak ada hasil" jika ada
-              const noResultRow = tbody.querySelector('.no-result-row');
-              if (noResultRow) {
-                  noResultRow.remove();
-              }
-          }
-        },
-      
-        // Fungsi untuk menangani klik tombol batal
-        handleBatalClick() {
-          if (confirm("Apakah Anda yakin ingin membatalkan?")) {
-            this.elements.tbody.innerHTML = "";
-            this.handleCategoryChange(this.elements.selectKategori.value, this.elements.tbody);
-            document.getElementById("total-items").textContent = "0";
-          }
-        },
-      
-        // Fungsi untuk mengambil data kode aksesoris dari Firestore dengan caching
-        async fetchKodeAksesoris() {
-          try {
-            // Check cache validity (cache expires after 10 minutes)
-            const now = new Date().getTime();
-            const cacheExpiry = 10 * 60 * 1000; // 10 minutes in milliseconds
-            
-            if (this.cache.kodeAksesoris.lastFetched && 
-                (now - this.cache.kodeAksesoris.lastFetched) < cacheExpiry &&
-                this.cache.kodeAksesoris.kotak && 
-                this.cache.kodeAksesoris.aksesoris) {
-              
-              console.log("Using cached kode aksesoris data");
-              return {
-                OPSI_KOTAK: this.cache.kodeAksesoris.kotak,
-                OPSI_AKSESORIS: this.cache.kodeAksesoris.aksesoris
-              };
-            }
-            
-            console.log("Fetching fresh kode aksesoris data");
-            const kotakSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "kotak"));
-            const aksesorisSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "aksesoris"));
-      
-            const OPSI_KOTAK = [{ value: "0", text: "Pilih Kategori" }];
-            const OPSI_AKSESORIS = [{ value: "0", text: "Pilih Kategori" }];
-      
-            kotakSnapshot.forEach((doc) => {
-              const data = doc.data();
-              OPSI_KOTAK.push({
-                id: doc.id,
-                text: data.text,
-                nama: data.nama,
-              });
-            });
-      
-            aksesorisSnapshot.forEach((doc) => {
-              const data = doc.data();
-              OPSI_AKSESORIS.push({
-                id: doc.id,
-                text: data.text,
-                nama: data.nama,
-              });
-            });
-            
-            // Update cache
-            this.cache.kodeAksesoris.kotak = OPSI_KOTAK;
-            this.cache.kodeAksesoris.aksesoris = OPSI_AKSESORIS;
-            this.cache.kodeAksesoris.lastFetched = now;
-      
-            return { OPSI_KOTAK, OPSI_AKSESORIS };
-          } catch (error) {
-            console.error("Error fetching kode aksesoris:", error);
-            return {
-              OPSI_KOTAK: [{ value: "0", text: "Pilih Kategori" }],
-              OPSI_AKSESORIS: [{ value: "0", text: "Pilih Kategori" }],
-            };
-          }
-        },
-      
-        // Fungsi untuk menangani perubahan kategori
-        handleCategoryChange(kategori, tbody) {
-          tbody.innerHTML = ""; // Clear table
-          const options = kategori === "1" ? this.OPSI_KOTAK : kategori === "2" ? this.OPSI_AKSESORIS : [];
-          this.updateAllKodeBarangOptions(options);
-          if (options.length) {
-            this.tambahBaris(kategori, tbody);
-          }
-          document.getElementById("total-items").textContent = "0";
-        },
-      
-        // Fungsi untuk memperbarui opsi kode barang
-        updateAllKodeBarangOptions(options) {
-          const kodeBarangSelects = document.querySelectorAll(".kode-barang");
-          kodeBarangSelects.forEach((select) => {
-            select.innerHTML = options
-              .map((option) => `<option value="${option.text}" data-nama="${option.nama}">${option.text}</option>`)
-              .join("");
-          });
-        },
-      
-        // Fungsi untuk memuat data kode barang untuk diedit
-        async loadKodeBarangData(docId, kategori) {
-          try {
-            const docRef = doc(firestore, "kodeAksesoris", "kategori", kategori, docId);
-            const docSnap = await getDoc(docRef);
-            
-            if (docSnap.exists()) {
-              const data = docSnap.data();
-              document.getElementById('textKode').value = data.text;
-              document.getElementById('namaKode').value = data.nama;
-            } else {
-              console.error("Dokumen tidak ditemukan!");
-              alert("Data tidak ditemukan!");
-            }
-          } catch (error) {
-            console.error("Error loading kode barang data:", error);
-            alert("Gagal memuat data: " + error.message);
-          }
-        },  
-      
-        // Fungsi untuk menambah baris baru
-        tambahBaris(kategori, tbody) {
-          const newRow = document.createElement("tr");
-          const rowCount = tbody.children.length + 1;
-      
-          const options = kategori === "1" ? this.OPSI_KOTAK : this.OPSI_AKSESORIS;
-      
-          newRow.innerHTML = `
+
+    rows.forEach((row) => {
+      const kodeCell = row.cells[1]; // Kolom kode
+      const namaCell = row.cells[2]; // Kolom nama
+
+      if (!kodeCell || !namaCell) return;
+
+      const kodeText = kodeCell.textContent.toLowerCase();
+      const namaText = namaCell.textContent.toLowerCase();
+
+      // Tampilkan baris jika kode atau nama mengandung teks pencarian
+      if (kodeText.includes(lowerSearchText) || namaText.includes(lowerSearchText)) {
+        row.style.display = "";
+      } else {
+        row.style.display = "none";
+      }
+    });
+
+    // Tampilkan pesan jika tidak ada hasil
+    const tbody = table.querySelector("tbody");
+    const visibleRows = [...rows].filter((row) => row.style.display !== "none");
+
+    if (visibleRows.length === 0 && searchText) {
+      // Cek apakah sudah ada pesan "tidak ada hasil"
+      const noResultRow = [...rows].find((row) => row.classList.contains("no-result-row"));
+
+      if (!noResultRow) {
+        const newRow = document.createElement("tr");
+        newRow.classList.add("no-result-row");
+        newRow.innerHTML = `<td colspan="5" class="text-center">Tidak ada hasil untuk pencarian "${searchText}"</td>`;
+        tbody.appendChild(newRow);
+      }
+    } else {
+      // Hapus pesan "tidak ada hasil" jika ada
+      const noResultRow = tbody.querySelector(".no-result-row");
+      if (noResultRow) {
+        noResultRow.remove();
+      }
+    }
+  },
+
+  // Fungsi untuk menangani klik tombol batal
+  handleBatalClick() {
+    this.showConfirmation("Apakah Anda yakin ingin membatalkan?").then((confirmed) => {
+      if (confirmed) {
+        this.elements.tbody.innerHTML = "";
+        this.handleCategoryChange(this.elements.selectKategori.value, this.elements.tbody);
+        document.getElementById("total-items").textContent = "0";
+      }
+    });
+  },
+
+  // Fungsi untuk mengambil data kode aksesoris dari Firestore dengan caching
+  async fetchKodeAksesoris() {
+    try {
+      // Check cache validity (cache expires after 10 minutes)
+      const now = new Date().getTime();
+      const cacheExpiry = 10 * 60 * 1000; // 10 minutes in milliseconds
+
+      if (
+        this.cache.kodeAksesoris.lastFetched &&
+        now - this.cache.kodeAksesoris.lastFetched < cacheExpiry &&
+        this.cache.kodeAksesoris.kotak &&
+        this.cache.kodeAksesoris.aksesoris
+      ) {
+        console.log("Using cached kode aksesoris data");
+        return {
+          OPSI_KOTAK: this.cache.kodeAksesoris.kotak,
+          OPSI_AKSESORIS: this.cache.kodeAksesoris.aksesoris,
+        };
+      }
+
+      console.log("Fetching fresh kode aksesoris data");
+      const kotakSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "kotak"));
+      const aksesorisSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "aksesoris"));
+
+      const OPSI_KOTAK = [{ value: "0", text: "Pilih Kategori" }];
+      const OPSI_AKSESORIS = [{ value: "0", text: "Pilih Kategori" }];
+
+      kotakSnapshot.forEach((doc) => {
+        const data = doc.data();
+        OPSI_KOTAK.push({
+          id: doc.id,
+          text: data.text,
+          nama: data.nama,
+        });
+      });
+
+      aksesorisSnapshot.forEach((doc) => {
+        const data = doc.data();
+        OPSI_AKSESORIS.push({
+          id: doc.id,
+          text: data.text,
+          nama: data.nama,
+        });
+      });
+
+      // Update cache
+      this.cache.kodeAksesoris.kotak = OPSI_KOTAK;
+      this.cache.kodeAksesoris.aksesoris = OPSI_AKSESORIS;
+      this.cache.kodeAksesoris.lastFetched = now;
+
+      return { OPSI_KOTAK, OPSI_AKSESORIS };
+    } catch (error) {
+      console.error("Error fetching kode aksesoris:", error);
+      return {
+        OPSI_KOTAK: [{ value: "0", text: "Pilih Kategori" }],
+        OPSI_AKSESORIS: [{ value: "0", text: "Pilih Kategori" }],
+      };
+    }
+  },
+
+  // Fungsi untuk menangani perubahan kategori
+  handleCategoryChange(kategori, tbody) {
+    tbody.innerHTML = ""; // Clear table
+    const options = kategori === "1" ? this.OPSI_KOTAK : kategori === "2" ? this.OPSI_AKSESORIS : [];
+    this.updateAllKodeBarangOptions(options);
+    if (options.length) {
+      this.tambahBaris(kategori, tbody);
+    }
+    document.getElementById("total-items").textContent = "0";
+  },
+
+  // Fungsi untuk memperbarui opsi kode barang
+  updateAllKodeBarangOptions(options) {
+    const kodeBarangSelects = document.querySelectorAll(".kode-barang");
+    kodeBarangSelects.forEach((select) => {
+      select.innerHTML = options
+        .map((option) => `<option value="${option.text}" data-nama="${option.nama}">${option.text}</option>`)
+        .join("");
+    });
+  },
+
+  // Fungsi untuk memuat data kode barang untuk diedit
+  async loadKodeBarangData(docId, kategori) {
+    try {
+      const docRef = doc(firestore, "kodeAksesoris", "kategori", kategori, docId);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        document.getElementById("textKode").value = data.text;
+        document.getElementById("namaKode").value = data.nama;
+      } else {
+        console.error("Dokumen tidak ditemukan!");
+        alert("Data tidak ditemukan!");
+      }
+    } catch (error) {
+      console.error("Error loading kode barang data:", error);
+      alert("Gagal memuat data: " + error.message);
+    }
+  },
+
+  // Fungsi untuk menambah baris baru
+  tambahBaris(kategori, tbody) {
+    const newRow = document.createElement("tr");
+    const rowCount = tbody.children.length + 1;
+
+    const options = kategori === "1" ? this.OPSI_KOTAK : this.OPSI_AKSESORIS;
+
+    newRow.innerHTML = `
                   <td>${rowCount}</td>
                   <td>
                       <select class="form-select kode-barang">
                           ${options
                             .map(
-                              (option) => `<option value="${option.text}" data-nama="${option.nama}">${option.text}</option>`
+                              (option) =>
+                                `<option value="${option.text}" data-nama="${option.nama}">${option.text}</option>`
                             )
                             .join("")}
                       </select>
@@ -462,236 +466,233 @@ export const aksesorisSaleHandler = {
                   <td><input type="number" class="form-control jumlah-barang" placeholder="Jumlah" min="1"></td>
                   <td><button type="button" class="btn btn-danger btn-sm btn-hapus"><i class="fas fa-trash"></i></button></td>
               `;
-      
-          tbody.appendChild(newRow);
-          this.attachRowEventListeners(newRow, tbody);
-        },
-      
-        // Fungsi untuk memasang event listener pada baris
-        attachRowEventListeners(row, tbody) {
-          this.attachCalculationListeners(row, tbody);
-          this.attachDeleteListener(row, tbody);
-          this.attachKodeBarangListener(row);
-        },
-      
-        // Fungsi untuk memasang event listener perhitungan
-        attachCalculationListeners(row, tbody) {
-          const jumlahInput = row.querySelector(".jumlah-barang");
-          
-          jumlahInput.addEventListener("input", () => {
-            this.updateTotalItems(tbody);
-          });
-        },
-      
-        // Fungsi untuk memasang event listener hapus
-        attachDeleteListener(row, tbody) {
-          const deleteButton = row.querySelector(".btn-hapus");
-          deleteButton.addEventListener("click", () => {
-            this.handleDeleteRow(row, tbody);
-          });
-        },
-      
-        // Fungsi untuk menangani penghapusan baris
-        handleDeleteRow(row, tbody) {
-          if (tbody.children.length > 1) {
-            row.remove();
-            this.renumberRows(tbody);
-            this.updateTotalItems(tbody);
-          } else {
-            alert("Minimal harus ada satu baris!");
-          }
-        },
-      
-        // Fungsi untuk memasang event listener pada kode barang
-        attachKodeBarangListener(row) {
-          const kodeBarangSelect = row.querySelector(".kode-barang");
-          const namaBarangInput = row.querySelector(".nama-barang");
-      
-          kodeBarangSelect.addEventListener("change", () => {
-            this.updateNamaBarang(kodeBarangSelect, namaBarangInput);
-          });
-      
-          // Trigger change event to set initial value
-          kodeBarangSelect.dispatchEvent(new Event("change"));
-        },
-      
-        // Fungsi untuk memperbarui nama barang
-        updateNamaBarang(kodeBarangSelect, namaBarangInput) {
-          const selectedOption = kodeBarangSelect.options[kodeBarangSelect.selectedIndex];
-          const nama = selectedOption.getAttribute("data-nama");
-          namaBarangInput.value = nama || "";
-        },
-      
-        // Fungsi untuk menomori ulang baris
-        renumberRows(tbody) {
-          const rows = tbody.querySelectorAll("tr");
-          rows.forEach((row, index) => {
-            row.cells[0].textContent = index + 1;
-          });
-        },
-      
-        // Fungsi untuk memperbarui total items
-        updateTotalItems(tbody) {
-          const jumlahInputs = tbody.querySelectorAll(".jumlah-barang");
-          let totalItems = 0;
-      
-          jumlahInputs.forEach((input) => {
-            totalItems += parseInt(input.value) || 0;
-          });
-      
-          const totalItemsElement = document.getElementById("total-items");
-          if (totalItemsElement) {
-            totalItemsElement.textContent = totalItems;
-          }
-        },
-      
-        // Fungsi untuk menyimpan data penambahan stok
-        async simpanData() {
-          try {
-            // Show loading indicator
-            this.showLoading(true);
-            
-            // Validasi data
-            if (!this.validateTransactionData()) {
-              this.showLoading(false);
-              return;
-            }
-        
-            // Kumpulkan data dari tabel
-            const items = this.collectItemsData();
-            if (!items) {
-              this.showLoading(false);
-              return;
-            }
-            
-            // Buat objek data penambahan stok
-            const stockAdditionData = this.createStockAdditionData(items);
-            
-            // Simpan data penambahan stok ke Firestore
-            const docId = await this.saveStockAdditionToFirestore(stockAdditionData);
-            console.log("Stock addition saved with ID:", docId);
-            
-            // Update stok aksesoris
-            await this.updateStokAksesoris(items);
-            
-            // Hitung total item yang ditambahkan
-            const totalItems = items.reduce((total, item) => total + item.jumlah, 0);
-            const kategoriText = this.elements.selectKategori.value === "1" ? "Kotak" : "Aksesoris";
-            
-            // Tampilkan notifikasi sukses dengan detail
-            this.showSuccessNotification(`
+
+    tbody.appendChild(newRow);
+    this.attachRowEventListeners(newRow, tbody);
+  },
+
+  // Fungsi untuk memasang event listener pada baris
+  attachRowEventListeners(row, tbody) {
+    this.attachCalculationListeners(row, tbody);
+    this.attachDeleteListener(row, tbody);
+    this.attachKodeBarangListener(row);
+  },
+
+  // Fungsi untuk memasang event listener perhitungan
+  attachCalculationListeners(row, tbody) {
+    const jumlahInput = row.querySelector(".jumlah-barang");
+
+    jumlahInput.addEventListener("input", () => {
+      this.updateTotalItems(tbody);
+    });
+  },
+
+  // Fungsi untuk memasang event listener hapus
+  attachDeleteListener(row, tbody) {
+    const deleteButton = row.querySelector(".btn-hapus");
+    deleteButton.addEventListener("click", () => {
+      this.handleDeleteRow(row, tbody);
+    });
+  },
+
+  // Fungsi untuk menangani penghapusan baris
+  handleDeleteRow(row, tbody) {
+    if (tbody.children.length > 1) {
+      row.remove();
+      this.renumberRows(tbody);
+      this.updateTotalItems(tbody);
+    } else {
+      this.showErrorNotification("Minimal harus ada satu baris!");
+    }
+  },
+
+  // Fungsi untuk memasang event listener pada kode barang
+  attachKodeBarangListener(row) {
+    const kodeBarangSelect = row.querySelector(".kode-barang");
+    const namaBarangInput = row.querySelector(".nama-barang");
+
+    kodeBarangSelect.addEventListener("change", () => {
+      this.updateNamaBarang(kodeBarangSelect, namaBarangInput);
+    });
+
+    // Trigger change event to set initial value
+    kodeBarangSelect.dispatchEvent(new Event("change"));
+  },
+
+  // Fungsi untuk memperbarui nama barang
+  updateNamaBarang(kodeBarangSelect, namaBarangInput) {
+    const selectedOption = kodeBarangSelect.options[kodeBarangSelect.selectedIndex];
+    const nama = selectedOption.getAttribute("data-nama");
+    namaBarangInput.value = nama || "";
+  },
+
+  // Fungsi untuk menomori ulang baris
+  renumberRows(tbody) {
+    const rows = tbody.querySelectorAll("tr");
+    rows.forEach((row, index) => {
+      row.cells[0].textContent = index + 1;
+    });
+  },
+
+  // Fungsi untuk memperbarui total items
+  updateTotalItems(tbody) {
+    const jumlahInputs = tbody.querySelectorAll(".jumlah-barang");
+    let totalItems = 0;
+
+    jumlahInputs.forEach((input) => {
+      totalItems += parseInt(input.value) || 0;
+    });
+
+    const totalItemsElement = document.getElementById("total-items");
+    if (totalItemsElement) {
+      totalItemsElement.textContent = totalItems;
+    }
+  },
+
+  // Fungsi untuk menyimpan data penambahan stok
+  async simpanData() {
+    try {
+      // Show loading indicator
+      this.showLoading(true);
+
+      // Validasi data
+      if (!this.validateTransactionData()) {
+        this.showLoading(false);
+        return;
+      }
+
+      // Kumpulkan data dari tabel
+      const items = this.collectItemsData();
+      if (!items) {
+        this.showLoading(false);
+        return;
+      }
+
+      // Buat objek data penambahan stok
+      const stockAdditionData = this.createStockAdditionData(items);
+
+      // Simpan data penambahan stok ke Firestore
+      const docId = await this.saveStockAdditionToFirestore(stockAdditionData);
+      console.log("Stock addition saved with ID:", docId);
+
+      // Update stok aksesoris
+      await this.updateStokAksesoris(items);
+
+      // Hitung total item yang ditambahkan
+      const totalItems = items.reduce((total, item) => total + item.jumlah, 0);
+      const kategoriText = this.elements.selectKategori.value === "1" ? "Kotak" : "Aksesoris";
+
+      // Tampilkan notifikasi sukses dengan detail
+      this.showSuccessNotification(`
               ${totalItems} item ${kategoriText} berhasil ditambahkan!
               
               Detail:
-              ${items.map(item => `• ${item.nama} (${item.kodeText}): ${item.jumlah} pcs`).join('\n')}
+              ${items.map((item) => `• ${item.nama} (${item.kodeText}): ${item.jumlah} pcs`).join("\n")}
             `);
-            
-            // Reload riwayat penambahan stok
-            this.loadStockAdditionHistory();
-            
-            // Reset form
-            this.resetForm();
-            
-            this.showLoading(false);
-          } catch (error) {
-            console.error("Error saving data:", error);
-            this.showErrorNotification("Gagal menyimpan data: " + error.message);
-            this.showLoading(false);
-          }
-        },
-      
-        // Fungsi untuk validasi data
-        validateTransactionData() {
-          const tanggal = document.getElementById("tanggal").value;
-          const jenisAksesoris = document.getElementById("jenis-aksesoris");
-      
-          if (!tanggal) {
-            this.showErrorNotification("Tanggal harus diisi!");
-            return false;
-          }
-      
-          if (jenisAksesoris.value === "Pilih Kategori") {
-            this.showErrorNotification("Jenis aksesoris harus dipilih!");
-            return false;
-          }
-      
-          return true;
-        },
-      
-        // Fungsi untuk mengumpulkan data item
-        collectItemsData() {
-          const tbody = document.querySelector("#tableTambahAksesoris tbody");
-          const rows = tbody.querySelectorAll("tr");
-          const items = [];
-          let isValid = true;
-      
-          rows.forEach((row, index) => {
-            const kodeSelect = row.querySelector(".kode-barang");
-            const kodeText = kodeSelect.value;
-            const namaBarang = row.querySelector(".nama-barang").value;
-            const jumlah = row.querySelector(".jumlah-barang").value;
-      
-            if (kodeText === "Pilih Kategori" || !jumlah) {
-              this.showErrorNotification(`Data pada baris ${index + 1} belum lengkap!`);
-              isValid = false;
-              return;
-            }
-      
-            items.push({
-              kodeText: kodeText,
-              nama: namaBarang,
-              jumlah: parseInt(jumlah),
-              kategori: this.elements.selectKategori.value === "1" ? "kotak" : "aksesoris"
-            });
-          });
-      
-          return isValid ? items : null;
-        },
-      
-        // Fungsi untuk membuat objek data penambahan stok
-        createStockAdditionData(items) {
-          const tanggal = document.getElementById("tanggal").value;
-          const jenisAksesoris = document.getElementById("jenis-aksesoris");
-          const jenisText = jenisAksesoris.options[jenisAksesoris.selectedIndex].text;
-      
-          return {
-            tanggal: tanggal,
-            jenisAksesoris: jenisAksesoris.value,
-            jenisText: jenisText,
-            items: items,
-            timestamp: serverTimestamp(),
-            totalItems: items.reduce((total, item) => total + item.jumlah, 0)
-          };
-        },
-      
-        // Fungsi untuk menyimpan data penambahan stok ke Firestore
-        async saveStockAdditionToFirestore(data) {
-          try {
-            // Simpan ke koleksi stockAdditions
-            const docRef = await addDoc(collection(firestore, "stockAdditions"), data);
-            console.log("Data berhasil disimpan dengan ID:", docRef.id);
-            return docRef.id;
-          } catch (error) {
-            console.error("Gagal menyimpan data:", error);
-            throw error;
-          }
-        },
-      
-          // Fungsi untuk memperbarui stok aksesoris
+
+      // Reload riwayat penambahan stok
+      this.loadStockAdditionHistory();
+
+      // Reset form
+      this.resetForm();
+
+      this.showLoading(false);
+    } catch (error) {
+      console.error("Error saving data:", error);
+      this.showErrorNotification("Gagal menyimpan data: " + error.message);
+      this.showLoading(false);
+    }
+  },
+
+  // Fungsi untuk validasi data
+  validateTransactionData() {
+    const tanggal = document.getElementById("tanggal").value;
+    const jenisAksesoris = document.getElementById("jenis-aksesoris");
+
+    if (!tanggal) {
+      this.showErrorNotification("Tanggal harus diisi!");
+      return false;
+    }
+
+    if (jenisAksesoris.value === "Pilih Kategori") {
+      this.showErrorNotification("Jenis aksesoris harus dipilih!");
+      return false;
+    }
+
+    return true;
+  },
+
+  // Fungsi untuk mengumpulkan data item
+  collectItemsData() {
+    const tbody = document.querySelector("#tableTambahAksesoris tbody");
+    const rows = tbody.querySelectorAll("tr");
+    const items = [];
+    let isValid = true;
+
+    rows.forEach((row, index) => {
+      const kodeSelect = row.querySelector(".kode-barang");
+      const kodeText = kodeSelect.value;
+      const namaBarang = row.querySelector(".nama-barang").value;
+      const jumlah = row.querySelector(".jumlah-barang").value;
+
+      if (kodeText === "Pilih Kategori" || !jumlah) {
+        this.showErrorNotification(`Data pada baris ${index + 1} belum lengkap!`);
+        isValid = false;
+        return;
+      }
+
+      items.push({
+        kodeText: kodeText,
+        nama: namaBarang,
+        jumlah: parseInt(jumlah),
+        kategori: this.elements.selectKategori.value === "1" ? "kotak" : "aksesoris",
+      });
+    });
+
+    return isValid ? items : null;
+  },
+
+  // Fungsi untuk membuat objek data penambahan stok
+  createStockAdditionData(items) {
+    const tanggal = document.getElementById("tanggal").value;
+    const jenisAksesoris = document.getElementById("jenis-aksesoris");
+    const jenisText = jenisAksesoris.options[jenisAksesoris.selectedIndex].text;
+
+    return {
+      tanggal: tanggal,
+      jenisAksesoris: jenisAksesoris.value,
+      jenisText: jenisText,
+      items: items,
+      timestamp: serverTimestamp(),
+      totalItems: items.reduce((total, item) => total + item.jumlah, 0),
+    };
+  },
+
+  // Fungsi untuk menyimpan data penambahan stok ke Firestore
+  async saveStockAdditionToFirestore(data) {
+    try {
+      // Simpan ke koleksi stockAdditions
+      const docRef = await addDoc(collection(firestore, "stockAdditions"), data);
+      console.log("Data berhasil disimpan dengan ID:", docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error("Gagal menyimpan data:", error);
+      throw error;
+    }
+  },
+
+  // Fungsi untuk memperbarui stok aksesoris
   async updateStokAksesoris(items) {
     try {
       // Refresh stock data cache
       this.cache.stockData.data = null;
-      
+
       for (const item of items) {
         // Cek apakah item sudah ada di koleksi stokAksesoris
-        const stokQuery = query(
-          collection(firestore, "stokAksesoris"),
-          where("kode", "==", item.kodeText)
-        );
-        
+        const stokQuery = query(collection(firestore, "stokAksesoris"), where("kode", "==", item.kodeText));
+
         const stokSnapshot = await getDocs(stokQuery);
-        
+
         if (stokSnapshot.empty) {
           // Jika belum ada, buat dokumen baru
           const newStockData = {
@@ -704,32 +705,32 @@ export const aksesorisSaleHandler = {
             free: 0,
             gantiLock: 0,
             stokAkhir: parseInt(item.jumlah) || 0,
-            lastUpdate: serverTimestamp()
+            lastUpdate: serverTimestamp(),
           };
-          
+
           await addDoc(collection(firestore, "stokAksesoris"), newStockData);
         } else {
           // Jika sudah ada, update dokumen
           const stokDoc = stokSnapshot.docs[0];
           const stokData = stokDoc.data();
-          
+
           // Hitung stok akhir baru
           const currentTambahStok = parseInt(stokData.tambahStok) || 0;
           const newTambahStok = currentTambahStok + (parseInt(item.jumlah) || 0);
-          
+
           const stokAwal = parseInt(stokData.stokAwal) || 0;
           const laku = parseInt(stokData.laku) || 0;
           const free = parseInt(stokData.free) || 0;
           const gantiLock = parseInt(stokData.gantiLock) || 0;
-          
+
           const stokAkhir = stokAwal + newTambahStok - laku - free - gantiLock;
-          
+
           const updateData = {
             tambahStok: newTambahStok,
             stokAkhir: stokAkhir,
-            lastUpdate: serverTimestamp()
+            lastUpdate: serverTimestamp(),
           };
-          
+
           await updateDoc(doc(firestore, "stokAksesoris", stokDoc.id), updateData);
         }
       }
@@ -744,36 +745,34 @@ export const aksesorisSaleHandler = {
     try {
       const filterDateInput = document.getElementById("filterDate");
       if (!filterDateInput) return;
-      
+
       const filterDateStr = filterDateInput.value;
       if (!filterDateStr) return;
-      
+
       // Check cache for this date
-      if (this.cache.stockAdditions.data[filterDateStr] && 
-          this.cache.stockAdditions.lastFetched[filterDateStr]) {
-        
+      if (this.cache.stockAdditions.data[filterDateStr] && this.cache.stockAdditions.lastFetched[filterDateStr]) {
         const cacheTime = this.cache.stockAdditions.lastFetched[filterDateStr];
         const now = new Date().getTime();
         const cacheExpiry = 5 * 60 * 1000; // 5 minutes
-        
-        if ((now - cacheTime) < cacheExpiry) {
+
+        if (now - cacheTime < cacheExpiry) {
           console.log(`Using cached stock additions for ${filterDateStr}`);
           this.renderStockAdditionHistory(this.cache.stockAdditions.data[filterDateStr]);
           return;
         }
       }
-      
+
       // Parse tanggal filter
-      const dateParts = filterDateStr.split('/');
+      const dateParts = filterDateStr.split("/");
       const filterDate = new Date(dateParts[2], dateParts[1] - 1, dateParts[0]);
-      
+
       // Set waktu ke awal hari
       filterDate.setHours(0, 0, 0, 0);
-      
+
       // Set waktu ke akhir hari untuk end date
       const endDate = new Date(filterDate);
       endDate.setHours(23, 59, 59, 999);
-      
+
       // Query penambahan stok berdasarkan tanggal
       const stockAdditionsRef = collection(firestore, "stockAdditions");
       const q = query(
@@ -782,34 +781,33 @@ export const aksesorisSaleHandler = {
         where("timestamp", "<=", endDate),
         orderBy("timestamp", "desc")
       );
-      
+
       const snapshot = await getDocs(q);
-      
+
       // Process data
       const historyData = [];
-      
-      snapshot.forEach(doc => {
+
+      snapshot.forEach((doc) => {
         const data = doc.data();
         if (data.items && data.items.length) {
-          data.items.forEach(item => {
+          data.items.forEach((item) => {
             historyData.push({
               id: doc.id,
               timestamp: data.timestamp,
               kodeText: item.kodeText,
               nama: item.nama,
-              jumlah: item.jumlah
+              jumlah: item.jumlah,
             });
           });
         }
       });
-      
+
       // Update cache
       this.cache.stockAdditions.data[filterDateStr] = historyData;
       this.cache.stockAdditions.lastFetched[filterDateStr] = new Date().getTime();
-      
+
       // Render data
       this.renderStockAdditionHistory(historyData);
-      
     } catch (error) {
       console.error("Error loading stock addition history:", error);
       const tableBody = document.querySelector("#tableRiwayatTambahStok tbody");
@@ -818,47 +816,50 @@ export const aksesorisSaleHandler = {
       }
     }
   },
-  
+
   // Render riwayat penambahan stok ke tabel
   renderStockAdditionHistory(historyData) {
     const tableBody = document.querySelector("#tableRiwayatTambahStok tbody");
     if (!tableBody) return;
-    
+
     if (!historyData || historyData.length === 0) {
       const filterDateStr = document.getElementById("filterDate").value;
       tableBody.innerHTML = `<tr><td colspan="4" class="text-center">Tidak ada data penambahan stok pada tanggal ${filterDateStr}</td></tr>`;
       return;
     }
-    
-    let html = '';
-    
-    historyData.forEach(item => {
-      const date = item.timestamp && item.timestamp.toDate ? 
-                  item.timestamp.toDate() : 
-                  new Date();
-      
-      const formattedDate = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-      
+
+    let html = "";
+
+    historyData.forEach((item) => {
+      const date = item.timestamp && item.timestamp.toDate ? item.timestamp.toDate() : new Date();
+
+      const formattedDate = `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
+        .toString()
+        .padStart(2, "0")}/${date.getFullYear()} ${date.getHours().toString().padStart(2, "0")}:${date
+        .getMinutes()
+        .toString()
+        .padStart(2, "0")}`;
+
       html += `
         <tr>
           <td>${formattedDate}</td>
-          <td>${item.kodeText || '-'}</td>
-          <td>${item.nama || '-'}</td>
+          <td>${item.kodeText || "-"}</td>
+          <td>${item.nama || "-"}</td>
           <td>${item.jumlah || 0}</td>
         </tr>
       `;
     });
-    
+
     tableBody.innerHTML = html;
   },
 
   // Fungsi untuk menampilkan loading indicator
   showLoading(isLoading) {
     if (isLoading) {
-      let loadingOverlay = document.getElementById('loadingOverlay');
+      let loadingOverlay = document.getElementById("loadingOverlay");
       if (!loadingOverlay) {
-        loadingOverlay = document.createElement('div');
-        loadingOverlay.id = 'loadingOverlay';
+        loadingOverlay = document.createElement("div");
+        loadingOverlay.id = "loadingOverlay";
         loadingOverlay.innerHTML = `
           <div class="loading-spinner">
             <div class="spinner-border text-primary" role="status">
@@ -881,36 +882,36 @@ export const aksesorisSaleHandler = {
         `;
         document.body.appendChild(loadingOverlay);
       } else {
-        loadingOverlay.style.display = 'flex';
+        loadingOverlay.style.display = "flex";
       }
     } else {
-      const loadingOverlay = document.getElementById('loadingOverlay');
+      const loadingOverlay = document.getElementById("loadingOverlay");
       if (loadingOverlay) {
-        loadingOverlay.style.display = 'none';
+        loadingOverlay.style.display = "none";
       }
     }
   },
 
   // Fungsi untuk menampilkan notifikasi sukses
   showSuccessNotification(message) {
-    if (typeof Swal !== 'undefined') {
+    if (typeof Swal !== "undefined") {
       Swal.fire({
-        icon: 'success',
-        title: 'Berhasil!',
-        text: message,
-        confirmButtonColor: '#28a745',
+        icon: "success",
+        title: "Berhasil!",
+        html: message.replace(/\n/g, "<br>"),
+        confirmButtonColor: "#28a745",
         timer: 3000,
         timerProgressBar: true,
         showClass: {
-          popup: 'animate__animated animate__fadeInDown'
+          popup: "animate__animated animate__fadeInDown",
         },
         hideClass: {
-          popup: 'animate__animated animate__fadeOutUp'
+          popup: "animate__animated animate__fadeOutUp",
         },
         didOpen: (toast) => {
-          toast.addEventListener('mouseenter', Swal.stopTimer)
-          toast.addEventListener('mouseleave', Swal.resumeTimer)
-        }
+          toast.addEventListener("mouseenter", Swal.stopTimer);
+          toast.addEventListener("mouseleave", Swal.resumeTimer);
+        },
       });
     } else {
       alert(message);
@@ -919,35 +920,57 @@ export const aksesorisSaleHandler = {
 
   // Fungsi untuk menampilkan notifikasi error
   showErrorNotification(message) {
-    if (typeof Swal !== 'undefined') {
+    if (typeof Swal !== "undefined") {
       Swal.fire({
-        icon: 'error',
-        title: 'Error!',
-        text: message,
-        confirmButtonColor: '#dc3545',
+        icon: "error",
+        title: "Error!",
+        html: message.replace(/\n/g, "<br>"),
+        confirmButtonColor: "#dc3545",
         showClass: {
-          popup: 'animate__animated animate__shakeX'
+          popup: "animate__animated animate__shakeX",
         },
-        footer: '<span class="text-muted">Jika masalah berlanjut, hubungi administrator</span>'
+        footer: '<span class="text-muted">Jika masalah berlanjut, hubungi administrator</span>',
       });
     } else {
       alert(message);
     }
   },
 
+  // Tambahkan fungsi untuk konfirmasi
+  showConfirmation(message, title = "Konfirmasi") {
+    return new Promise((resolve) => {
+      if (typeof Swal !== "undefined") {
+        Swal.fire({
+          title: title,
+          html: message.replace(/\n/g, "<br>"),
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonColor: "#28a745",
+          cancelButtonColor: "#dc3545",
+          confirmButtonText: "Ya",
+          cancelButtonText: "Tidak",
+        }).then((result) => {
+          resolve(result.isConfirmed);
+        });
+      } else {
+        resolve(confirm(message));
+      }
+    });
+  },
+
   // Fungsi untuk mereset form
   resetForm() {
     // Set tanggal hari ini
     this.setTodayDate();
-    
+
     // Reset jenis aksesoris
     document.getElementById("jenis-aksesoris").value = "Pilih Kategori";
-    
+
     // Reset tabel
     const tbody = document.querySelector("#tableTambahAksesoris tbody");
     tbody.innerHTML = "";
     this.tambahBaris(document.getElementById("jenis-aksesoris").value, tbody);
-    
+
     // Reset total items
     document.getElementById("total-items").textContent = "0";
   },
@@ -977,11 +1000,12 @@ export const aksesorisSaleHandler = {
       // Check cache
       const now = new Date().getTime();
       const cacheExpiry = 5 * 60 * 1000; // 5 minutes
-      
-      if (this.cache.kodeAksesoris[kategori] && 
-          this.cache.kodeAksesoris.lastFetched && 
-          (now - this.cache.kodeAksesoris.lastFetched) < cacheExpiry) {
-        
+
+      if (
+        this.cache.kodeAksesoris[kategori] &&
+        this.cache.kodeAksesoris.lastFetched &&
+        now - this.cache.kodeAksesoris.lastFetched < cacheExpiry
+      ) {
         console.log(`Using cached ${kategori} data`);
         this.renderKodeBarangTable(tableBody, this.cache.kodeAksesoris[kategori], kategori);
         return;
@@ -995,16 +1019,16 @@ export const aksesorisSaleHandler = {
       }
 
       const kodeData = [];
-      
+
       snapshot.forEach((doc) => {
         const data = doc.data();
         kodeData.push({
           id: doc.id,
           text: data.text,
-          nama: data.nama
+          nama: data.nama,
         });
       });
-      
+
       // Update cache
       this.cache.kodeAksesoris[kategori] = kodeData;
       if (!this.cache.kodeAksesoris.lastFetched) {
@@ -1013,7 +1037,6 @@ export const aksesorisSaleHandler = {
 
       // Render table
       this.renderKodeBarangTable(tableBody, kodeData, kategori);
-      
     } catch (error) {
       console.error("Error loading kode barang:", error);
       const tableId = kategori === "kotak" ? "tableKodeKotak" : "tableKodeAksesoris";
@@ -1023,7 +1046,7 @@ export const aksesorisSaleHandler = {
       }
     }
   },
-  
+
   // Render tabel kode barang
   renderKodeBarangTable(tableBody, kodeData, kategori) {
     let html = "";
@@ -1128,7 +1151,7 @@ export const aksesorisSaleHandler = {
 
       // Invalidate cache
       this.cache.kodeAksesoris.lastFetched = null;
-      
+
       // Reload data
       this.modalFormKode.hide();
       this.loadKodeBarang(kategori);
@@ -1154,23 +1177,23 @@ export const aksesorisSaleHandler = {
 
   // Fungsi untuk validasi form kode barang
   validateKodeBarangForm() {
-    const textKode = document.getElementById('textKode');
-    const namaKode = document.getElementById('namaKode');
-    
+    const textKode = document.getElementById("textKode");
+    const namaKode = document.getElementById("namaKode");
+
     if (!textKode || !namaKode) {
       console.error("Form elements not found");
       this.showErrorNotification("Terjadi kesalahan: Elemen form tidak ditemukan");
       return false;
     }
-    
+
     const text = textKode.value;
     const nama = namaKode.value;
-    
+
     if (!text || !nama) {
       this.showErrorNotification("Semua field harus diisi!");
       return false;
     }
-    
+
     return true;
   },
 
@@ -1197,9 +1220,10 @@ export const aksesorisSaleHandler = {
     }
   },
 
-  // Fungsi untuk menghapus kode barang
+  // Ganti confirm di deleteKodeBarang
   async deleteKodeBarang(docId, kategori) {
-    if (!confirm("Apakah Anda yakin ingin menghapus kode ini?")) {
+    const confirmed = await this.showConfirmation("Apakah Anda yakin ingin menghapus kode ini?");
+    if (!confirmed) {
       return;
     }
 
@@ -1210,7 +1234,7 @@ export const aksesorisSaleHandler = {
 
       // Invalidate cache
       this.cache.kodeAksesoris.lastFetched = null;
-      
+
       // Reload data
       this.loadKodeBarang(kategori);
 
@@ -1232,25 +1256,24 @@ export const aksesorisSaleHandler = {
       this.showErrorNotification("Gagal menghapus data: " + error.message);
     }
   },
-
   // Fungsi untuk mengedit kode barang
   async editKodeBarang(docId, kategori) {
     this.showFormKodeModal(kategori, docId);
   },
-  
+
   // Fungsi untuk mengatur stok awal hari berikutnya
   async setNextDayStartingStock() {
     try {
       // Ambil semua data stok
       const stockSnapshot = await getDocs(collection(firestore, "stokAksesoris"));
-      
+
       // Update stok awal untuk setiap item
       const batch = firestore.batch();
-      
-      stockSnapshot.forEach(stockDoc => {
+
+      stockSnapshot.forEach((stockDoc) => {
         const stockData = stockDoc.data();
         const docRef = doc(firestore, "stokAksesoris", stockDoc.id);
-        
+
         // Set stok awal = stok akhir hari sebelumnya
         batch.update(docRef, {
           stokAwal: stockData.stokAkhir || 0,
@@ -1258,42 +1281,38 @@ export const aksesorisSaleHandler = {
           laku: 0, // Reset laku
           free: 0, // Reset free
           gantiLock: 0, // Reset ganti lock
-          lastUpdate: serverTimestamp()
+          lastUpdate: serverTimestamp(),
         });
       });
-      
+
       // Commit batch update
       await batch.commit();
       console.log("Stok awal hari berikutnya berhasil diatur");
-      
+
       // Invalidate cache
       this.cache.stockData.data = null;
       this.cache.stockData.lastFetched = null;
-      
     } catch (error) {
       console.error("Error setting next day starting stock:", error);
       throw error;
     }
-  }
+  },
 };
 
 // Initialize when document is ready
 document.addEventListener("DOMContentLoaded", function () {
   aksesorisSaleHandler.init();
-  
+
   // Set up datepicker for filterDate
-  $('#filterDate').datepicker({
-    format: 'dd/mm/yyyy',
+  $("#filterDate").datepicker({
+    format: "dd/mm/yyyy",
     autoclose: true,
-    language: 'id',
-    todayHighlight: true
+    language: "id",
+    todayHighlight: true,
   });
-  
+
   // Calendar icon click handler
-  $('#filterDateIcon').on('click', function() {
-    $('#filterDate').datepicker('show');
+  $("#filterDateIcon").on("click", function () {
+    $("#filterDate").datepicker("show");
   });
 });
-
-
-      

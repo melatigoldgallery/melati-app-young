@@ -17,6 +17,33 @@ import {
 let activeLockRow = null;
 let currentTransactionData = null;
 
+// Fungsi untuk menampilkan alert yang lebih menarik
+function showAlert(message, title = "Informasi", type = "info") {
+  return Swal.fire({
+    title: title,
+    text: message,
+    icon: type, // 'success', 'error', 'warning', 'info', 'question'
+    confirmButtonText: 'OK',
+    confirmButtonColor: '#0d6efd' // Warna primary Bootstrap
+  });
+}
+
+// Fungsi untuk konfirmasi
+function showConfirm(message, title = "Konfirmasi") {
+  return Swal.fire({
+    title: title,
+    text: message,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Ya',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#0d6efd',
+    cancelButtonColor: '#6c757d'
+  }).then((result) => {
+    return result.isConfirmed;
+  });
+}
+
 // Wait for document to be ready
 $(document).ready(function () {
   // Pastikan event listener hanya ditambahkan sekali
@@ -49,6 +76,9 @@ $(document).ready(function () {
   $("#calendarIcon").on("click", function () {
     $("#tanggal").datepicker("show");
   });
+
+    // Set focus to sales field when page loads
+    $("#sales").focus();
 
   console.log("Print event handlers initialized");
 });
@@ -94,7 +124,7 @@ async function loadStockData() {
     populateStockTables(stockData);
   } catch (error) {
     console.error("Error loading stock data:", error);
-    alert("Gagal memuat data stok: " + error.message);
+    showAlert("Gagal memuat data stok: " + error.message);
   }
 }
 
@@ -104,27 +134,19 @@ function populateStockTables(stockData) {
   const aksesorisTable = $("#tableAksesoris tbody");
   aksesorisTable.empty();
 
-  const aksesorisItems = stockData.filter((item) => item.kategori === "aksesoris");
+  const aksesorisItems = stockData.filter((item) => 
+    item.kategori === "aksesoris" && (item.stokAkhir > 0) // Only show items with stock > 0
+  );
 
   if (aksesorisItems.length === 0) {
-    aksesorisTable.append('<tr><td colspan="5" class="text-center">Tidak ada data aksesoris</td></tr>');
+    aksesorisTable.append('<tr><td colspan="3" class="text-center">Tidak ada data aksesoris</td></tr>');
   } else {
     aksesorisItems.forEach((item) => {
       const row = `
-          <tr>
+          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${item.hargaJual || 0}">
             <td>${item.kode || "-"}</td>
             <td>${item.nama || "-"}</td>
             <td>${item.stokAkhir || 0}</td>
-            <td>${item.hargaJual ? parseInt(item.hargaJual).toLocaleString("id-ID") : "0"}</td>
-            <td>
-              <button class="btn btn-sm btn-primary btn-pilih-aksesoris" 
-                data-kode="${item.kode}" 
-                data-nama="${item.nama}"
-                data-stok="${item.stokAkhir || 0}"
-                data-harga="${item.hargaJual || 0}">
-                <i class="fas fa-check"></i> Pilih
-              </button>
-            </td>
           </tr>
         `;
       aksesorisTable.append(row);
@@ -135,27 +157,19 @@ function populateStockTables(stockData) {
   const kotakTable = $("#tableKotak tbody");
   kotakTable.empty();
 
-  const kotakItems = stockData.filter((item) => item.kategori === "kotak");
+  const kotakItems = stockData.filter((item) => 
+    item.kategori === "kotak" && (item.stokAkhir > 0) // Only show items with stock > 0
+  );
 
   if (kotakItems.length === 0) {
-    kotakTable.append('<tr><td colspan="5" class="text-center">Tidak ada data kotak</td></tr>');
+    kotakTable.append('<tr><td colspan="3" class="text-center">Tidak ada data kotak</td></tr>');
   } else {
     kotakItems.forEach((item) => {
       const row = `
-          <tr>
+          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${item.hargaJual || 0}">
             <td>${item.kode || "-"}</td>
             <td>${item.nama || "-"}</td>
             <td>${item.stokAkhir || 0}</td>
-            <td>${item.hargaJual ? parseInt(item.hargaJual).toLocaleString("id-ID") : "0"}</td>
-            <td>
-              <button class="btn btn-sm btn-primary btn-pilih-kotak" 
-                data-kode="${item.kode}" 
-                data-nama="${item.nama}"
-                data-stok="${item.stokAkhir || 0}"
-                data-harga="${item.hargaJual || 0}">
-                <i class="fas fa-check"></i> Pilih
-              </button>
-            </td>
           </tr>
         `;
       kotakTable.append(row);
@@ -166,40 +180,34 @@ function populateStockTables(stockData) {
   const lockTable = $("#tableLock tbody");
   lockTable.empty();
 
-  const lockItems = stockData.filter((item) => item.kategori === "aksesoris");
+  const lockItems = stockData.filter((item) => 
+    item.kategori === "aksesoris" && (item.stokAkhir > 0) // Only show items with stock > 0
+  );
 
   if (lockItems.length === 0) {
-    lockTable.append('<tr><td colspan="4" class="text-center">Tidak ada data lock</td></tr>');
+    lockTable.append('<tr><td colspan="3" class="text-center">Tidak ada data lock</td></tr>');
   } else {
     lockItems.forEach((item) => {
       const row = `
-        <tr>
+        <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${item.hargaJual || 0}">
           <td>${item.kode || "-"}</td>
           <td>${item.nama || "-"}</td>
           <td>${item.stokAkhir || 0}</td>
-          <td>
-            <button class="btn btn-sm btn-primary btn-pilih-lock" 
-              data-kode="${item.kode}" 
-              data-nama="${item.nama}">
-              <i class="fas fa-check"></i> Pilih
-            </button>
-          </td>
         </tr>
       `;
       lockTable.append(row);
     });
   }
 
-  // Attach event handlers for pilih buttons
-  attachPilihButtonHandlers();
+  // Attach event handlers for table row clicks
+  attachTableRowClickHandlers();
 }
 
-// Function to attach event handlers to pilih buttons
-function attachPilihButtonHandlers() {
-  // Aksesoris pilih button
-  $(document)
-    .off("click", ".btn-pilih-aksesoris")
-    .on("click", ".btn-pilih-aksesoris", function () {
+// Function to attach click handlers to table rows
+function attachTableRowClickHandlers() {
+  // Aksesoris table row click
+  $("#tableAksesoris tbody tr").on("click", function() {
+    if ($(this).data('kode')) {
       const kode = $(this).data("kode");
       const nama = $(this).data("nama");
       const stok = $(this).data("stok");
@@ -210,12 +218,12 @@ function attachPilihButtonHandlers() {
 
       // Close modal
       $("#modalPilihAksesoris").modal("hide");
-    });
+    }
+  });
 
-  // Kotak pilih button
-  $(document)
-    .off("click", ".btn-pilih-kotak")
-    .on("click", ".btn-pilih-kotak", function () {
+  // Kotak table row click
+  $("#tableKotak tbody tr").on("click", function() {
+    if ($(this).data('kode')) {
       const kode = $(this).data("kode");
       const nama = $(this).data("nama");
       const stok = $(this).data("stok");
@@ -226,13 +234,14 @@ function attachPilihButtonHandlers() {
 
       // Close modal
       $("#modalPilihKotak").modal("hide");
-    });
+    }
+  });
 
-  // Lock pilih button
-  $(document)
-    .off("click", ".btn-pilih-lock")
-    .on("click", ".btn-pilih-lock", function () {
+  // Lock table row click
+  $("#tableLock tbody tr").on("click", function() {
+    if ($(this).data('kode')) {
       const kode = $(this).data("kode");
+      const nama = $(this).data("nama");
 
       if (activeLockRow) {
         // Jika ini adalah baris input
@@ -249,15 +258,16 @@ function attachPilihButtonHandlers() {
 
       // Tutup modal
       $("#modalPilihLock").modal("hide");
-    });
+    }
+  });
 }
 
 // Function to add aksesoris to table
 function addAksesorisToTable(kode, nama, stok, harga) {
   // Default values
   const jumlah = 1;
-  const berat = 0;
-  const totalHarga = 0;
+  const berat = "";
+  const totalHarga = "";
   const kadar = ""; // Default empty kadar
 
   // Create new row
@@ -269,16 +279,16 @@ function addAksesorisToTable(kode, nama, stok, harga) {
         <input type="number" class="form-control form-control-sm jumlah-input" value="${jumlah}" min="1" max="${stok}">
       </td>
       <td>
-        <input type="text" class="form-control form-control-sm kadar-input" value="${kadar}" placeholder="Kadar">
+        <input type="text" class="form-control form-control-sm kadar-input" value="${kadar}" placeholder="Kadar" required>
       </td>
       <td>
-        <input type="text" class="form-control form-control-sm berat-input" value="${berat}" min="0.01" step="0.01">
+        <input type="text" class="form-control form-control-sm berat-input" value="${berat}" min="0.01" step="0.01" placeholder="0.00" required>
       </td>
       <td>
         <input type="text" class="form-control form-control-sm harga-per-gram-input" value="0" readonly>
       </td>
       <td>
-        <input type="text" class="form-control form-control-sm total-harga-input" value="0">
+        <input type="text" class="form-control form-control-sm total-harga-input" value="${totalHarga}" placeholder="0" required>
       </td>
       <td>
         <button class="btn btn-sm btn-danger btn-delete">
@@ -302,6 +312,7 @@ function addAksesorisToTable(kode, nama, stok, harga) {
   updateGrandTotal("aksesoris");
 }
 
+
 // Function to add kotak to table
 function addKotakToTable(kode, nama, stok, harga) {
   // Default values
@@ -319,7 +330,7 @@ function addKotakToTable(kode, nama, stok, harga) {
       <td>
         <input type="text" class="form-control form-control-sm harga-input" value="${parseInt(harga).toLocaleString(
           "id-ID"
-        )}">
+        )}" required>
       </td>
       <td class="total-harga">${parseInt(totalHarga).toLocaleString("id-ID")}</td>
       <td>
@@ -1041,9 +1052,10 @@ $("#jumlahBayar").on("blur", function () {
   calculateKembalian();
 });
 
-// Reset form button
-$("#btnBatal").on("click", function () {
-  if (confirm("Apakah Anda yakin ingin membatalkan transaksi ini?")) {
+// Di fungsi btnBatal
+$("#btnBatal").on("click", async function () {
+  const confirmed = await showConfirm("Apakah Anda yakin ingin membatalkan transaksi ini?");
+  if (confirmed) {
     location.reload();
   }
 });
@@ -1077,10 +1089,10 @@ function resetTableAndAddInputRow(type) {
           </button>
         </div>
       </td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputKadar" placeholder="Kadar"></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputBerat" placeholder="0.00"></td>
+      <td><input type="text" class="form-control form-control-sm" id="${type}InputKadar" placeholder="Kadar" required></td>
+      <td><input type="text" class="form-control form-control-sm" id="${type}InputBerat" placeholder="0.00" required></td>
       <td><input type="text" class="form-control form-control-sm" id="${type}InputHargaPerGram" placeholder="0" readonly></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputTotalHarga" placeholder="0"></td>
+      <td><input type="text" class="form-control form-control-sm" id="${type}InputTotalHarga" placeholder="0" required></td>
       <td></td>
     </tr>
   `
@@ -1088,10 +1100,10 @@ function resetTableAndAddInputRow(type) {
     <tr class="input-row">
       <td><input type="text" class="form-control form-control-sm" id="${type}InputKode" placeholder="Kode"></td>
       <td><input type="text" class="form-control form-control-sm" id="${type}InputNamaBarang" placeholder="Nama barang"></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputKadar" placeholder="Kadar"></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputBerat" placeholder="0.00"></td>
+      <td><input type="text" class="form-control form-control-sm" id="${type}InputKadar" placeholder="Kadar" required></td>
+      <td><input type="text" class="form-control form-control-sm" id="${type}InputBerat" placeholder="0.00" required></td>
       <td><input type="text" class="form-control form-control-sm" id="${type}InputHargaPerGram" placeholder="0" readonly></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputTotalHarga" placeholder="0"></td>
+      <td><input type="text" class="form-control form-control-sm" id="${type}InputTotalHarga" placeholder="0" required></td>
       <td><input type="text" class="form-control form-control-sm" id="${type}InputKeterangan" placeholder="Keterangan"></td>
       <td></td>
     </tr>
@@ -1208,38 +1220,42 @@ function resetTableAndAddInputRow(type) {
 
 // Function to add new row (extracted from btnTambahBaris click handler)
 function addNewRow(type) {
-  // Get values from input row
-  const kode = $(`#${type}InputKode`).val() || "-";
-  const namaBarang = $(`#${type}InputNamaBarang`).val();
-  const kadar = $(`#${type}InputKadar`).val() || "-";
-  const berat = $(`#${type}InputBerat`).val() || 0;
-  const totalHargaValue = $(`#${type}InputTotalHarga`).val() || "0";
-  const totalHarga = parseFloat(totalHargaValue.replace(/\./g, "").replace(",", ".")) || 0;
-  const hargaPerGram = $(`#${type}InputHargaPerGram`).val() || "0";
+ // Get values from input row
+ const kode = $(`#${type}InputKode`).val() || "-";
+ const namaBarang = $(`#${type}InputNamaBarang`).val();
+ const kadar = $(`#${type}InputKadar`).val() || "-";
+ const berat = $(`#${type}InputBerat`).val() || 0;
+ const totalHargaValue = $(`#${type}InputTotalHarga`).val() || "0";
+ const totalHarga = parseFloat(totalHargaValue.replace(/\./g, "").replace(",", ".")) || 0;
+ const hargaPerGram = $(`#${type}InputHargaPerGram`).val() || "0";
 
-  // Ambil keterangan untuk tipe manual
-  const keterangan = type === "manual" ? $(`#${type}InputKeterangan`).val() || "" : "";
+ // Ambil keterangan untuk tipe manual
+ const keterangan = type === "manual" ? $(`#${type}InputKeterangan`).val() || "" : "";
 
-  // Get kode lock for lock type
-  const kodeLock = type === "lock" ? $(`#${type}InputKodeLock`).val() || "-" : "";
+ // Get kode lock for lock type
+ const kodeLock = type === "lock" ? $(`#${type}InputKodeLock`).val() || "-" : "";
 
-  // Validasi
-  if (!namaBarang) {
-    alert("Nama barang harus diisi!");
-    $(`#${type}InputNamaBarang`).focus();
-    return;
-  }
-  if (berat <= 0) {
-    alert("Berat harus lebih dari 0!");
-    $(`#${type}InputBerat`).focus();
-    return;
-  }
-
-  if (totalHarga <= 0) {
-    alert("Total harga harus lebih dari 0!");
-    $(`#${type}InputTotalHarga`).focus();
-    return;
-  }
+ // Validasi
+ if (!namaBarang) {
+   showAlert("Nama barang harus diisi!");
+   $(`#${type}InputNamaBarang`).focus();
+   return;
+ }
+ if (!kadar) {
+   showAlert("Kadar harus diisi!");
+   $(`#${type}InputKadar`).focus();
+   return;
+ }
+ if (berat <= 0) {
+   showAlert("Berat harus lebih dari 0!");
+   $(`#${type}InputBerat`).focus();
+   return;
+ }
+ if (totalHarga <= 0) {
+   showAlert("Total harga harus lebih dari 0!");
+   $(`#${type}InputTotalHarga`).focus();
+   return;
+ }
 
   // Determine target table and sales type
   let tableSelector;
@@ -1319,176 +1335,12 @@ function addNewRow(type) {
 }
 
 // Fungsi simpan penjualan
-// Print struk kasir
-$("#btnPrintReceipt").on("click", function () {
-  // Check if we have transaction data
-  if (!window.currentTransaction) {
-    alert("Tidak ada data transaksi untuk dicetak!");
-    return;
-  }
-
-  const transaction = window.currentTransaction;
-  const salesType = transaction.salesType;
-  const tanggal = transaction.tanggal;
-  const sales = transaction.sales;
-  const totalHarga = transaction.totalHarga;
-  const items = transaction.items;
-
-  console.log("Printing receipt with data:", transaction); // Debug log
-
-  // Generate receipt HTML
-  let receiptHTML = `
-    <div class="receipt">
-      <h3>MELATI 3</h3>
-      <h4>JL. DIPONEGORO NO. 116</h4>
-      <h4>NOTA PENJUALAN ${salesType.toUpperCase()}</h4>
-      <hr>
-      <p>Tanggal: ${tanggal}<br>Sales: ${sales}</p>
-      <hr>
-      <table>
-        <tr>
-          <th>Kode</th>
-          <th>Nama</th>
-          <th>Gr</th>
-          <th>Harga</th>
-        </tr>
-  `;
-
-  // Add items to receipt
-  items.forEach((item) => {
-    receiptHTML += `
-      <tr>
-        <td>${item.kodeText || "-"}</td>
-        <td>${item.nama || "-"}</td>
-        <td>${item.berat || "-"}</td>
-        <td>${parseInt(item.totalHarga).toLocaleString("id-ID")}</td>
-      </tr>
-    `;
-  });
-
-  // Add total
-  receiptHTML += `
-      <tr>
-        <td colspan="3" style="text-align: right;"><strong>Total:</strong></td>
-        <td><strong>${totalHarga}</strong></td>
-      </tr>
-    </table>
-    <hr>
-    <p style="text-align: center;">Terima Kasih<br>Atas Kunjungan Anda</p>
-  </div>
-  `;
-
-  // Set receipt HTML to print area
-  $("#printArea").html(receiptHTML);
-
-  // Close modal and print
-  $("#printModal").modal("hide");
-  setTimeout(() => {
-    window.print();
-  }, 500);
-});
-
-// Print invoice customer
-$("#btnPrintInvoice").on("click", function () {
-  // Check if we have transaction data
-  if (!window.currentTransaction) {
-    alert("Tidak ada data transaksi untuk dicetak!");
-    return;
-  }
-
-  const transaction = window.currentTransaction;
-  const salesType = transaction.salesType;
-  const tanggal = transaction.tanggal;
-  const sales = transaction.sales;
-  const totalHarga = transaction.totalHarga;
-  const items = transaction.items;
-
-  console.log("Printing invoice with data:", transaction); // Debug log
-
-  // Generate invoice HTML
-  let invoiceHTML = `
-    <div class="invoice">
-      <div style="text-align: center; margin-bottom: 20px;">
-        <h2>MELATI GOLD SHOP</h2>
-        <h3>INVOICE PENJUALAN ${salesType.toUpperCase()}</h3>
-      </div>
-      
-      <div style="margin-bottom: 20px;">
-        <p><strong>Tanggal:</strong> ${tanggal}</p>
-        <p><strong>Sales:</strong> ${sales}</p>
-      </div>
-      
-      <table>
-        <thead>
-          <tr>
-            <th>Kode Barang</th>
-            <th>Ptg</th>
-            <th>Nama Barang</th>
-            <th>Kadar</th>
-            <th>Berat</th>
-            <th>Harga</th>
-          </tr>
-        </thead>
-        <tbody>
-  `;
-
-  // Add items to invoice
-  items.forEach((item) => {
-    invoiceHTML += `
-      <tr>
-        <td>${item.kodeText || "-"}</td>
-        <td>${item.jumlah || "1"}</td>
-        <td>${item.nama || "-"}</td>
-        <td>${item.kadar || "-"}</td>
-        <td>${item.berat || "-"}</td>
-        <td>${parseInt(item.totalHarga).toLocaleString("id-ID")}</td>
-      </tr>
-    `;
-  });
-
-  // Add total
-  invoiceHTML += `
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colspan="5" style="text-align: right;"><strong>Total:</strong></td>
-            <td><strong>${totalHarga}</strong></td>
-          </tr>
-        </tfoot>
-      </table>
-      
-      <div style="margin-top: 30px; display: flex; justify-content: space-between;">
-        <div style="text-align: center;">
-          <p>Customer</p>
-          <br><br><br>
-          <p>(______________)</p>
-        </div>
-        <div style="text-align: center;">
-          <p>Hormat Kami</p>
-          <br><br><br>
-          <p>(______________)</p>
-        </div>
-      </div>
-    </div>
-  `;
-
-  // Set invoice HTML to print area
-  $("#printArea").html(invoiceHTML);
-
-  // Close modal and print
-  $("#printModal").modal("hide");
-  setTimeout(() => {
-    window.print();
-  }, 500);
-});
-
-// Fungsi simpan penjualan
 $("#btnSimpanPenjualan").on("click", async function () {
   try {
     // Validasi nama sales
     const salesName = $("#sales").val().trim();
     if (!salesName) {
-      alert("Nama sales harus diisi!");
+      showAlert("Nama sales harus diisi!");
       $("#sales").focus();
       return;
     }
@@ -1505,7 +1357,7 @@ $("#btnSimpanPenjualan").on("click", async function () {
 
     // Check if table has rows
     if ($(tableSelector + " tbody tr:not(.input-row)").length === 0) {
-      alert("Tidak ada barang yang ditambahkan!");
+      showAlert("Tidak ada barang yang ditambahkan!");
       return;
     }
 
@@ -1516,7 +1368,7 @@ $("#btnSimpanPenjualan").on("click", async function () {
       const total = parseFloat($("#totalOngkos").val().replace(/\./g, "").replace(",", ".")) || 0;
 
       if (nominalDP <= 0 || nominalDP >= total) {
-        alert(
+        showAlert(
           nominalDP <= 0 ? "Nominal DP harus diisi!" : "Nominal DP tidak boleh sama dengan atau melebihi total harga!"
         );
         $("#nominalDP").focus();
@@ -1527,7 +1379,7 @@ $("#btnSimpanPenjualan").on("click", async function () {
       const total = parseFloat($("#totalOngkos").val().replace(/\./g, "").replace(",", ".")) || 0;
 
       if (jumlahBayar < total) {
-        alert("Jumlah bayar kurang dari total!");
+        showAlert("Jumlah bayar kurang dari total!");
         $("#jumlahBayar").focus();
         return;
       }
@@ -1653,7 +1505,7 @@ $("#btnSimpanPenjualan").on("click", async function () {
     }
 
     // Show success message only after successful save
-    alert("Transaksi berhasil disimpan!");
+    showAlert("Transaksi berhasil disimpan!");
 
     // Store the current transaction data in a global variable for printing
     currentTransactionData = {
@@ -1663,7 +1515,14 @@ $("#btnSimpanPenjualan").on("click", async function () {
       sales: salesName,
       totalHarga: $("#totalOngkos").val(),
       items: items,
+      metodeBayar: paymentMethod,
     };
+
+    // Add DP information if payment method is DP
+    if (paymentMethod === "dp") {
+      currentTransactionData.nominalDP = $("#nominalDP").val();
+      currentTransactionData.sisaPembayaran = $("#sisaPembayaran").val();
+    }
 
     console.log("Current transaction data set:", currentTransactionData);
 
@@ -1673,19 +1532,22 @@ $("#btnSimpanPenjualan").on("click", async function () {
     // Reset form after modal is closed
     $("#printModal").on("hidden.bs.modal", function () {
       resetForm();
+      // Set focus to sales field
+      $("#sales").focus();
       // Remove the one-time event handler to prevent multiple bindings
       $("#printModal").off("hidden.bs.modal");
     });
   } catch (error) {
     console.error("Error saving transaction: ", error);
-    alert("Terjadi kesalahan saat menyimpan transaksi: " + error.message);
+    showAlert("Terjadi kesalahan saat menyimpan transaksi: " + error.message);
   }
 });
 
 // Fungsi untuk print struk kasir
+// Fungsi untuk print struk kasir
 function printReceipt() {
   if (!currentTransactionData) {
-    alert("Tidak ada data transaksi untuk dicetak!");
+    showAlert("Tidak ada data transaksi untuk dicetak!");
     return;
   }
 
@@ -1741,6 +1603,11 @@ function printReceipt() {
           border-top: 1px dotted #000;
           padding-top: 2mm;
         }
+        .payment-info {
+          margin-top: 2mm;
+          border-top: 1px dotted #000;
+          padding-top: 2mm;
+        }
       </style>
     </head>
     <body>
@@ -1790,8 +1657,33 @@ function printReceipt() {
             <td class="text-right"><strong>${transaction.totalHarga}</strong></td>
           </tr>
         </table>
-        <hr>
   `;
+
+  // Tambahkan informasi pembayaran DP jika metode pembayaran adalah DP
+  if (transaction.metodeBayar === "dp") {
+    // Format DP and remaining balance with thousand separators
+    const dpAmount = parseFloat(transaction.nominalDP.replace(/\./g, "").replace(",", "."));
+    const remainingAmount = parseFloat(transaction.sisaPembayaran.replace(/\./g, "").replace(",", "."));
+    
+    receiptHTML += `
+        <div class="payment-info">
+          <table>
+            <tr>
+              <td>Total Harga:</td>
+              <td class="text-right">${transaction.totalHarga}</td>
+            </tr>
+            <tr>
+              <td>DP:</td>
+              <td class="text-right">${dpAmount.toLocaleString("id-ID")}</td>
+            </tr>
+            <tr>
+              <td><strong>SISA:</strong></td>
+              <td class="text-right"><strong>${remainingAmount.toLocaleString("id-ID")}</strong></td>
+            </tr>
+          </table>
+        </div>
+    `;
+  }
 
   // Tambahkan keterangan jika ada
   if (hasKeterangan && transaction.salesType === "manual") {
@@ -1803,6 +1695,7 @@ function printReceipt() {
   }
 
   receiptHTML += `
+        <hr>
         <p class="text-center">Terima Kasih<br>Atas Kunjungan Anda</p>
       </div>
       <script>
@@ -1822,7 +1715,7 @@ function printReceipt() {
 
 function printInvoice() {
   if (!currentTransactionData) {
-    alert("Tidak ada data transaksi untuk dicetak!");
+    showAlert("Tidak ada data transaksi untuk dicetak!");
     return;
   }
   
@@ -1834,141 +1727,140 @@ function printInvoice() {
   
   // Buat konten HTML untuk invoice
   let invoiceHTML = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Invoice Customer</title>
-      <style>
-        @page {
-          size: 20cm 10cm;
-          margin: 0;
-        }
-        body {
-          font-family: Arial, sans-serif;
-          font-size: 8px;
-          margin: 0;
-          padding: 5mm;
-          width: 20cm;
-          box-sizing: border-box;
-        }
-        .invoice {
-          width: 100%;
-        }
-        .header-info {
-          text-align: right;
-          margin-bottom: 2cm;
-        }
-        hr {
-          margin: 3mm 0;
-        }
-        .total-row {
-          margin-top: 2cm;
-          text-align: right;
-          font-weight: bold;
-        }
-        .sales{
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <title>Invoice Customer</title>
+    <style>
+      @page {
+        size: 10cm 20cm;
+        margin: 0;
+      }
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+        margin: 0;
+        padding: 5mm;
+        width: 20cm;
+        box-sizing: border-box;
+      }
+      .invoice {
+        width: 100%;
+      }
+      .header-info {
         text-align: right;
-        margin-top: 2cm;
-        }
-        .keterangan {
-          font-style: italic;
-          font-size: 10px;
-          margin-top: 2mm;
-          padding-top: 2mm;
-        }
-        
-        .item-details {
-          display: flex;
-          flex-wrap: wrap;
-        }
-        .item-price {
-          width: 100%;
-          text-align: right;
-          font-weight: bold;
-        }
-        .item-data {
-          display: grid;
-          grid-template-columns: 2cm 2cm 4cm 3cm 3cm;
-          width: 100%;
-          column-gap: 0.2cm;
-        }
-        .item-data span {
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="invoice">
-        <div class="header-info">
-          <p>${transaction.tanggal}</p>
-        </div>
-        <hr>
-  `;
-  
-  // Tambahkan item ke invoice
-  let hasKeterangan = false;
-  let keteranganText = "";
-  let totalHarga = 0;
-  
-  transaction.items.forEach((item) => {
-    const itemHarga = parseInt(item.totalHarga) || 0;
-    totalHarga += itemHarga;
-    
-    invoiceHTML += `
-
-        <div class="item-details">
-          <div class="item-data">
-            <span>${item.kodeText || "-"}</span>
-            <span>${item.jumlah || "1"}pcs</span>
-            <span>${item.nama || "-"}</span>
-            <span>${item.berat || "-"}gr</span>
-            <span>${item.kadar || "-"}</span>
-          </div>
-          <div class="item-price">Rp ${itemHarga.toLocaleString("id-ID")}</div>
-        </div>
-
-    `;
-    
-    // Simpan keterangan jika ada
-    if (item.keterangan && item.keterangan.trim() !== "") {
-      hasKeterangan = true;
-      keteranganText += `${item.nama}: ${item.keterangan}; `;
-    }
-  });
-  
-  // Tambahkan garis pemisah
-  invoiceHTML += `<hr>`;
-  
-  // Tambahkan total di pojok kanan bawah
-  invoiceHTML += `
-        <div class="total-row">
-          Rp ${totalHarga.toLocaleString("id-ID")}
-        </div>
-      <div class="sales">${transaction.sales}</div>
-  `;
-  
-  // Tambahkan keterangan jika ada
-  if (hasKeterangan && transaction.salesType === "manual") {
-    invoiceHTML += `
-        <div class="keterangan">
-          ${keteranganText}
-        </div>
-    `;
-  }
-  
-  invoiceHTML += `
+        margin-bottom: 2cm;
+        margin-right:3cm:
+        margin-top:1cm;
+      }         
+      .total-row {
+        margin-top: 1.9cm;
+        text-align: right;
+        font-weight: bold;
+        margin-right: 3cm;
+      }
+      .sales{
+      text-align: right;
+      margin-top: 0.6cm;
+      margin-right:2cm;
+      }
+      .keterangan {
+        font-style: italic;
+        font-size: 10px;
+        margin-top: 2mm;
+        padding-top: 2mm;
+      }
+      
+      .item-details {
+        display: flex;
+        flex-wrap: wrap;
+      }
+      .item-price {
+        width: 100%;
+        text-align: right;
+        font-weight: bold;
+      }
+      .item-data {
+        display: grid;
+        grid-template-columns: 2cm 1.8cm 5cm 2cm 2cm 2cm;
+        width: 100%;
+        column-gap: 0.2cm;
+        margin-left: 1cm;
+        margin-top: 1.5cm;
+        margin-right: 3cm;
+      }
+      .item-data span {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="invoice">
+      <div class="header-info">
+        <p>${transaction.tanggal || this.formatTimestamp(transaction.timestamp)}</p>
       </div>
-      <script>
-        window.onload = function() {
-          window.print();
-          setTimeout(function() { window.close(); }, 500);
-        };
-      </script>
-    </body>
-    </html>
+      <hr>
+`;
+
+// Tambahkan item ke invoice
+let hasKeterangan = false;
+let keteranganText = "";
+let totalHarga = 0;
+
+transaction.items.forEach((item) => {
+  const itemHarga = parseInt(item.totalHarga) || 0;
+  totalHarga += itemHarga;
+  
+  invoiceHTML += `
+      <div class="item-details">
+        <div class="item-data">
+          <span>${item.kodeText || "-"}</span>
+          <span>${item.jumlah || "1"}pcs</span>
+          <span>${item.nama || "-"}</span>
+          <span>${item.kadar || "-"}</span>
+          <span>${item.berat || "-"}gr</span>
+          <span>${itemHarga.toLocaleString("id-ID")}</span>
+        </div>
+      </div>
   `;
+  
+  // Simpan keterangan jika ada
+  if (item.keterangan && item.keterangan.trim() !== "") {
+    hasKeterangan = true;
+    keteranganText += `${item.nama}: ${item.keterangan}; `;
+  }
+});
+
+// Tambahkan total di pojok kanan bawah
+invoiceHTML += `
+      <div class="total-row">
+        Rp ${totalHarga.toLocaleString("id-ID")}
+      </div>
+    <div class="sales">${transaction.sales || "-"}</div>
+`;
+
+// Tambahkan keterangan jika ada
+if (hasKeterangan && transaction.jenisPenjualan === "manual") {
+  invoiceHTML += `
+      <div class="keterangan">
+        ${keteranganText}
+      </div>
+  `;
+}
+
+invoiceHTML += `
+    </div>
+    <script>
+      window.onload = function() {
+        window.print();
+        setTimeout(function() { window.close(); }, 500);
+      };
+    </script>
+  </body>
+  </html>
+`;
   
   // Tulis HTML ke jendela baru
   printWindow.document.write(invoiceHTML);
@@ -1991,7 +1883,7 @@ $("#btnCetak").on("click", function () {
 
     // Periksa apakah ada item di tabel
     if ($(tableSelector + " tbody tr:not(.input-row)").length === 0) {
-      alert("Tidak ada data transaksi untuk dicetak. Simpan transaksi terlebih dahulu.");
+      showAlert("Tidak ada data transaksi untuk dicetak. Simpan transaksi terlebih dahulu.");
       return;
     }
 
@@ -2263,169 +2155,6 @@ function resetFormAfterSave() {
   }
 }
 
-// Print struk kasir
-$("#btnPrintReceipt").on("click", function () {
-  // Check if we have transaction data
-  if (!window.currentTransaction) {
-    alert("Tidak ada data transaksi untuk dicetak!");
-    return;
-  }
-
-  const transaction = window.currentTransaction;
-  const salesType = transaction.salesType;
-  const tanggal = transaction.tanggal;
-  const sales = transaction.sales;
-  const totalHarga = transaction.totalHarga;
-  const items = transaction.items;
-
-  console.log("Printing receipt with data:", transaction); // Debug log
-
-  // Generate receipt HTML
-  let receiptHTML = `
-    <div class="receipt">
-      <h3>MELATI 3</h3>
-      <h4>JL. DIPONEGORO NO. 116</h4>
-      <h4>NOTA PENJUALAN ${salesType.toUpperCase()}</h4>
-      <hr>
-      <p>Tanggal: ${tanggal}<br>Sales: ${sales}</p>
-      <hr>
-      <table>
-        <tr>
-          <th>Kode</th>
-          <th>Nama</th>
-          <th>Gr</th>
-          <th>Harga</th>
-        </tr>
-  `;
-
-  // Add items to receipt
-  items.forEach((item) => {
-    receiptHTML += `
-      <tr>
-        <td>${item.kodeText || "-"}</td>
-        <td>${item.nama || "-"}</td>
-        <td>${item.berat || "-"}</td>
-        <td>${parseInt(item.totalHarga).toLocaleString("id-ID")}</td>
-      </tr>
-    `;
-  });
-
-  // Add total
-  receiptHTML += `
-      <tr>
-        <td colspan="3" style="text-align: right;"><strong>Total:</strong></td>
-        <td><strong>${totalHarga}</strong></td>
-      </tr>
-    </table>
-    <hr>
-    <p style="text-align: center;">Terima Kasih<br>Atas Kunjungan Anda</p>
-  </div>
-  `;
-
-  // Set receipt HTML to print area
-  $("#printArea").html(receiptHTML);
-
-  // Close modal and print
-  $("#printModal").modal("hide");
-  setTimeout(() => {
-    window.print();
-  }, 500);
-});
-
-// Print invoice customer
-$("#btnPrintInvoice").on("click", function () {
-  // Check if we have transaction data
-  if (!window.currentTransaction) {
-    alert("Tidak ada data transaksi untuk dicetak!");
-    return;
-  }
-
-  const transaction = window.currentTransaction;
-  const salesType = transaction.salesType;
-  const tanggal = transaction.tanggal;
-  const sales = transaction.sales;
-  const totalHarga = transaction.totalHarga;
-  const items = transaction.items;
-
-  console.log("Printing invoice with data:", transaction); // Debug log
-
-  // Generate invoice HTML
-  let invoiceHTML = `
-    <div class="invoice">
-      <div style="text-align: center; margin-bottom: 20px;">
-        <h2>MELATI GOLD SHOP</h2>
-        <h3>INVOICE PENJUALAN ${salesType.toUpperCase()}</h3>
-      </div>
-      
-      <div style="margin-bottom: 20px;">
-        <p><strong>Tanggal:</strong> ${tanggal}</p>
-        <p><strong>Sales:</strong> ${sales}</p>
-      </div>
-      
-      <table>
-        <thead>
-          <tr>
-            <th>Kode Barang</th>
-            <th>Ptg</th>
-            <th>Nama Barang</th>
-            <th>Kadar</th>
-            <th>Berat</th>
-            <th>Harga</th>
-          </tr>
-        </thead>
-        <tbody>
-  `;
-
-  // Add items to invoice
-  items.forEach((item) => {
-    invoiceHTML += `
-      <tr>
-        <td>${item.kodeText || "-"}</td>
-        <td>${item.jumlah || "1"}</td>
-        <td>${item.nama || "-"}</td>
-        <td>${item.kadar || "-"}</td>
-        <td>${item.berat || "-"}</td>
-        <td>${parseInt(item.totalHarga).toLocaleString("id-ID")}</td>
-      </tr>
-    `;
-  });
-
-  // Add total
-  invoiceHTML += `
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colspan="5" style="text-align: right;"><strong>Total:</strong></td>
-            <td><strong>${totalHarga}</strong></td>
-          </tr>
-        </tfoot>
-      </table>
-      
-      <div style="margin-top: 30px; display: flex; justify-content: space-between;">
-        <div style="text-align: center;">
-          <p>Customer</p>
-          <br><br><br>
-          <p>(______________)</p>
-        </div>
-        <div style="text-align: center;">
-          <p>Hormat Kami</p>
-          <br><br><br>
-          <p>(______________)</p>
-        </div>
-      </div>
-    </div>
-  `;
-
-  // Set invoice HTML to print area
-  $("#printArea").html(invoiceHTML);
-
-  // Close modal and print
-  $("#printModal").modal("hide");
-  setTimeout(() => {
-    window.print();
-  }, 500);
-});
-
 // Fungsi untuk memperbarui stok setelah penjualan
 async function updateStock(salesType, items) {
   try {
@@ -2517,7 +2246,8 @@ function resetForm() {
     const formattedDate = formatDate(today);
     $("#tanggal").val(formattedDate);
 
-    // Keep sales name (don't reset it for convenience)
+    // Reset sales name field
+    $("#sales").val("").removeClass("is-valid is-invalid");
 
     // Clear all tables
     $("#tableAksesorisDetail tbody").empty();
@@ -2538,6 +2268,9 @@ function resetForm() {
     $("#grand-total-kotak").text("0");
     $("#grand-total-lock").text("0");
     $("#grand-total-manual").text("0");
+
+    // Set focus to sales field after reset
+    $("#sales").focus();
 
     console.log("Form reset successfully");
   } catch (error) {

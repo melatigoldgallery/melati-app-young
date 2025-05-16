@@ -9,6 +9,9 @@
       href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <!-- SweetAlert2 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@sweetalert2/theme-bootstrap-4/bootstrap-4.css" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- jQuery first -->
     <script src="js/jquery-3.6.3.min.js"></script>
     <!-- Bootstrap CSS and JS -->
@@ -18,7 +21,10 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <!-- Datepicker CSS and JS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css" rel="stylesheet">
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css"
+      rel="stylesheet"
+    />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/locales/bootstrap-datepicker.id.min.js"></script>
     <!-- Custom CSS -->
@@ -26,57 +32,64 @@
     <!-- Favicon sederhana -->
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
     <!-- Tambahkan di bagian head HTML -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
     <style>
-      .success-icon, .error-icon {
-    animation: bounceIn 1s;
-  }
-  
-  @keyframes bounceIn {
-    0%, 20%, 40%, 60%, 80%, 100% {
-      transition-timing-function: cubic-bezier(0.215, 0.610, 0.355, 1.000);
-    }
-    0% {
-      opacity: 0;
-      transform: scale3d(.3, .3, .3);
-    }
-    20% {
-      transform: scale3d(1.1, 1.1, 1.1);
-    }
-    40% {
-      transform: scale3d(.9, .9, .9);
-    }
-    60% {
-      opacity: 1;
-      transform: scale3d(1.03, 1.03, 1.03);
-    }
-    80% {
-      transform: scale3d(.97, .97, .97);
-    }
-    100% {
-      opacity: 1;
-      transform: scale3d(1, 1, 1);
-    }
-  }
-  
-  #successModalContent, #errorModalContent {
-    max-height: 300px;
-    overflow-y: auto;
-  }
-  
-  .item-list {
-    text-align: left;
-    margin-top: 15px;
-  }
-  
-  .item-list .item {
-    padding: 8px;
-    border-bottom: 1px solid #eee;
-  }
-  
-  .item-list .item:last-child {
-    border-bottom: none;
-  }
+      .success-icon,
+      .error-icon {
+        animation: bounceIn 1s;
+      }
+
+      @keyframes bounceIn {
+        0%,
+        20%,
+        40%,
+        60%,
+        80%,
+        100% {
+          transition-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1);
+        }
+        0% {
+          opacity: 0;
+          transform: scale3d(0.3, 0.3, 0.3);
+        }
+        20% {
+          transform: scale3d(1.1, 1.1, 1.1);
+        }
+        40% {
+          transform: scale3d(0.9, 0.9, 0.9);
+        }
+        60% {
+          opacity: 1;
+          transform: scale3d(1.03, 1.03, 1.03);
+        }
+        80% {
+          transform: scale3d(0.97, 0.97, 0.97);
+        }
+        100% {
+          opacity: 1;
+          transform: scale3d(1, 1, 1);
+        }
+      }
+
+      #successModalContent,
+      #errorModalContent {
+        max-height: 300px;
+        overflow-y: auto;
+      }
+
+      .item-list {
+        text-align: left;
+        margin-top: 15px;
+      }
+
+      .item-list .item {
+        padding: 8px;
+        border-bottom: 1px solid #eee;
+      }
+
+      .item-list .item:last-child {
+        border-bottom: none;
+      }
     </style>
     <title>Tambah Aksesoris - Melati Gold Shop</title>
   </head>
@@ -237,12 +250,7 @@
                   <div class="col-md-3">
                     <label for="tanggal" class="form-label">Tanggal</label>
                     <div class="input-group">
-                      <input
-                        type="text"
-                        class="form-control"
-                        id="tanggal"
-                        placeholder="Masukkan tanggal"
-                      />
+                      <input type="text" class="form-control" id="tanggal" placeholder="Masukkan tanggal" />
                       <span class="input-group-text bg-primary text-white" id="calendarIcon" style="cursor: pointer">
                         <i class="fa-solid fa-calendar-days"></i>
                       </span>
@@ -250,10 +258,7 @@
                   </div>
                   <div class="col-md-3">
                     <label for="jenis-aksesoris" class="form-label">Jenis Aksesoris</label>
-                    <select
-                      class="form-select"
-                      id="jenis-aksesoris"
-                      aria-label="Pilih Jenis Aksesoris">
+                    <select class="form-select" id="jenis-aksesoris" aria-label="Pilih Jenis Aksesoris">
                       <option selected>Pilih Kategori</option>
                       <option id="jenis-kotak" value="1">Kotak Perhiasan</option>
                       <option id="jenis-aksesoris" value="2">Aksesoris Perhiasan</option>
@@ -263,7 +268,8 @@
                     <label for="kode" class="form-label">Kelola Kode Aksesoris</label>
                     <div>
                       <button class="btn btn-outline-secondary form-control" type="button" id="btnKelolaKode">
-                        <i class="fas fa-cog mx-2"></i>Edit Kode
+                        <i class="fas fa-cog mx-2"></i>
+                        Edit Kode
                       </button>
                     </div>
                   </div>
@@ -278,12 +284,9 @@
                   <i class="fas fa-list"></i>
                   Detail Barang
                 </h2>
-                <button
-                  type="button"
-                  class="btn btn-primary"
-                  id="btnTambahAksesoris"
-                >
-                  <i class="fas fa-plus me-2"></i>Tambah
+                <button type="button" class="btn btn-primary" id="btnTambahAksesoris">
+                  <i class="fas fa-plus me-2"></i>
+                  Tambah
                 </button>
               </div>
               <div class="card-body">
@@ -313,10 +316,12 @@
               </div>
               <div class="card-footer">
                 <button class="btn btn-primary" id="btnSimpanData">
-                  <i class="fas fa-save me-2"></i>Simpan Data
+                  <i class="fas fa-save me-2"></i>
+                  Simpan Data
                 </button>
                 <button class="btn btn-secondary" id="btnBatal">
-                  <i class="fas fa-times me-2"></i>Batal
+                  <i class="fas fa-times me-2"></i>
+                  Batal
                 </button>
               </div>
             </div>
@@ -332,7 +337,7 @@
                   <div class="col-md-3">
                     <label for="filterDate" class="form-label">Filter Tanggal</label>
                     <div class="input-group">
-                      <input type="text" class="form-control datepicker" id="filterDate" placeholder="Pilih tanggal">
+                      <input type="text" class="form-control datepicker" id="filterDate" placeholder="Pilih tanggal" />
                       <span class="input-group-text bg-primary text-white" id="filterDateIcon" style="cursor: pointer">
                         <i class="fa-solid fa-calendar-days"></i>
                       </span>
@@ -340,7 +345,8 @@
                   </div>
                   <div class="col-md-2 d-flex align-items-end">
                     <button class="btn btn-primary" id="btnFilterHistory">
-                      <i class="fas fa-filter me-2"></i>Filter
+                      <i class="fas fa-filter me-2"></i>
+                      Filter
                     </button>
                   </div>
                 </div>
@@ -365,180 +371,212 @@
         </div>
       </main>
     </div>
-<!-- Modal Kelola Kode Barang -->
-<div class="modal fade" id="modalKelolaKode" tabindex="-1" aria-labelledby="modalKelolaKodeLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="modalKelolaKodeLabel">Kelola Kode Barang</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <!-- Tab untuk memilih kategori -->
-        <ul class="nav nav-tabs mb-3" id="kodeBarangTab" role="tablist">
-          <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="kotak-tab" data-bs-toggle="tab" data-bs-target="#kotak" type="button" role="tab" aria-controls="kotak" aria-selected="true">Kotak Perhiasan</button>
-          </li>
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" id="aksesoris-tab" data-bs-toggle="tab" data-bs-target="#aksesoris" type="button" role="tab" aria-controls="aksesoris" aria-selected="false">Aksesoris Perhiasan</button>
-          </li>
-        </ul>
-        
-        <!-- Tab content -->
-        <div class="tab-content" id="kodeBarangTabContent">
-          <!-- Tab Kotak Perhiasan -->
-          <div class="tab-pane fade show active" id="kotak" role="tabpanel" aria-labelledby="kotak-tab">
-            <div class="d-flex justify-content-between mb-3">
-              <div class="input-group" style="max-width: 300px;">
-                <input type="text" class="form-control" id="searchKotak" placeholder="Cari kode atau nama...">
-                <button class="btn btn-outline-secondary" type="button" id="clearSearchKotak">
-                  <i class="fas fa-search"></i>
+    <!-- Modal Kelola Kode Barang -->
+    <div
+      class="modal fade"
+      id="modalKelolaKode"
+      tabindex="-1"
+      aria-labelledby="modalKelolaKodeLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalKelolaKodeLabel">Kelola Kode Barang</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <!-- Tab untuk memilih kategori -->
+            <ul class="nav nav-tabs mb-3" id="kodeBarangTab" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button
+                  class="nav-link active"
+                  id="kotak-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#kotak"
+                  type="button"
+                  role="tab"
+                  aria-controls="kotak"
+                  aria-selected="true"
+                >
+                  Kotak Perhiasan
                 </button>
-              </div>
-              <button class="btn btn-primary btn-sm" id="btnTambahKotak">
-                <i class="fas fa-plus-circle me-1"></i> Tambah Kode
-              </button>
-            </div>
-            <div class="table-responsive">
-              <table class="table table-hover" id="tableKodeKotak">
-                <thead class="table-light">
-                  <tr>
-                    <th>No</th>
-                    <th>Kode</th>
-                    <th>Nama</th>
-                    <th>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <!-- Data akan diisi oleh JavaScript -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-          
-          <!-- Tab Aksesoris Perhiasan -->
-          <div class="tab-pane fade" id="aksesoris" role="tabpanel" aria-labelledby="aksesoris-tab">
-            <div class="d-flex justify-content-between mb-3">
-              <div class="input-group" style="max-width: 300px;">
-                <input type="text" class="form-control" id="searchAksesoris" placeholder="Cari kode atau nama...">
-                <button class="btn btn-outline-secondary" type="button" id="clearSearchAksesoris">
-                  <i class="fas fa-search"></i>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button
+                  class="nav-link"
+                  id="aksesoris-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#aksesoris"
+                  type="button"
+                  role="tab"
+                  aria-controls="aksesoris"
+                  aria-selected="false"
+                >
+                  Aksesoris Perhiasan
                 </button>
+              </li>
+            </ul>
+
+            <!-- Tab content -->
+            <div class="tab-content" id="kodeBarangTabContent">
+              <!-- Tab Kotak Perhiasan -->
+              <div class="tab-pane fade show active" id="kotak" role="tabpanel" aria-labelledby="kotak-tab">
+                <div class="d-flex justify-content-between mb-3">
+                  <div class="input-group" style="max-width: 300px">
+                    <input type="text" class="form-control" id="searchKotak" placeholder="Cari kode atau nama..." />
+                    <button class="btn btn-outline-secondary" type="button" id="clearSearchKotak">
+                      <i class="fas fa-search"></i>
+                    </button>
+                  </div>
+                  <button class="btn btn-primary btn-sm" id="btnTambahKotak">
+                    <i class="fas fa-plus-circle me-1"></i>
+                    Tambah Kode
+                  </button>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-hover" id="tableKodeKotak">
+                    <thead class="table-light">
+                      <tr>
+                        <th>No</th>
+                        <th>Kode</th>
+                        <th>Nama</th>
+                        <th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <!-- Data akan diisi oleh JavaScript -->
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <button class="btn btn-primary btn-sm" id="btnTambahAksesorisKode">
-                <i class="fas fa-plus-circle me-1"></i> Tambah Kode
-              </button>
+
+              <!-- Tab Aksesoris Perhiasan -->
+              <div class="tab-pane fade" id="aksesoris" role="tabpanel" aria-labelledby="aksesoris-tab">
+                <div class="d-flex justify-content-between mb-3">
+                  <div class="input-group" style="max-width: 300px">
+                    <input type="text" class="form-control" id="searchAksesoris" placeholder="Cari kode atau nama..." />
+                    <button class="btn btn-outline-secondary" type="button" id="clearSearchAksesoris">
+                      <i class="fas fa-search"></i>
+                    </button>
+                  </div>
+                  <button class="btn btn-primary btn-sm" id="btnTambahAksesorisKode">
+                    <i class="fas fa-plus-circle me-1"></i>
+                    Tambah Kode
+                  </button>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-hover" id="tableKodeAksesoris">
+                    <thead class="table-light">
+                      <tr>
+                        <th>No</th>
+                        <th>Kode</th>
+                        <th>Nama</th>
+                        <th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <!-- Data akan diisi oleh JavaScript -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-            <div class="table-responsive">
-              <table class="table table-hover" id="tableKodeAksesoris">
-                <thead class="table-light">
-                  <tr>
-                    <th>No</th>
-                    <th>Kode</th>
-                    <th>Nama</th>
-                    <th>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <!-- Data akan diisi oleh JavaScript -->
-                </tbody>
-              </table>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Form Tambah/Edit Kode -->
+    <div class="modal fade" id="modalFormKode" tabindex="-1" aria-labelledby="modalFormKodeLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalFormKodeLabel">Tambah Kode Baru</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form id="formKodeBarang">
+              <input type="hidden" id="docId" />
+              <input type="hidden" id="kategoriKode" />
+              <div class="mb-3">
+                <label for="textKode" class="form-label">Kode</label>
+                <input type="text" class="form-control" id="textKode" placeholder="Masukkan kode" />
+              </div>
+              <div class="mb-3">
+                <label for="namaKode" class="form-label">Nama</label>
+                <input type="text" class="form-control" id="namaKode" placeholder="Masukkan nama" />
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="button" class="btn btn-primary" id="btnSimpanKode">Simpan</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Notifikasi Sukses -->
+    <div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-success text-white">
+            <h5 class="modal-title" id="successModalLabel">
+              <i class="fas fa-check-circle me-2"></i>
+              Berhasil!
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="text-center mb-4">
+              <div class="success-icon mb-3">
+                <i class="fas fa-check-circle fa-4x text-success"></i>
+              </div>
+              <h4 id="successModalTitle">Data berhasil disimpan</h4>
+            </div>
+            <div id="successModalContent" class="mt-3">
+              <!-- Detail akan diisi oleh JavaScript -->
             </div>
           </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-success" data-bs-dismiss="modal">OK</button>
+          </div>
         </div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
-      </div>
     </div>
-  </div>
-</div>
 
-<!-- Modal Form Tambah/Edit Kode -->
-<div class="modal fade" id="modalFormKode" tabindex="-1" aria-labelledby="modalFormKodeLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="modalFormKodeLabel">Tambah Kode Baru</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <form id="formKodeBarang">
-          <input type="hidden" id="docId">
-          <input type="hidden" id="kategoriKode">
-          <div class="mb-3">
-            <label for="textKode" class="form-label">Kode</label>
-            <input type="text" class="form-control" id="textKode" placeholder="Masukkan kode">
+    <!-- Modal Notifikasi Error -->
+    <div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title" id="errorModalLabel">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              Error!
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
-          <div class="mb-3">
-            <label for="namaKode" class="form-label">Nama</label>
-            <input type="text" class="form-control" id="namaKode" placeholder="Masukkan nama">
+          <div class="modal-body">
+            <div class="text-center mb-4">
+              <div class="error-icon mb-3">
+                <i class="fas fa-exclamation-circle fa-4x text-danger"></i>
+              </div>
+              <h4 id="errorModalTitle">Terjadi Kesalahan</h4>
+            </div>
+            <div id="errorModalContent" class="mt-3">
+              <!-- Detail akan diisi oleh JavaScript -->
+            </div>
           </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-        <button type="button" class="btn btn-primary" id="btnSimpanKode">Simpan</button>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-danger" data-bs-dismiss="modal">OK</button>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-</div>
-
-<!-- Modal Notifikasi Sukses -->
-<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-success text-white">
-        <h5 class="modal-title" id="successModalLabel">
-          <i class="fas fa-check-circle me-2"></i>Berhasil!
-        </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="text-center mb-4">
-          <div class="success-icon mb-3">
-            <i class="fas fa-check-circle fa-4x text-success"></i>
-          </div>
-          <h4 id="successModalTitle">Data berhasil disimpan</h4>
-        </div>
-        <div id="successModalContent" class="mt-3">
-          <!-- Detail akan diisi oleh JavaScript -->
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-success" data-bs-dismiss="modal">OK</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Notifikasi Error -->
-<div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-danger text-white">
-        <h5 class="modal-title" id="errorModalLabel">
-          <i class="fas fa-exclamation-triangle me-2"></i>Error!
-        </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="text-center mb-4">
-          <div class="error-icon mb-3">
-            <i class="fas fa-exclamation-circle fa-4x text-danger"></i>
-          </div>
-          <h4 id="errorModalTitle">Terjadi Kesalahan</h4>
-        </div>
-        <div id="errorModalContent" class="mt-3">
-          <!-- Detail akan diisi oleh JavaScript -->
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">OK</button>
-      </div>
-    </div>
-  </div>
-</div>
     <!-- Scripts -->
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/components/sidebar.js"></script>
@@ -546,17 +584,17 @@
     <script type="module" src="js/tambahAksesoris.js"></script>
     <script>
       // Initialize datepicker
-      $(document).ready(function() {
-        $('#tanggal').datepicker({
-          format: 'dd/mm/yyyy',
+      $(document).ready(function () {
+        $("#tanggal").datepicker({
+          format: "dd/mm/yyyy",
           autoclose: true,
-          language: 'id',
-          todayHighlight: true
+          language: "id",
+          todayHighlight: true,
         });
-        
+
         // Calendar icon click handler
-        $('#calendarIcon').on('click', function() {
-          $('#tanggal').datepicker('show');
+        $("#calendarIcon").on("click", function () {
+          $("#tanggal").datepicker("show");
         });
       });
     </script>
