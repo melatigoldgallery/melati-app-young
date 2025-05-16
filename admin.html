@@ -34,7 +34,7 @@
         <div class="sidebar-menu">
           <ul class="nav flex-column" id="sidebarAccordion">
             <li class="nav-item">
-              <a class="nav-link active" href="dashboard.html">
+              <a class="nav-link" href="dashboard.html">
                 <i class="fas fa-tachometer-alt"></i>
                 <span class="menu-text">Dashboard</span>
               </a>
@@ -45,7 +45,6 @@
                 <span class="menu-text">Buyback</span>
               </a>
             </li>
-            <!-- Antrian dropdown menu -->
             <li class="nav-item">
               <a
                 class="nav-link collapsed"
@@ -80,7 +79,42 @@
                   </li>
                 </ul>
               </div>
-            </li>            
+            </li>
+            <li class="nav-item">
+              <a
+                class="nav-link collapsed"
+                href="#"
+                data-bs-toggle="collapse"
+                data-bs-target="#aksesorisSubmenu"
+                aria-expanded="false"
+              >
+                <i class="fas fa-gem"></i>
+                <span class="menu-text">Aksesoris</span>
+                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
+              </a>
+              <div class="collapse" id="aksesorisSubmenu" data-bs-parent="#sidebarAccordion">
+                <ul class="nav flex-column ms-3">
+                  <li class="nav-item">
+                    <a class="nav-link" href="tambahAksesoris.html">
+                      <i class="fas fa-plus-circle"></i>
+                      <span class="menu-text">Tambah Aksesoris</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link active" href="penjualanAksesoris.html">
+                      <i class="fas fa-shopping-cart"></i>
+                      <span class="menu-text">Penjualan Aksesoris</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="laporanAksesoris.html">
+                      <i class="fas fa-chart-bar"></i>
+                      <span class="menu-text">Laporan Aksesoris</span>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </li>
           </ul>
         </div>
         <div class="sidebar-footer">
