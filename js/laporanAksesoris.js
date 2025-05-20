@@ -1499,7 +1499,7 @@ const laporanAksesorisHandler = {
         <title>Struk Kasir</title>
         <style>
           body {
-            font-family: roboto;
+            font-family: 'Courier New', monospace;
             font-size: 13px;
             margin: 0;
             padding: 0;

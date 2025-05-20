@@ -1565,8 +1565,8 @@ function printReceipt() {
       <title>Struk Kasir</title>
       <style>
         body {
-          font-family: 'Courier New', monospace;
-          font-size: 12px;
+          font-family: roboto;
+          font-size: 13px;
           margin: 0;
           padding: 0;
           width: 80mm;
