@@ -13,8 +13,96 @@ import {
   Timestamp,
   startAt,
   endAt,
+  writeBatch,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 import { firestore } from "./configFirebase.js";
+
+// Tambahkan konstanta untuk kata sandi verifikasi
+const VERIFICATION_PASSWORD = "melati3"; // Ganti dengan kata sandi yang diinginkan
+
+// Tambahkan variabel untuk menyimpan jenis data yang akan dihapus
+let deleteDataType = "";
+let deleteStartDate = null;
+let deleteEndDate = null;
+
+// Tambahkan fungsi untuk menghapus data penjualan
+async function deleteSalesData(startDate, endDate) {
+  try {
+    showLoading(true);
+    console.log("Deleting sales data from", startDate, "to", endDate);
+
+    // Query untuk mendapatkan data penjualan dalam rentang tanggal
+    const salesRef = collection(firestore, "penjualanAksesoris");
+    const q = query(
+      salesRef,
+      where("timestamp", ">=", Timestamp.fromDate(startDate)),
+      where("timestamp", "<=", Timestamp.fromDate(endDate))
+    );
+
+    const querySnapshot = await getDocs(q);
+    console.log("Found", querySnapshot.size, "documents to delete");
+
+    if (querySnapshot.empty) {
+      showLoading(false);
+      return showAlert("Tidak ada data penjualan dalam rentang tanggal yang dipilih.", "Info", "info");
+    }
+
+    // Gunakan batch untuk menghapus data
+    const batch = writeBatch(firestore);
+    let deleteCount = 0;
+
+    querySnapshot.forEach((docSnapshot) => {
+      console.log("Adding document to batch delete:", docSnapshot.id);
+      batch.delete(doc(firestore, "penjualanAksesoris", docSnapshot.id));
+      deleteCount++;
+    });
+
+    // Commit batch
+    console.log("Committing batch delete for", deleteCount, "documents");
+    await batch.commit();
+    console.log("Batch delete successful");
+
+    // Refresh data
+    laporanAksesorisHandler.cache.salesData.data = null;
+    await laporanAksesorisHandler.loadSalesData();
+    laporanAksesorisHandler.filterSalesData();
+
+    showLoading(false);
+    return showAlert(`Berhasil menghapus ${deleteCount} data penjualan.`, "Sukses", "success");
+  } catch (error) {
+    console.error("Error deleting sales data:", error);
+    showLoading(false);
+    return showAlert("Gagal menghapus data: " + error.message, "Error", "error");
+  }
+}
+
+// Tambahkan fungsi untuk menampilkan modal verifikasi
+function showVerificationModal(dataType, startDate, endDate) {
+  // Simpan jenis data dan rentang tanggal
+  deleteDataType = dataType;
+  deleteStartDate = startDate;
+  deleteEndDate = endDate;
+
+  // Format tanggal untuk ditampilkan
+  const startDateStr = formatDate(startDate);
+  const endDateStr = formatDate(endDate);
+
+  // Set teks konfirmasi
+  const confirmationText = document.getElementById("deleteConfirmationText");
+  if (dataType === "sales") {
+    confirmationText.textContent = `Anda akan menghapus data penjualan dari ${startDateStr} hingga ${endDateStr}. Tindakan ini tidak dapat dibatalkan.`;
+  } else {
+    confirmationText.textContent = `Anda akan menghapus data transaksi stok dari ${startDateStr} hingga ${endDateStr}. Tindakan ini tidak dapat dibatalkan.`;
+  }
+
+  // Reset input password
+  document.getElementById("verificationPassword").value = "";
+
+  // Tampilkan modal
+  const modal = new bootstrap.Modal(document.getElementById("verificationModal"));
+  modal.show();
+}
 
 // Utility functions
 const formatRupiah = (angka) => {
@@ -63,8 +151,8 @@ function printSummaryReceiptFormat(summaryData) {
         }
 
         body {
-          font-family: 'Courier New', monospace;
-          font-size: 10px;
+          font-family: Roboto;
+          font-size: 13px;
           margin: 0;
           padding: 5mm;
           width: 73mm;  /* 7.3cm */
@@ -75,7 +163,7 @@ function printSummaryReceiptFormat(summaryData) {
         .receipt h3, .receipt h4 {
           text-align: center;
           margin: 2mm 0;
-          font-size: 12px;
+          font-size: 13px;
         }
         .receipt hr {
           border-top: 1px dashed #000;
@@ -194,18 +282,132 @@ const laporanAksesorisHandler = {
     },
   },
 
+  // Fungsi utilitas untuk menghancurkan DataTable dengan aman
+safelyDestroyDataTable(tableId) {
+  try {
+    const tableSelector = `#${tableId}`;
+    if ($.fn.DataTable.isDataTable(tableSelector)) {
+      const dt = $(tableSelector).DataTable();
+      if (dt && typeof dt.destroy === 'function') {
+        dt.destroy();
+        return true;
+      }
+    }
+    return false;
+  } catch (error) {
+    console.warn(`Error safely destroying DataTable ${tableId}:`, error);
+    return false;
+  }
+},
+
+// Fungsi utilitas untuk memastikan struktur tabel lengkap
+ensureTableStructure(tableId, columnHeaders) {
+  try {
+    const tableElement = document.getElementById(tableId);
+    if (!tableElement) {
+      console.error(`Table element #${tableId} not found`);
+      return false;
+    }
+    
+    // Pastikan thead ada
+    let theadElement = tableElement.querySelector("thead");
+    if (!theadElement) {
+      theadElement = document.createElement("thead");
+      tableElement.appendChild(theadElement);
+    }
+    
+    // Pastikan thead memiliki tr
+    let headerRow = theadElement.querySelector("tr");
+    if (!headerRow) {
+      headerRow = document.createElement("tr");
+      theadElement.appendChild(headerRow);
+    }
+    
+    // Isi header dengan kolom yang diberikan
+    headerRow.innerHTML = columnHeaders.map(header => `<th>${header}</th>`).join('');
+    
+    // Pastikan tbody ada
+    let tbodyElement = tableElement.querySelector("tbody");
+    if (!tbodyElement) {
+      tbodyElement = document.createElement("tbody");
+      tableElement.appendChild(tbodyElement);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error(`Error ensuring table structure for #${tableId}:`, error);
+    return false;
+  }
+},
+
+
   // Initialize the module
   init() {
+    this.ensureTableStructure("penjualanTable", [
+      "Tanggal", "Sales", "Jenis", "Kode Barang", "Nama Barang", 
+      "Jumlah", "Berat", "Harga", "Status", "Aksi"
+    ]);
+    
+    this.ensureTableStructure("stockTable", [
+      "No", "Kode", "Nama", "Stok Awal", "Tambah Stok", 
+      "Laku", "Free", "Ganti Lock", "Stok Akhir"
+    ]);
+    
     this.initDatePickers();
     this.attachEventListeners();
     this.setDefaultDates();
-
-    // Initialize DataTables
     this.initDataTables();
-
-    // Tidak lagi memanggil loadSalesData() dan loadStockData() secara otomatis
-    // Hanya menyiapkan tabel kosong
     this.prepareEmptyTables();
+
+    // Tombol hapus data penjualan
+    const deleteSalesDataBtn = document.getElementById("deleteSalesDataBtn");
+    if (deleteSalesDataBtn) {
+      deleteSalesDataBtn.addEventListener("click", () => {
+        const startDateStr = document.querySelector("#sales-tab-pane #startDate").value;
+        const endDateStr = document.querySelector("#sales-tab-pane #endDate").value;
+
+        if (!startDateStr || !endDateStr) {
+          return showAlert("Pilih rentang tanggal terlebih dahulu.", "Peringatan", "warning");
+        }
+
+        const startDate = parseDate(startDateStr);
+        const endDate = parseDate(endDateStr);
+
+        if (!startDate || !endDate) {
+          return showAlert("Format tanggal tidak valid.", "Peringatan", "warning");
+        }
+
+        // Set waktu
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+
+        showVerificationModal("sales", startDate, endDate);
+      });
+    }
+
+    // Tombol konfirmasi hapus di modal - GUNAKAN ID BARU
+    const confirmDeleteRangeBtn = document.getElementById("confirmDeleteRangeBtn");
+    if (confirmDeleteRangeBtn) {
+      confirmDeleteRangeBtn.addEventListener("click", async () => {
+        console.log("Confirm delete range button clicked");
+        const password = document.getElementById("verificationPassword").value;
+
+        if (password !== VERIFICATION_PASSWORD) {
+          return showAlert("Kata sandi verifikasi salah.", "Error", "error");
+        }
+
+        // Tutup modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById("verificationModal"));
+        modal.hide();
+
+        // Hapus data sesuai jenis
+        if (deleteDataType === "sales") {
+          await deleteSalesData(deleteStartDate, deleteEndDate);
+        } else if (deleteDataType === "stock") {
+          await deleteStockData(deleteStartDate, deleteEndDate);
+        }
+      });
+    }
   },
 
   // Tambahkan fungsi untuk menyiapkan tabel kosong
@@ -309,14 +511,6 @@ const laporanAksesorisHandler = {
       });
     }
 
-    // Reset Filter button
-    const resetFilterBtn = document.getElementById("resetFilterBtn");
-    if (resetFilterBtn) {
-      resetFilterBtn.addEventListener("click", () => {
-        this.resetSalesFilters();
-      });
-    }
-
     // Toggle Summary button
     const toggleSummaryBtn = document.getElementById("toggleSummaryBtn");
     if (toggleSummaryBtn) {
@@ -347,92 +541,112 @@ const laporanAksesorisHandler = {
 
   // Add this method to toggle between detailed and summary views
   toggleSummaryView() {
-    this.isSummaryMode = !this.isSummaryMode;
-
-    // Update button text
-    const toggleSummaryBtn = document.getElementById("toggleSummaryBtn");
-    if (toggleSummaryBtn) {
-      toggleSummaryBtn.innerHTML = this.isSummaryMode
-        ? '<i class="fas fa-list me-1"></i> Detail Penjualan'
-        : '<i class="fas fa-chart-pie me-1"></i> Summary Penjualan';
+    try {
+      this.isSummaryMode = !this.isSummaryMode;
+  
+      // Update button text
+      const toggleSummaryBtn = document.getElementById("toggleSummaryBtn");
+      if (toggleSummaryBtn) {
+        toggleSummaryBtn.innerHTML = this.isSummaryMode
+          ? '<i class="fas fa-list me-1"></i> Detail Penjualan'
+          : '<i class="fas fa-chart-pie me-1"></i> Summary Penjualan';
+      }
+      
+      // If in summary mode, generate summary data
+      if (this.isSummaryMode) {
+        this.generateSalesSummary();
+      }
+  
+      // Pastikan struktur tabel sebelum render
+      if (this.isSummaryMode) {
+        this.ensureTableStructure("penjualanTable", [
+          "Kode Barang", "Nama Barang", "Total Jumlah", "Total Harga"
+        ]);
+      } else {
+        this.ensureTableStructure("penjualanTable", [
+          "Tanggal", "Sales", "Jenis", "Kode Barang", "Nama Barang", 
+          "Jumlah", "Berat", "Harga", "Status", "Aksi"
+        ]);
+      }
+      
+      // Hancurkan DataTable dengan aman sebelum render
+      this.safelyDestroyDataTable("penjualanTable");
+  
+      // Re-render the table
+      this.renderSalesTable();
+    } catch (error) {
+      console.error("Error toggling summary view:", error);
+      this.showError("Terjadi kesalahan saat mengubah tampilan: " + error.message);
     }
-    // If in summary mode, generate summary data
-    if (this.isSummaryMode) {
-      this.generateSalesSummary();
-    }
-
-    // Re-render the table
-    this.renderSalesTable();
-  },
-
-  // Add this new method to toggle between detailed and summary views
-  toggleSummaryView() {
-    this.isSummaryMode = !this.isSummaryMode;
-
-    // Update button text
-    const toggleSummaryBtn = document.getElementById("toggleSummaryBtn");
-    if (toggleSummaryBtn) {
-      toggleSummaryBtn.innerHTML = this.isSummaryMode
-        ? '<i class="fas fa-list me-1"></i> Detail Penjualan'
-        : '<i class="fas fa-chart-pie me-1"></i> Summary Penjualan';
-    }
-    // If in summary mode, generate summary data
-    if (this.isSummaryMode) {
-      this.generateSalesSummary();
-    }
-
-    // Re-render the table
-    this.renderSalesTable();
   },
 
   // Add this method to generate summary data
-  generateSalesSummary() {
-    try {
-      // Reset summary data
-      this.summaryData = [];
+  generateSummaryData() {
+    if (!this.filteredSalesData.length) return;
 
+    this.showLoading(true);
+
+    try {
       // Create a map to store summary data
       const summaryMap = new Map();
 
       // Process each transaction
       this.filteredSalesData.forEach((transaction) => {
+        // Skip transactions without items
+        if (!transaction.items || !transaction.items.length) return;
+
         // Process each item in the transaction
-        if (transaction.items && transaction.items.length > 0) {
-          transaction.items.forEach((item) => {
-            const kode = item.kodeText || "-";
-            const nama = item.nama || "Tidak diketahui";
-            const jumlah = parseInt(item.jumlah || 1);
-            const totalHarga = parseInt(item.totalHarga || 0);
+        transaction.items.forEach((item) => {
+          const key = item.kodeText ? item.kodeText : "unknown";
+          const name = item.nama ? item.nama : "Tidak diketahui";
+          const quantity = parseInt(item.jumlah) || 1;
 
-            // Create a unique key for this item
-            const key = `${kode}-${nama}`;
+          // PERBAIKAN: Hitung total harga berdasarkan metode pembayaran
+          let itemTotalPrice = parseInt(item.totalHarga) || 0;
 
-            // Update summary map
-            if (summaryMap.has(key)) {
-              const existingItem = summaryMap.get(key);
-              existingItem.jumlah += jumlah;
-              existingItem.totalHarga += totalHarga;
-            } else {
-              summaryMap.set(key, {
-                kode,
-                nama,
-                jumlah,
-                totalHarga,
-              });
-            }
-          });
-        }
+          // Jika transaksi menggunakan DP, hitung proporsi sisa pembayaran untuk item ini
+          if (transaction.metodeBayar === "dp" && transaction.statusPembayaran === "DP") {
+            // Hitung proporsi harga item terhadap total transaksi
+            const proportion = itemTotalPrice / transaction.totalHarga;
+            // Hitung bagian sisa pembayaran untuk item ini
+            itemTotalPrice = Math.round(proportion * transaction.sisaPembayaran);
+          } else if (transaction.metodeBayar === "free") {
+            // Untuk transaksi free, set harga item menjadi 0
+            itemTotalPrice = 0;
+          }
+
+          // If item already exists in map, update it
+          if (summaryMap.has(key)) {
+            const existingItem = summaryMap.get(key);
+            existingItem.jumlah += quantity;
+            existingItem.totalHarga += itemTotalPrice;
+          } else {
+            // Otherwise, add new item to map
+            summaryMap.set(key, {
+              kode: key,
+              nama: name,
+              jumlah: quantity,
+              totalHarga: itemTotalPrice,
+            });
+          }
+        });
       });
 
       // Convert map to array
       this.summaryData = Array.from(summaryMap.values());
 
-      // Sort by total price (descending)
+      // Sort by total price (highest first)
       this.summaryData.sort((a, b) => b.totalHarga - a.totalHarga);
 
-      console.log("Summary data generated:", this.summaryData);
+      // Update UI
+      this.isSummaryMode = true;
+      this.renderSalesTable();
+
+      this.showLoading(false);
     } catch (error) {
-      console.error("Error generating sales summary:", error);
+      console.error("Error generating summary data:", error);
+      this.showError("Terjadi kesalahan saat membuat ringkasan: " + error.message);
+      this.showLoading(false);
     }
   },
 
@@ -645,59 +859,84 @@ const laporanAksesorisHandler = {
     }
   },
 
-  // Modify the filterSalesData method to properly apply the sales type filter
   filterSalesData() {
-    if (!this.salesData.length) return;
-
+    if (!this.salesData || !this.salesData.length) return;
+  
     this.showLoading(true);
-
-    // Get filter values
-    const startDateStr = document.querySelector("#sales-tab-pane #startDate").value;
-    const endDateStr = document.querySelector("#sales-tab-pane #endDate").value;
-    const salesType = document.querySelector("#sales-tab-pane #salesType").value;
-    const salesPerson = document.querySelector("#sales-tab-pane #salesPerson").value;
-
-    // Parse dates
-    const startDate = parseDate(startDateStr);
-    const endDate = parseDate(endDateStr);
-    if (endDate) {
-      // Add one day to end date to include the end date in the range
-      endDate.setDate(endDate.getDate() + 1);
+  
+    try {
+      // Get filter values
+      const startDateStr = document.querySelector("#sales-tab-pane #startDate").value;
+      const endDateStr = document.querySelector("#sales-tab-pane #endDate").value;
+      const salesType = document.querySelector("#sales-tab-pane #salesType").value;
+      const salesPerson = document.querySelector("#sales-tab-pane #salesPerson").value;
+  
+      // Parse dates
+      const startDate = parseDate(startDateStr);
+      const endDate = parseDate(endDateStr);
+      if (endDate) {
+        // Add one day to end date to include the end date in the range
+        endDate.setDate(endDate.getDate() + 1);
+      }
+  
+      // Filter data
+      this.filteredSalesData = this.salesData.filter((item) => {
+        if (!item) return false; // Skip undefined/null items
+        
+        // Parse transaction date
+        const transactionDate = item.timestamp ? item.timestamp.toDate() : parseDate(item.tanggal);
+        if (!transactionDate) return false;
+  
+        // Check if date is within range
+        const dateInRange = (!startDate || transactionDate >= startDate) && (!endDate || transactionDate < endDate);
+  
+        // Check if sales type matches
+        let typeMatches = true;
+        if (salesType !== "all") {
+          typeMatches = item.jenisPenjualan === salesType;
+        }
+  
+        // Check if sales person matches
+        let salesMatches = true;
+        if (salesPerson !== "all") {
+          salesMatches = item.sales === salesPerson;
+        }
+  
+        return dateInRange && typeMatches && salesMatches;
+      });
+  
+      // Sort by date (newest first)
+      this.filteredSalesData.sort((a, b) => {
+        if (!a || !b) return 0;
+        const dateA = a.timestamp ? a.timestamp.toDate() : parseDate(a.tanggal);
+        const dateB = b.timestamp ? b.timestamp.toDate() : parseDate(b.tanggal);
+        if (!dateA || !dateB) return 0;
+        return dateB - dateA;
+      });
+  
+      // Pastikan struktur tabel sebelum render
+      if (this.isSummaryMode) {
+        this.ensureTableStructure("penjualanTable", [
+          "Kode Barang", "Nama Barang", "Total Jumlah", "Total Harga"
+        ]);
+      } else {
+        this.ensureTableStructure("penjualanTable", [
+          "Tanggal", "Sales", "Jenis", "Kode Barang", "Nama Barang", 
+          "Jumlah", "Berat", "Harga", "Status", "Aksi"
+        ]);
+      }
+      
+      // Hancurkan DataTable dengan aman sebelum render
+      this.safelyDestroyDataTable("penjualanTable");
+      
+      // Render the table
+      this.renderSalesTable();
+    } catch (error) {
+      console.error("Error filtering sales data:", error);
+      this.showError("Terjadi kesalahan saat memfilter data: " + error.message);
+    } finally {
+      this.showLoading(false);
     }
-
-    // Filter data
-    this.filteredSalesData = this.salesData.filter((item) => {
-      // Parse transaction date
-      const transactionDate = item.timestamp ? item.timestamp.toDate() : parseDate(item.tanggal);
-
-      // Check if date is within range
-      const dateInRange = (!startDate || transactionDate >= startDate) && (!endDate || transactionDate < endDate);
-
-      // Check if sales type matches
-      let typeMatches = true;
-      if (salesType !== "all") {
-        typeMatches = item.jenisPenjualan === salesType;
-      }
-
-      // Check if sales person matches
-      let salesMatches = true;
-      if (salesPerson !== "all") {
-        salesMatches = item.sales === salesPerson;
-      }
-
-      return dateInRange && typeMatches && salesMatches;
-    });
-
-    // Sort by date (newest first)
-    this.filteredSalesData.sort((a, b) => {
-      const dateA = a.timestamp ? a.timestamp.toDate() : parseDate(a.tanggal);
-      const dateB = b.timestamp ? b.timestamp.toDate() : parseDate(b.tanggal);
-      return dateB - dateA;
-    });
-
-    // Render the table
-    this.renderSalesTable();
-    this.showLoading(false);
   },
 
   async filterStockData() {
@@ -1094,45 +1333,104 @@ const laporanAksesorisHandler = {
     }
   },
 
-  // Render the sales table
-  renderSalesTable() {
+ // Render the sales table
+renderSalesTable() {
+  try {
+    // Periksa apakah tabel ada di DOM
+    const tableElement = document.getElementById("penjualanTable");
+    if (!tableElement) {
+      console.error("Elemen tabel #penjualanTable tidak ditemukan di DOM");
+      return;
+    }
+
+    // PERBAIKAN UTAMA: Pendekatan yang lebih defensif untuk menghancurkan DataTable
     try {
-      // Periksa apakah tabel ada di DOM
-      const tableElement = document.getElementById("penjualanTable");
-      if (!tableElement) {
-        console.error("Elemen tabel #penjualanTable tidak ditemukan di DOM");
-        return;
-      }
-
-      // Hancurkan DataTable yang ada dengan aman
-      try {
-        if ($.fn.DataTable.isDataTable("#penjualanTable")) {
-          $("#penjualanTable").DataTable().destroy();
+      // Cek apakah DataTable sudah diinisialisasi
+      if ($.fn.DataTable.isDataTable("#penjualanTable")) {
+        // Simpan referensi ke instance DataTable
+        const dt = $("#penjualanTable").DataTable();
+        
+        // Coba hancurkan dengan aman
+        if (dt && typeof dt.destroy === 'function') {
+          dt.destroy();
         }
-      } catch (error) {
-        console.warn("Error destroying DataTable:", error);
-        // Lanjutkan eksekusi meskipun destroy gagal
       }
+    } catch (dtError) {
+      console.warn("Error saat menghancurkan DataTable:", dtError);
+      // Lanjutkan eksekusi meskipun ada error
+    }
 
-      // Get table body
-      const tableBody = document.querySelector("#penjualanTable tbody");
-      if (!tableBody) {
-        console.error("Elemen tbody dari #penjualanTable tidak ditemukan");
-        return;
-      }
+    // Persiapkan header tabel sesuai mode tampilan
+    const tableHeader = document.querySelector("#penjualanTable thead tr");
+    if (!tableHeader) {
+      console.error("Header tabel tidak ditemukan");
+      // Buat header jika tidak ada
+      const thead = document.createElement("thead");
+      thead.innerHTML = `<tr>
+        ${this.isSummaryMode ? `
+          <th>Kode Barang</th>
+          <th>Nama Barang</th>
+          <th>Total Jumlah</th>
+          <th>Total Harga</th>
+        ` : `
+          <th>Tanggal</th>
+          <th>Sales</th>
+          <th>Jenis</th>
+          <th>Kode Barang</th>
+          <th>Nama Barang</th>
+          <th>Jumlah</th>
+          <th>Berat</th>
+          <th>Harga</th>
+          <th>Status</th>
+          <th>Aksi</th>
+        `}
+      </tr>`;
+      tableElement.appendChild(thead);
+    } else {
+      // Update header yang sudah ada
+      tableHeader.innerHTML = this.isSummaryMode ? `
+        <th>Kode Barang</th>
+        <th>Nama Barang</th>
+        <th>Total Jumlah</th>
+        <th>Total Harga</th>
+      ` : `
+        <th>Tanggal</th>
+        <th>Sales</th>
+        <th>Jenis</th>
+        <th>Kode Barang</th>
+        <th>Nama Barang</th>
+        <th>Jumlah</th>
+        <th>Berat</th>
+        <th>Harga</th>
+        <th>Status</th>
+        <th>Aksi</th>
+      `;
+    }
 
-      // Clear table body
+    // Pastikan tbody ada
+    let tableBody = document.querySelector("#penjualanTable tbody");
+    if (!tableBody) {
+      tableBody = document.createElement("tbody");
+      tableElement.appendChild(tableBody);
+    } else {
+      // Kosongkan tbody yang sudah ada
       tableBody.innerHTML = "";
+    }
 
-      // Check if there's data to display
-      if ((this.isSummaryMode && !this.summaryData.length) || (!this.isSummaryMode && !this.filteredSalesData.length)) {
-        tableBody.innerHTML = `
-          <tr>
-            <td colspan="9" class="text-center">Tidak ada data yang sesuai dengan filter</td>
-          </tr>
-        `;
+    // Check if there's data to display
+    const hasData = this.isSummaryMode 
+      ? this.summaryData && this.summaryData.length > 0
+      : this.filteredSalesData && this.filteredSalesData.length > 0;
 
-        // Inisialisasi DataTable kosong
+    if (!hasData) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="${this.isSummaryMode ? 4 : 10}" class="text-center">Tidak ada data yang sesuai dengan filter</td>
+        </tr>
+      `;
+      
+      // Inisialisasi DataTable dengan data kosong
+      try {
         $("#penjualanTable").DataTable({
           language: {
             url: "//cdn.datatables.net/plug-ins/1.10.25/i18n/Indonesian.json",
@@ -1140,333 +1438,366 @@ const laporanAksesorisHandler = {
           dom: "Bfrtip",
           buttons: ["excel", "pdf", "print"],
         });
-
-        return;
+      } catch (initError) {
+        console.warn("Error inisialisasi DataTable kosong:", initError);
       }
+      
+      return;
+    }
 
-      // Prepare data for table
-      let totalRevenue = 0;
-      let totalTransactions = 0;
+    // Prepare data for table
+    let totalRevenue = 0;
+    let totalTransactions = 0;
+    let tableHTML = '';
 
-      if (this.isSummaryMode) {
-        // Render summary view
-        // Modify table header for summary view
-        const tableHeader = document.querySelector("#penjualanTable thead tr");
-        if (tableHeader) {
-          tableHeader.innerHTML = `
-            <th>Kode Barang</th>
-            <th>Nama Barang</th>
-            <th>Total Jumlah</th>
-            <th>Total Harga</th>
-          `;
-        }
+    if (this.isSummaryMode && this.summaryData) {
+      // Calculate total revenue
+      totalRevenue = this.calculateTotalRevenue(this.summaryData);
 
-        // Calculate total revenue
-        totalRevenue = this.summaryData.reduce((sum, item) => sum + item.totalHarga, 0);
+      // Render summary rows
+      this.summaryData.forEach((item) => {
+        tableHTML += `
+          <tr>
+            <td>${item.kode || '-'}</td>
+            <td>${item.nama || '-'}</td>
+            <td class="text-center">${item.jumlah || 0}</td>
+            <td>Rp ${(item.totalHarga || 0).toLocaleString("id-ID")}</td>
+          </tr>
+        `;
+      });
 
-        // Render summary rows
-        this.summaryData.forEach((item) => {
-          const row = document.createElement("tr");
-          row.innerHTML = `
-            <td>${item.kode}</td>
-            <td>${item.nama}</td>
-            <td class="text-center">${item.jumlah}</td>
-            <td>Rp ${item.totalHarga.toLocaleString("id-ID")}</td>
-          `;
-          tableBody.appendChild(row);
-        });
+      // Set total transactions to number of unique items
+      totalTransactions = this.summaryData.length;
+    } else if (this.filteredSalesData) {
+      // Process each transaction
+      this.filteredSalesData.forEach((transaction) => {
+        if (!transaction) return; // Skip undefined/null items
+        
+        const date = transaction.timestamp 
+          ? formatDate(transaction.timestamp.toDate()) 
+          : (transaction.tanggal || "-");
+        const sales = transaction.sales || "Admin";
+        let jenisPenjualan = transaction.jenisPenjualan || "Tidak diketahui";
 
-        // Set total transactions to number of unique items
-        totalTransactions = this.summaryData.length;
-
-        // Tambahkan tombol print struk di samping tombol summary
-        const salesSummary = document.querySelector(".sales-summary");
-        if (salesSummary) {
-          // Periksa apakah tombol sudah ada
-          if (!document.getElementById("printReceiptBtn")) {
-            const printReceiptBtn = document.createElement("button");
-            printReceiptBtn.id = "printReceiptBtn";
-            printReceiptBtn.className = "btn btn-sm btn-warning me-2";
-            printReceiptBtn.innerHTML = '<i class="fas fa-print me-1"></i> Print Struk';
-
-            // Gunakan fungsi global printSummaryReceiptFormat
-            printReceiptBtn.addEventListener("click", () => {
-              // Panggil fungsi print dengan mengakses handler
-              printSummaryReceiptFormat(this.summaryData);
-            });
-
-            // Tambahkan tombol setelah tombol summary
-            salesSummary.insertBefore(printReceiptBtn, document.getElementById("totalTransactions"));
-          }
-        }
-      } else {
-        // Render detailed view
-        // Restore original table header
-        const tableHeader = document.querySelector("#penjualanTable thead tr");
-        if (tableHeader) {
-          tableHeader.innerHTML = `
-            <th>Tanggal</th>
-            <th>Sales</th>
-            <th style="width: 1%">Jenis</th>
-            <th>Kode Barang</th>
-            <th>Nama Barang</th>
-            <th>Jumlah</th>
-            <th>Berat</th>
-            <th>Harga</th>
-            <th>Aksi</th>
-          `;
-        }
-
-        // Process each transaction
-        this.filteredSalesData.forEach((transaction) => {
-          const date = transaction.timestamp ? formatDate(transaction.timestamp.toDate()) : transaction.tanggal;
-
-          const sales = transaction.sales || "Admin";
-
-          // Modifikasi tampilan jenis penjualan untuk gantiLock
-          let jenisPenjualan = transaction.jenisPenjualan || "Tidak diketahui";
-
+        // Hitung total pendapatan berdasarkan metode pembayaran
+        if (transaction.metodeBayar === "dp" && transaction.statusPembayaran === "DP") {
+          totalRevenue += transaction.sisaPembayaran || 0;
+        } else if (transaction.metodeBayar === "free") {
+          totalRevenue += 0;
+        } else {
           totalRevenue += transaction.totalHarga || 0;
-          totalTransactions++;
+        }
 
-          // Process each item in the transaction
-          if (transaction.items && transaction.items.length > 0) {
-            transaction.items.forEach((item) => {
-              // Untuk jenis gantiLock, tambahkan kode lock ke tampilan jenis penjualan
-              let displayJenisPenjualan = jenisPenjualan;
-              if (jenisPenjualan === "gantiLock" && item.kodeLock) {
-                displayJenisPenjualan = `gantiLock ${item.kodeLock}`;
-              }
+        totalTransactions++;
 
-              const row = document.createElement("tr");
-              row.innerHTML = `
-              <td>${date}</td>
-              <td>${sales}</td>
-              <td>${displayJenisPenjualan}</td>
-              <td>${item.kodeText || "-"}</td>
-              <td>${item.nama || "-"}</td>
-              <td>${item.jumlah || 1}</td>
-              <td>${item.berat ? item.berat + " gr" : "-"}</td>
-              <td>Rp ${parseInt(item.totalHarga || 0).toLocaleString("id-ID")}</td>
-              <td>
-                <div class="dropdown">
-                  <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="fas fa-cog"></i>
-                  </button>
-                  <ul class="dropdown-menu dropdown-menu-end">
-                    <li><button class="dropdown-item btn-reprint" data-id="${
-                      transaction.id
-                    }"><i class="fas fa-print me-2"></i>Cetak Ulang</button></li>
-                    <li><button class="dropdown-item btn-edit" data-id="${
-                      transaction.id
-                    }"><i class="fas fa-edit me-2"></i>Edit</button></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><button class="dropdown-item btn-delete text-danger" data-id="${
-                      transaction.id
-                    }"><i class="fas fa-trash-alt me-2"></i>Hapus</button></li>
-                  </ul>
-                </div>
-              </td>
+        // Process each item in the transaction
+        if (transaction.items && transaction.items.length > 0) {
+          transaction.items.forEach((item) => {
+            if (!item) return; // Skip undefined/null items
+            
+            // Untuk jenis gantiLock, tambahkan kode lock ke tampilan jenis penjualan
+            let displayJenisPenjualan = jenisPenjualan;
+            if (jenisPenjualan === "gantiLock" && item.kodeLock) {
+              displayJenisPenjualan = `gantiLock ${item.kodeLock}`;
+            }
+
+            // Tambahkan kolom status pembayaran
+            let statusPembayaran = transaction.statusPembayaran || "Lunas";
+            let statusBadge = "";
+
+            if (statusPembayaran === "DP") {
+              statusBadge = `<span class="badge bg-warning">DP: Rp ${formatRupiah(transaction.nominalDP)}</span>
+                            <br><small>Sisa: Rp ${formatRupiah(transaction.sisaPembayaran)}</small>`;
+            } else if (statusPembayaran === "Lunas") {
+              statusBadge = `<span class="badge bg-success">Lunas</span>`;
+            } else if (transaction.metodeBayar === "free") {
+              statusBadge = `<span class="badge bg-info">Gratis</span>`;
+            } else {
+              statusBadge = `<span class="badge bg-secondary">${statusPembayaran}</span>`;
+            }
+
+            tableHTML += `
+              <tr>
+                <td>${date}</td>
+                <td>${sales}</td>
+                <td>${displayJenisPenjualan}</td>
+                <td>${item.kodeText || "-"}</td>
+                <td>${item.nama || "-"}</td>
+                <td>${item.jumlah || 1}</td>
+                <td>${item.berat ? item.berat + " gr" : "-"}</td>
+                <td>Rp ${parseInt(item.totalHarga || 0).toLocaleString("id-ID")}</td>
+                <td>${statusBadge}</td>
+                <td>
+                  <div class="btn-group">
+                    <button class="btn btn-sm btn-warning btn-reprint" data-id="${transaction.id}">
+                      <i class="fas fa-print"></i>
+                    </button>
+                    <button class="btn btn-sm btn-primary btn-edit" data-id="${transaction.id}">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger btn-delete" data-id="${transaction.id}">
+                      <i class="fas fa-trash-alt"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
             `;
-              tableBody.appendChild(row);
-            });
+          });
+        } else {
+          // Fallback if no items
+          let statusPembayaran = transaction.statusPembayaran || "Lunas";
+          let statusBadge = "";
+          if (statusPembayaran === "DP") {
+            statusBadge = `<span class="badge bg-warning">DP: Rp ${formatRupiah(transaction.nominalDP)}</span>
+                          <br><small>Sisa: Rp ${formatRupiah(transaction.sisaPembayaran)}</small>`;
+          } else if (statusPembayaran === "Lunas") {
+            statusBadge = `<span class="badge bg-success">Lunas</span>`;
+          } else if (transaction.metodeBayar === "free") {
+            statusBadge = `<span class="badge bg-info">Gratis</span>`;
           } else {
-            // Fallback if no items
-            const row = document.createElement("tr");
-            row.innerHTML = `
+            statusBadge = `<span class="badge bg-secondary">${statusPembayaran}</span>`;
+          }
+
+          tableHTML += `
+            <tr>
               <td>${date}</td>
               <td>${sales}</td>
               <td>${jenisPenjualan}</td>
               <td colspan="4" class="text-center">Tidak ada detail item</td>
               <td>Rp ${parseInt(transaction.totalHarga || 0).toLocaleString("id-ID")}</td>
+              <td>${statusBadge}</td>
               <td>
-                <button class="btn btn-sm btn-info btn-detail" data-id="${transaction.id}">
-                  <i class="fas fa-eye"></i>
-                </button>
+                <div class="btn-group">
+                  <button class="btn btn-sm btn-info btn-detail" data-id="${transaction.id}">
+                    <i class="fas fa-eye"></i>
+                  </button>
+                  <button class="btn btn-sm btn-warning btn-reprint" data-id="${transaction.id}">
+                    <i class="fas fa-print"></i>
+                  </button>
+                  <button class="btn btn-sm btn-primary btn-edit" data-id="${transaction.id}">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button class="btn btn-sm btn-danger btn-delete" data-id="${transaction.id}">
+                    <i class="fas fa-trash-alt"></i>
+                  </button>
+                </div>
               </td>
-            `;
-            tableBody.appendChild(row);
-          }
-        });
-
-        // Hapus tombol print struk jika ada
-        const printReceiptBtn = document.getElementById("printReceiptBtn");
-        if (printReceiptBtn) {
-          printReceiptBtn.remove();
+            </tr>
+          `;
         }
-      }
+      });
+    }
 
-      // Update summary
-      document.getElementById("totalTransactions").textContent = this.isSummaryMode
+    // Isi tabel dengan HTML yang sudah dibuat
+    tableBody.innerHTML = tableHTML;
+
+    // Update summary
+    const totalTransactionsElement = document.getElementById("totalTransactions");
+    if (totalTransactionsElement) {
+      totalTransactionsElement.textContent = this.isSummaryMode
         ? `Total Jenis Barang: ${totalTransactions}`
         : `Total Transaksi: ${totalTransactions}`;
-      document.getElementById("totalRevenue").textContent = `Total Pendapatan: Rp ${parseInt(
+    }
+    
+    const totalRevenueElement = document.getElementById("totalRevenue");
+    if (totalRevenueElement) {
+      totalRevenueElement.textContent = `Total Pendapatan: Rp ${parseInt(
         totalRevenue
       ).toLocaleString("id-ID")}`;
-
-      // Initialize DataTable with a delay to ensure DOM is ready
-      setTimeout(() => {
-        try {
-          $("#penjualanTable").DataTable({
-            language: {
-              url: "//cdn.datatables.net/plug-ins/1.10.25/i18n/Indonesian.json",
-            },
-            dom: "Bfrtip",
-            buttons: ["excel", "pdf", "print"],
-            order: this.isSummaryMode ? [[3, "desc"]] : [[0, "desc"]], // Sort by total price in summary mode, date in detail mode
-          });
-        } catch (error) {
-          console.error("Error initializing DataTable:", error);
-        }
-      }, 100);
-
-      // Attach event handlers for detail buttons (only in detailed view)
-      if (!this.isSummaryMode) {
-        // Detail button handler
-        document.querySelectorAll(".btn-detail").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const transactionId = btn.getAttribute("data-id");
-            this.showTransactionDetails(transactionId);
-          });
-        });
-
-        // Reprint button handler
-        document.querySelectorAll(".btn-reprint").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const transactionId = btn.getAttribute("data-id");
-            this.reprintInvoice(transactionId);
-          });
-        });
-
-        // Edit button handler
-        document.querySelectorAll(".btn-edit").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const transactionId = btn.getAttribute("data-id");
-            this.showEditForm(transactionId);
-          });
-        });
-
-        // Delete button handler
-        document.querySelectorAll(".btn-delete").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const transactionId = btn.getAttribute("data-id");
-            this.confirmDelete(transactionId);
-          });
-        });
-      }
-    } catch (error) {
-      console.error("Error rendering sales table:", error);
     }
-  },
 
-  // Show transaction details (existing method, but let's add it for reference)
-  showTransactionDetail(transactionId) {
+    // PERBAIKAN UTAMA: Inisialisasi DataTable dengan cara yang benar
     try {
-      const transaction = this.salesData.find((item) => item.id === transactionId);
-      if (!transaction) {
-        throw new Error("Transaksi tidak ditemukan");
+      const dataTableOptions = {
+        language: {
+          url: "//cdn.datatables.net/plug-ins/1.10.25/i18n/Indonesian.json",
+        },
+        dom: "Bfrtip",
+        buttons: ["excel", "pdf", "print"],
+        order: this.isSummaryMode ? [[3, "desc"]] : [[0, "desc"]], // Sort by total price in summary mode, date in detail mode
+        drawCallback: () => {
+          // Pasang event listener setelah DataTable selesai menggambar
+          try {
+            this.attachEventListenersToButtons();
+          } catch (eventError) {
+            console.warn("Error attaching event listeners:", eventError);
+          }
+        },
+      };
+
+      // Inisialisasi DataTable
+      $("#penjualanTable").DataTable(dataTableOptions);
+    } catch (dtInitError) {
+      console.error("Error initializing DataTable:", dtInitError);
+      // Fallback: tampilkan tabel tanpa DataTable
+    }
+    
+  } catch (error) {
+    console.error("Error rendering sales table:", error);
+    this.showError("Terjadi kesalahan saat menampilkan data: " + error.message);
+    
+    // Tampilkan pesan error di tabel
+    try {
+      // Pastikan tabel dalam keadaan bersih
+      try {
+        if ($.fn.DataTable.isDataTable("#penjualanTable")) {
+          $("#penjualanTable").DataTable().destroy();
+        }
+      } catch (dtError) {
+        console.warn("Error destroying DataTable in error handler:", dtError);
       }
-
-      const modalBody = document.querySelector("#detailModal .modal-body");
-
-      // Format tanggal
-      const tanggal = transaction.tanggal || this.formatTimestamp(transaction.timestamp);
-
-      // Buat HTML untuk detail transaksi
-      let detailHTML = `
-        <div class="transaction-detail">
-          <div class="row mb-3">
-            <div class="col-md-6">
-              <p><strong>Tanggal:</strong> ${tanggal}</p>
-              <p><strong>Sales:</strong> ${transaction.sales || "-"}</p>
-              <p><strong>Jenis Penjualan:</strong> ${this.formatSalesType(transaction.jenisPenjualan)}</p>
-            </div>
-            <div class="col-md-6">
-              <p><strong>Metode Bayar:</strong> ${this.formatPaymentMethod(transaction.metodeBayar)}</p>
-              <p><strong>Status Pembayaran:</strong> ${transaction.statusPembayaran || "Lunas"}</p>
-              <p><strong>Total Harga:</strong> Rp ${this.formatNumber(transaction.totalHarga)}</p>
-            </div>
-          </div>
-          
-          <h5 class="mb-3">Detail Item</h5>
-          <div class="table-responsive">
-            <table class="table table-bordered table-striped">
-              <thead>
-                <tr>
-                  <th>Kode</th>
-                  <th>Nama Barang</th>
-                  <th>Jumlah</th>
-                  <th>Kadar</th>
-                  <th>Berat</th>
-                  <th>Harga</th>
-                </tr>
-              </thead>
-              <tbody>
-      `;
-
-      // Tambahkan baris untuk setiap item
-      transaction.items.forEach((item) => {
-        detailHTML += `
+      
+      const tableElement = document.getElementById("penjualanTable");
+      if (tableElement) {
+        // Pastikan struktur tabel lengkap
+        if (!tableElement.querySelector("thead")) {
+          const thead = document.createElement("thead");
+          thead.innerHTML = `<tr>
+            <th>Tanggal</th>
+            <th>Sales</th>
+            <th>Jenis</th>
+            <th>Kode Barang</th>
+            <th>Nama Barang</th>
+            <th>Jumlah</th>
+            <th>Berat</th>
+            <th>Harga</th>
+            <th>Status</th>
+            <th>Aksi</th>
+          </tr>`;
+          tableElement.appendChild(thead);
+        }
+        
+        let tableBody = tableElement.querySelector("tbody");
+        if (!tableBody) {
+          tableBody = document.createElement("tbody");
+          tableElement.appendChild(tableBody);
+        }
+        
+        tableBody.innerHTML = `
           <tr>
-            <td>${item.kodeText || "-"}</td>
-            <td>${item.nama || "-"}</td>
-            <td>${item.jumlah || "1"}</td>
-            <td>${item.kadar || "-"}</td>
-            <td>${item.berat || "-"}</td>
-            <td>Rp ${this.formatNumber(item.totalHarga)}</td>
+                      <td colspan="10" class="text-center">Terjadi kesalahan saat memuat data: ${error.message}</td>
           </tr>
         `;
-      });
-
-      detailHTML += `
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colspan="5" class="text-end"><strong>Total:</strong></td>
-                  <td><strong>Rp ${this.formatNumber(transaction.totalHarga)}</strong></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-      `;
-
-      // Tambahkan tombol cetak di footer modal
-      const modalFooter = document.querySelector("#detailModal .modal-footer");
-      modalFooter.innerHTML = `
-        <div class="btn-group me-2">
-          <button type="button" class="btn btn-primary" id="btnPrintInvoice">
-            <i class="fas fa-file-invoice me-1"></i> Cetak Invoice
-          </button>
-          <button type="button" class="btn btn-info" id="btnPrintReceipt">
-            <i class="fas fa-receipt me-1"></i> Cetak Struk
-          </button>
-        </div>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
-      `;
-
-      // Set HTML ke modal body
-      modalBody.innerHTML = detailHTML;
-
-      // Simpan data transaksi saat ini untuk digunakan saat mencetak
-      this.currentTransaction = transaction;
-
-      // Tampilkan modal
-      const detailModal = new bootstrap.Modal(document.getElementById("detailModal"));
-      detailModal.show();
-
-      // Tambahkan event listener untuk tombol cetak
-      document.getElementById("btnPrintInvoice").addEventListener("click", () => {
-        this.printInvoice(transaction);
-      });
-
-      document.getElementById("btnPrintReceipt").addEventListener("click", () => {
-        this.printReceipt(transaction);
-      });
-    } catch (error) {
-      console.error("Error showing transaction detail:", error);
-      this.showError("Error menampilkan detail transaksi: " + error.message);
+      }
+      
+      // Inisialisasi DataTable kosong dengan penanganan error
+      try {
+        $("#penjualanTable").DataTable({
+          language: {
+            emptyTable: "Tidak ada data yang tersedia",
+          },
+          dom: "Bfrtip",
+          buttons: ["excel", "pdf", "print"],
+        });
+      } catch (initError) {
+        console.warn("Error initializing DataTable in error handler:", initError);
+        // Jika gagal inisialisasi DataTable, biarkan tabel HTML biasa
+      }
+    } catch (innerError) {
+      console.warn("Error saat menampilkan pesan error:", innerError);
     }
+  }
+},
+
+  // Tambahkan fungsi untuk memasang event listener ke tombol-tombol
+  attachEventListenersToButtons() {
+    console.log("Attaching event listeners to buttons");
+
+    // Detail button handler
+    document.querySelectorAll(".btn-detail").forEach((btn) => {
+      // Hapus event listener yang mungkin sudah ada untuk mencegah duplikasi
+      btn.removeEventListener("click", this.handleDetailClick);
+      btn.addEventListener("click", this.handleDetailClick);
+    });
+
+    // Reprint button handler
+    document.querySelectorAll(".btn-reprint").forEach((btn) => {
+      // Hapus event listener yang mungkin sudah ada untuk mencegah duplikasi
+      btn.removeEventListener("click", this.handleReprintClick);
+      btn.addEventListener("click", this.handleReprintClick);
+    });
+
+    // Edit button handler
+    document.querySelectorAll(".btn-edit").forEach((btn) => {
+      // Hapus event listener yang mungkin sudah ada untuk mencegah duplikasi
+      btn.removeEventListener("click", this.handleEditClick);
+      btn.addEventListener("click", this.handleEditClick);
+    });
+
+    // Delete button handler
+    document.querySelectorAll(".btn-delete").forEach((btn) => {
+      // Hapus event listener yang mungkin sudah ada untuk mencegah duplikasi
+      btn.removeEventListener("click", this.handleDeleteClick);
+      btn.addEventListener("click", this.handleDeleteClick);
+    });
+  },
+
+  // Handler untuk tombol detail
+  handleDetailClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const transactionId = this.getAttribute("data-id");
+    console.log("Detail button clicked for transaction:", transactionId);
+    laporanAksesorisHandler.showTransactionDetails(transactionId);
+  },
+
+  // Handler untuk tombol reprint
+  handleReprintClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const transactionId = this.getAttribute("data-id");
+    console.log("Reprint button clicked for transaction:", transactionId);
+    laporanAksesorisHandler.reprintTransaction(transactionId);
+  },
+
+  // Handler untuk tombol edit
+  handleEditClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const transactionId = this.getAttribute("data-id");
+    console.log("Edit button clicked for transaction:", transactionId);
+    laporanAksesorisHandler.editTransaction(transactionId);
+  },
+
+  // Handler untuk tombol delete
+  handleDeleteClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const transactionId = this.getAttribute("data-id");
+    console.log("Delete button clicked for transaction:", transactionId);
+    laporanAksesorisHandler.confirmDeleteTransaction(transactionId);
+  },
+
+  // Tambahkan fungsi baru untuk menghitung total pendapatan dengan benar
+  calculateTotalRevenue(data) {
+    let total = 0;
+
+    if (!data || !Array.isArray(data)) {
+      // Jika data adalah array transaksi (mode detail)
+      if (this.filteredSalesData && Array.isArray(this.filteredSalesData)) {
+        this.filteredSalesData.forEach((transaction) => {
+          // PERBAIKAN: Untuk transaksi DP, tambahkan sisa pembayaran (bukan DP)
+          if (transaction.metodeBayar === "dp" && transaction.statusPembayaran === "DP") {
+            // Untuk transaksi DP, tambahkan sisa pembayaran ke total pendapatan
+            total += transaction.sisaPembayaran || 0;
+          } else if (transaction.metodeBayar === "free") {
+            // Untuk transaksi free, tidak menambahkan apa-apa
+            total += 0;
+          } else {
+            // Untuk transaksi lain (tunai), tambahkan total harga
+            total += transaction.totalHarga || 0;
+          }
+        });
+      }
+      return total;
+    }
+
+    // Jika data adalah array ringkasan (mode summary)
+    data.forEach((item) => {
+      total += item.totalHarga || 0;
+    });
+
+    return total;
   },
 
   // Fungsi untuk mencetak struk kasir
@@ -1637,162 +1968,161 @@ const laporanAksesorisHandler = {
 
   // Fungsi untuk mencetak invoice customer
   printInvoice(transaction) {
-    try {
-      const currentTransactionData = transaction;
-      if (!currentTransactionData) {
-        this.showError("Tidak ada data transaksi untuk dicetak!");
-        return;
-      }
+    if (!transaction) {
+      this.showError("Tidak ada data transaksi untuk dicetak!");
+      return;
+    }
 
-      console.log("Printing invoice with data:", currentTransactionData);
+    console.log("Printing invoice with data:", transaction);
 
-      // Buat jendela baru untuk print
-      const printWindow = window.open("", "_blank");
+    // PERBAIKAN: Tutup jendela print yang mungkin sudah ada
+    if (this.printWindow && !this.printWindow.closed) {
+      this.printWindow.close();
+    }
 
-      // Buat konten HTML untuk invoice
-      let invoiceHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Invoice Customer</title>
-        <style>
-          @page {
-            size: 10cm 20cm;
-            margin: 0;
-          }
-          body {
-            font-family: Arial, sans-serif;
-            font-size: 12px;
-            margin: 0;
-            padding: 5mm;
-            width: 20cm;
-            box-sizing: border-box;
-          }
-          .invoice {
-            width: 100%;
-          }
-          .header-info {
-            text-align: right;
-            margin-bottom: 2cm;
-            margin-right:3cm:
-            margin-top:1cm;
-          }         
-          .total-row {
-            margin-top: 1.9cm;
-            text-align: right;
-            font-weight: bold;
-            margin-right: 3cm;
-          }
-          .sales{
+    // Buat jendela baru untuk print
+    this.printWindow = window.open("", "_blank");
+
+    // Buat konten HTML untuk invoice
+    let invoiceHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Invoice Customer</title>
+      <style>
+        @page {
+          size: 10cm 20cm;
+          margin: 0;
+        }
+        body {
+          font-family: Arial, sans-serif;
+          font-size: 12px;
+          margin: 0;
+          padding: 5mm;
+          width: 20cm;
+          box-sizing: border-box;
+        }
+        .invoice {
+          width: 100%;
+        }
+        .header-info {
+          text-align: right;
+          margin-bottom: 2cm;
+          margin-right:3cm;
+          margin-top:1cm;
+        }         
+        .total-row {
+          margin-top: 1.9cm;
+          text-align: right;
+          font-weight: bold;
+          margin-right: 3cm;
+        }
+        .sales{
           text-align: right;
           margin-top: 0.6cm;
           margin-right:2cm;
-          }
-          .keterangan {
-            font-style: italic;
-            font-size: 10px;
-            margin-top: 2mm;
-            padding-top: 2mm;
-          }
-          
-          .item-details {
-            display: flex;
-            flex-wrap: wrap;
-          }
-          .item-price {
-            width: 100%;
-            text-align: right;
-            font-weight: bold;
-          }
-          .item-data {
-            display: grid;
-            grid-template-columns: 2cm 1.8cm 5cm 2cm 2cm 2cm;
-            width: 100%;
-            column-gap: 0.2cm;
-            margin-left: 1cm;
-            margin-top: 1.5cm;
-            margin-right: 3cm;
-          }
-          .item-data span {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="invoice">
-          <div class="header-info">
-            <p>${transaction.tanggal || this.formatTimestamp(transaction.timestamp)}</p>
-          </div>
-          <hr>
-    `;
-
-      // Tambahkan item ke invoice
-      let hasKeterangan = false;
-      let keteranganText = "";
-      let totalHarga = 0;
-
-      transaction.items.forEach((item) => {
-        const itemHarga = parseInt(item.totalHarga) || 0;
-        totalHarga += itemHarga;
-
-        invoiceHTML += `
-          <div class="item-details">
-            <div class="item-data">
-              <span>${item.kodeText || "-"}</span>
-              <span>${item.jumlah || "1"}pcs</span>
-              <span>${item.nama || "-"}</span>
-              <span>${item.kadar || "-"}</span>
-              <span>${item.berat || "-"}gr</span>
-              <span>${itemHarga.toLocaleString("id-ID")}</span>
-            </div>
-          </div>
-      `;
-
-        // Simpan keterangan jika ada
-        if (item.keterangan && item.keterangan.trim() !== "") {
-          hasKeterangan = true;
-          keteranganText += `${item.nama}: ${item.keterangan}; `;
         }
-      });
-
-      // Tambahkan total di pojok kanan bawah
-      invoiceHTML += `
-          <div class="total-row">
-            Rp ${totalHarga.toLocaleString("id-ID")}
-          </div>
-        <div class="sales">${transaction.sales || "-"}</div>
-    `;
-
-      // Tambahkan keterangan jika ada
-      if (hasKeterangan && transaction.jenisPenjualan === "manual") {
-        invoiceHTML += `
-          <div class="keterangan">
-            ${keteranganText}
-          </div>
-      `;
-      }
-
-      invoiceHTML += `
+        .keterangan {
+          font-style: italic;
+          font-size: 10px;
+          margin-top: 0.5cm;
+          padding-top: 2mm;
+          margin-left: 1cm;
+        }
+        .item-details {
+          display: flex;
+          flex-wrap: wrap;
+        }
+        .item-price {
+          width: 100%;
+          text-align: right;
+          font-weight: bold;
+        }
+        .item-data {
+          display: grid;
+          grid-template-columns: 2cm 1.8cm 5cm 2cm 2cm 2cm;
+          width: 100%;
+          column-gap: 0.2cm;
+          margin-left: 1cm;
+          margin-top: 1.5cm;
+          margin-right: 3cm;
+        }
+        .item-data span {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="invoice">
+        <div class="header-info">
+          <p>${transaction.tanggal}</p>
         </div>
-        <script>
-          window.onload = function() {
-            window.print();
-            setTimeout(function() { window.close(); }, 500);
-          };
-        </script>
-      </body>
-      </html>
+        <hr>
+  `;
+
+    // Tambahkan item ke invoice
+    let hasKeterangan = false;
+    let keteranganText = "";
+    let totalHarga = 0;
+
+    transaction.items.forEach((item) => {
+      const itemHarga = parseInt(item.totalHarga) || 0;
+      totalHarga += itemHarga;
+
+      invoiceHTML += `
+        <div class="item-details">
+          <div class="item-data">
+            <span>${item.kodeText || "-"}</span>
+            <span>${item.jumlah || "1"}pcs</span>
+            <span>${item.nama || "-"}</span>
+            <span>${item.kadar || "-"}</span>
+            <span>${item.berat || "-"}gr</span>
+            <span>${itemHarga.toLocaleString("id-ID")}</span>
+          </div>
+        </div>
     `;
 
-      // Tulis HTML ke jendela baru
-      printWindow.document.write(invoiceHTML);
-      printWindow.document.close();
-    } catch (error) {
-      console.error("Error printing invoice:", error);
-      this.showError("Error mencetak invoice: " + error.message);
+      // PERBAIKAN: Simpan keterangan jika ada
+      if (item.keterangan && item.keterangan.trim() !== "") {
+        hasKeterangan = true;
+        keteranganText += `${item.nama}: ${item.keterangan}; `;
+      }
+    });
+
+    // Tambahkan total di pojok kanan bawah
+    invoiceHTML += `
+        <div class="total-row">
+          Rp ${totalHarga.toLocaleString("id-ID")}
+        </div>
+      <div class="sales">${transaction.sales || "-"}</div>
+  `;
+
+    // PERBAIKAN: Tambahkan keterangan jika ada dan jenis penjualan adalah manual
+    if (hasKeterangan && transaction.salesType === "manual") {
+      invoiceHTML += `
+        <div class="keterangan">
+          ${keteranganText}
+        </div>
+    `;
     }
+
+    invoiceHTML += `
+      </div>
+      <script>
+        window.onload = function() {
+          window.print();
+          setTimeout(function() { window.close(); }, 500);
+        };
+      </script>
+    </body>
+    </html>
+  `;
+
+    // Tulis HTML ke jendela baru
+    this.printWindow.document.write(invoiceHTML);
+    this.printWindow.document.close();
   },
 
   // Fungsi untuk memformat timestamp menjadi string tanggal
@@ -1837,207 +2167,271 @@ const laporanAksesorisHandler = {
     }
   },
 
-  // Fungsi untuk memformat angka menjadi format rupiah
-  formatNumber(number) {
-    if (number === undefined || number === null) return "0";
-
-    // Pastikan number adalah angka
-    const num = typeof number === "string" ? parseInt(number.replace(/\D/g, "")) : number;
-
-    return num.toLocaleString("id-ID");
-  },
-
-  // Reprint invoice - modifikasi fungsi yang sudah ada
-  async reprintInvoice(transactionId) {
+  // Perbaikan fungsi reprintTransaction
+  reprintTransaction(transactionId) {
     try {
-      this.showLoading(true);
-
-      // Get transaction data from Firestore
-      const transactionDoc = await getDoc(doc(firestore, "penjualanAksesoris", transactionId));
-
-      if (!transactionDoc.exists()) {
-        throw new Error("Transaksi tidak ditemukan");
+      // Find transaction by ID
+      const transaction = this.salesData.find((item) => item.id === transactionId);
+      if (!transaction) {
+        return this.showError("Transaksi tidak ditemukan");
       }
 
-      const transaction = transactionDoc.data();
-      transaction.id = transactionId; // Tambahkan ID ke objek transaksi
+      // Prepare data for printing
+      const printData = {
+        id: transactionId,
+        salesType: transaction.jenisPenjualan,
+        tanggal: transaction.timestamp ? formatDate(transaction.timestamp.toDate()) : transaction.tanggal,
+        sales: transaction.sales || "Admin",
+        totalHarga: parseInt(transaction.totalHarga || 0).toLocaleString("id-ID"),
+        items: transaction.items || [],
+        metodeBayar: transaction.metodeBayar || "tunai",
+      };
 
-      // Tampilkan dropdown untuk memilih jenis cetak
-      const printOptions = [
-        { id: "invoice", name: "Invoice Customer (A4)", icon: "file-invoice" },
-        { id: "receipt", name: "Struk Kasir (Thermal)", icon: "receipt" },
-      ];
+      // Add DP information if payment method is DP
+      if (transaction.metodeBayar === "dp" && transaction.statusPembayaran === "DP") {
+        printData.nominalDP = parseInt(transaction.nominalDP || 0).toLocaleString("id-ID");
+        printData.sisaPembayaran = parseInt(transaction.sisaPembayaran || 0).toLocaleString("id-ID");
+      }
 
-      // Buat modal untuk memilih jenis cetak
-      const modalHTML = `
-      <div class="modal fade" id="printOptionsModal" tabindex="-1" aria-labelledby="printOptionsModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="printOptionsModalLabel">Pilih Jenis Cetak</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-              <div class="list-group">
-                ${printOptions
-                  .map(
-                    (option) => `
-                  <button type="button" class="list-group-item list-group-item-action print-option" data-option="${option.id}">
-                    <i class="fas fa-${option.icon} me-2"></i> ${option.name}
-                  </button>
-                `
-                  )
-                  .join("")}
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-            </div>
-          </div>
+      // Show print options modal
+      Swal.fire({
+        title: "Cetak Ulang",
+        html: `
+        <p>Pilih jenis nota yang akan dicetak:</p>
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-primary" id="btnPrintReceipt">
+            <i class="fas fa-receipt me-2"></i>
+            Struk Kasir
+          </button>
+          <button type="button" class="btn btn-success" id="btnPrintInvoice">
+            <i class="fas fa-file-invoice me-2"></i>
+            Invoice Customer
+          </button>
         </div>
-      </div>
-    `;
-
-      // Tambahkan modal ke body jika belum ada
-      if (!document.getElementById("printOptionsModal")) {
-        const modalContainer = document.createElement("div");
-        modalContainer.innerHTML = modalHTML;
-        document.body.appendChild(modalContainer);
-      }
-
-      // Tampilkan modal
-      const printOptionsModal = new bootstrap.Modal(document.getElementById("printOptionsModal"));
-      printOptionsModal.show();
-
-      // Tambahkan event listener untuk opsi cetak
-      document.querySelectorAll(".print-option").forEach((button) => {
-        button.addEventListener("click", () => {
-          const option = button.getAttribute("data-option");
-          printOptionsModal.hide();
-
-          // Cetak sesuai opsi yang dipilih
-          if (option === "invoice") {
-            this.printInvoice(transaction);
-          } else if (option === "receipt") {
-            this.printReceipt(transaction);
-          }
-        });
+      `,
+        showConfirmButton: false,
+        showCancelButton: true,
+        cancelButtonText: "Tutup",
+        width: "400px",
+        didOpen: () => {
+          // Add event listeners to print buttons
+          document.getElementById("btnPrintReceipt").addEventListener("click", () => {
+            this.printReceipt(printData);
+            Swal.close();
+          });
+          document.getElementById("btnPrintInvoice").addEventListener("click", () => {
+            this.printInvoice(printData);
+            Swal.close();
+          });
+        },
       });
-
-      this.showLoading(false);
     } catch (error) {
-      console.error("Error reprinting invoice:", error);
-      this.showError("Error mencetak ulang: " + error.message);
-      this.showLoading(false);
+      console.error("Error reprinting transaction:", error);
+      this.showError("Terjadi kesalahan saat mencetak ulang: " + error.message);
     }
   },
 
   // Show edit form
-  async showEditForm(transactionId) {
-    try {
-      this.showLoading(true);
-
-      // Get transaction data from Firestore
-      const transactionDoc = await getDoc(doc(firestore, "penjualanAksesoris", transactionId));
-
-      if (!transactionDoc.exists()) {
-        throw new Error("Transaksi tidak ditemukan");
-      }
-
-      const transaction = transactionDoc.data();
-
-      // Store the transaction ID for later use
-      this.currentEditId = transactionId;
-
-      // Fill the edit form with transaction data
-      document.getElementById("editSales").value = transaction.sales || "";
-      document.getElementById("editJenisPenjualan").value = transaction.jenisPenjualan || "aksesoris";
-
-      // Clear previous items
-      const itemsContainer = document.getElementById("editItemsContainer");
-      itemsContainer.innerHTML = "";
-
-      // Add items to the form
-      if (transaction.items && transaction.items.length > 0) {
-        transaction.items.forEach((item, index) => {
-          const itemRow = document.createElement("div");
-          itemRow.className = "card mb-3 edit-item";
-          itemRow.dataset.index = index;
-
-          itemRow.innerHTML = `
-          <div class="card-body">
-            <div class="row g-3">
-              <div class="col-md-6">
-                <label class="form-label">Kode</label>
-                <input type="text" class="form-control item-kode" value="${item.kodeText || ""}">
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">Nama</label>
-                <input type="text" class="form-control item-nama" value="${item.nama || ""}">
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">Jumlah</label>
-                <input type="number" class="form-control item-jumlah" value="${item.jumlah || 1}" min="1">
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">Berat (gr)</label>
-                <input type="number" class="form-control item-berat" value="${item.berat || 0}" step="0.01">
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">Harga</label>
-                <input type="text" class="form-control item-harga" value="${parseInt(item.totalHarga || 0)}">
-              </div>
-            </div>
-            <div class="mt-2 text-end">
-              <button type="button" class="btn btn-sm btn-danger btn-remove-item">
-                <i class="fas fa-trash-alt"></i> Hapus Item
-              </button>
-            </div>
-          </div>
-        `;
-
-          itemsContainer.appendChild(itemRow);
-
-          // Add event listener for remove button
-          itemRow.querySelector(".btn-remove-item").addEventListener("click", function () {
-            itemRow.remove();
-          });
-
-          // Add event listener for formatting price
-          const hargaInput = itemRow.querySelector(".item-harga");
-          hargaInput.addEventListener("blur", function () {
-            const value = this.value.replace(/\D/g, "");
-            this.value = parseInt(value || 0).toLocaleString("id-ID");
-          });
-
-          hargaInput.addEventListener("focus", function () {
-            this.value = this.value.replace(/\./g, "");
-          });
-        });
-      }
-
-      // Add button to add new item
-      const addItemBtn = document.createElement("button");
-      addItemBtn.type = "button";
-      addItemBtn.className = "btn btn-success mt-2";
-      addItemBtn.innerHTML = '<i class="fas fa-plus"></i> Tambah Item';
-      addItemBtn.addEventListener("click", () => {
-        this.addNewItemRow();
-      });
-
-      itemsContainer.appendChild(addItemBtn);
-
-      // Show modal
-      const editModal = new bootstrap.Modal(document.getElementById("editModal"));
-      editModal.show();
-
-      this.showLoading(false);
-    } catch (error) {
-      console.error("Error showing edit form:", error);
-      this.showError("Error menampilkan form edit: " + error.message);
-      this.showLoading(false);
+// Perbaikan fungsi editTransaction
+editTransaction(transactionId) {
+  try {
+    // Find transaction by ID
+    const transaction = this.salesData.find((item) => item.id === transactionId);
+    if (!transaction) {
+      return this.showError("Transaksi tidak ditemukan");
     }
-  },
+
+    // Tampilkan form edit sesuai jenis penjualan
+    let formHtml = '';
+    
+    // Form untuk semua jenis penjualan
+    formHtml += `
+      <div class="mb-3">
+        <label for="editSales" class="form-label">Sales:</label>
+        <input type="text" class="form-control" id="editSales" value="${transaction.sales || ''}">
+      </div>
+    `;
+    
+    // Form khusus untuk transaksi DP
+    if (transaction.metodeBayar === "dp") {
+      formHtml += `
+        <div class="mb-3">
+          <label for="editNominalDP" class="form-label">Nominal DP:</label>
+          <input type="text" class="form-control" id="editNominalDP" value="${parseInt(transaction.nominalDP || 0).toLocaleString("id-ID")}">
+        </div>
+        <div class="mb-3">
+          <label for="editSisaPembayaran" class="form-label">Sisa Pembayaran:</label>
+          <input type="text" class="form-control" id="editSisaPembayaran" value="${parseInt(transaction.sisaPembayaran || 0).toLocaleString("id-ID")}" readonly>
+        </div>
+        <div class="mb-3">
+          <label for="editStatusPembayaran" class="form-label">Status Pembayaran:</label>
+          <select class="form-select" id="editStatusPembayaran">
+            <option value="DP" ${transaction.statusPembayaran === "DP" ? "selected" : ""}>DP</option>
+            <option value="Lunas" ${transaction.statusPembayaran === "Lunas" ? "selected" : ""}>Lunas</option>
+          </select>
+        </div>
+      `;
+    } else {
+      // Form untuk transaksi non-DP
+      formHtml += `
+        <div class="mb-3">
+          <label for="editTotalHarga" class="form-label">Total Harga:</label>
+          <input type="text" class="form-control" id="editTotalHarga" value="${parseInt(transaction.totalHarga || 0).toLocaleString("id-ID")}">
+        </div>
+        <div class="mb-3">
+          <label for="editMetodeBayar" class="form-label">Metode Pembayaran:</label>
+          <select class="form-select" id="editMetodeBayar">
+            <option value="tunai" ${transaction.metodeBayar === "tunai" ? "selected" : ""}>Tunai</option>
+            <option value="dp" ${transaction.metodeBayar === "dp" ? "selected" : ""}>DP</option>
+            <option value="free" ${transaction.metodeBayar === "free" ? "selected" : ""}>Free</option>
+          </select>
+        </div>
+      `;
+    }
+
+    // Simpan referensi ke this untuk digunakan dalam callback
+    const self = this;
+
+    Swal.fire({
+      title: "Edit Transaksi",
+      html: formHtml,
+      showCancelButton: true,
+      confirmButtonText: "Simpan",
+      cancelButtonText: "Batal",
+      didOpen: () => {
+        // Event listener untuk transaksi DP
+        if (transaction.metodeBayar === "dp") {
+          const editNominalDPInput = document.getElementById("editNominalDP");
+          const editSisaPembayaranInput = document.getElementById("editSisaPembayaran");
+          
+          editNominalDPInput.addEventListener("input", () => {
+            const dpValue = parseFloat(editNominalDPInput.value.replace(/\./g, "").replace(",", ".")) || 0;
+            const totalHarga = parseFloat(transaction.totalHarga) || 0;
+            const sisaPembayaran = Math.max(0, totalHarga - dpValue);
+            
+            editSisaPembayaranInput.value = sisaPembayaran.toLocaleString("id-ID");
+          });
+          
+          // Format DP input with thousand separator
+          editNominalDPInput.addEventListener("blur", () => {
+            const value = editNominalDPInput.value.replace(/\./g, "");
+            editNominalDPInput.value = parseInt(value || 0).toLocaleString("id-ID");
+          });
+        } else {
+          // Event listener untuk transaksi non-DP
+          const editTotalHargaInput = document.getElementById("editTotalHarga");
+          const editMetodeBayarSelect = document.getElementById("editMetodeBayar");
+          
+          // Format total harga input with thousand separator
+          editTotalHargaInput.addEventListener("blur", () => {
+            const value = editTotalHargaInput.value.replace(/\./g, "");
+            editTotalHargaInput.value = parseInt(value || 0).toLocaleString("id-ID");
+          });
+          
+          // Jika metode bayar diubah menjadi DP, tampilkan form DP
+          editMetodeBayarSelect.addEventListener("change", () => {
+            if (editMetodeBayarSelect.value === "dp") {
+              Swal.close();
+              
+              // Panggil fungsi edit dengan metode DP
+              const updatedTransaction = {...transaction, metodeBayar: "dp"};
+              self.editTransaction(transactionId);
+            }
+          });
+        }
+      }
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        // Persiapkan data yang akan diupdate
+        const updateData = {};
+        
+        // Update sales untuk semua jenis transaksi
+        updateData.sales = document.getElementById("editSales").value.trim();
+        
+        // Update data khusus untuk transaksi DP
+        if (transaction.metodeBayar === "dp") {
+          const nominalDP = parseFloat(document.getElementById("editNominalDP").value.replace(/\./g, "").replace(",", ".")) || 0;
+          const sisaPembayaran = parseFloat(document.getElementById("editSisaPembayaran").value.replace(/\./g, "").replace(",", ".")) || 0;
+          const statusPembayaran = document.getElementById("editStatusPembayaran").value;
+          
+          // Validasi input
+          if (nominalDP <= 0) {
+            return self.showError("Nominal DP harus lebih dari 0");
+          }
+          
+          if (nominalDP >= transaction.totalHarga && statusPembayaran === "DP") {
+            return self.showError("Nominal DP tidak boleh sama dengan atau melebihi total harga untuk status DP");
+          }
+          
+          updateData.nominalDP = nominalDP;
+          updateData.sisaPembayaran = sisaPembayaran;
+          updateData.statusPembayaran = statusPembayaran;
+        } else {
+          // Update data untuk transaksi non-DP
+          const totalHarga = parseFloat(document.getElementById("editTotalHarga").value.replace(/\./g, "").replace(",", ".")) || 0;
+          const metodeBayar = document.getElementById("editMetodeBayar").value;
+          
+          // Validasi input
+          if (totalHarga < 0) {
+            return self.showError("Total harga tidak boleh negatif");
+          }
+          
+          updateData.totalHarga = totalHarga;
+          updateData.metodeBayar = metodeBayar;
+          
+          // Update status pembayaran berdasarkan metode bayar
+          if (metodeBayar === "free") {
+            updateData.statusPembayaran = "Free";
+          } else {
+            updateData.statusPembayaran = "Lunas";
+          }
+        }
+        
+        // Tambahkan timestamp update
+        updateData.lastUpdated = serverTimestamp();
+        
+        try {
+          self.showLoading(true);
+          
+          // Update transaction in Firestore
+          await updateDoc(doc(firestore, "penjualanAksesoris", transactionId), updateData);
+          
+          // PERBAIKAN: Update data lokal dengan benar
+          // Buat salinan data transaksi yang diperbarui
+          const updatedTransaction = {...transaction, ...updateData};
+          
+          // Hapus properti serverTimestamp karena tidak bisa dirender langsung
+          delete updatedTransaction.lastUpdated;
+          
+          // Update array salesData
+          const salesIndex = self.salesData.findIndex(item => item.id === transactionId);
+          if (salesIndex !== -1) {
+            self.salesData[salesIndex] = updatedTransaction;
+          }
+          
+          // Update array filteredSalesData
+          const filteredIndex = self.filteredSalesData.findIndex(item => item.id === transactionId);
+          if (filteredIndex !== -1) {
+            self.filteredSalesData[filteredIndex] = updatedTransaction;
+          }
+          
+          // Re-render tabel
+          self.renderSalesTable();
+          
+          self.showLoading(false);
+          self.showSuccess("Transaksi berhasil diperbarui");
+        } catch (error) {
+          self.showLoading(false);
+          console.error("Error updating transaction:", error);
+          self.showError("Terjadi kesalahan saat memperbarui transaksi: " + error.message);
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Error editing transaction:", error);
+    this.showError("Terjadi kesalahan saat mengedit transaksi: " + error.message);
+  }
+},
 
   // Add new item row to edit form
   addNewItemRow() {
@@ -2206,50 +2600,81 @@ const laporanAksesorisHandler = {
   },
 
   // Confirm delete
-  async confirmDelete(transactionId) {
-    // Store the ID for the delete operation
-    this.currentDeleteId = transactionId;
-
-    // Show confirmation dialog
-    const confirmed = await this.showConfirm("Apakah Anda yakin ingin menghapus transaksi ini?");
-    if (confirmed) {
-      this.deleteTransaction();
+  confirmDeleteTransaction(transactionId) {
+    try {
+      // Find transaction by ID
+      const transaction = this.salesData.find((item) => item.id === transactionId);
+      if (!transaction) {
+        return this.showError("Transaksi tidak ditemukan");
+      }
+  
+      // Format date
+      const date = transaction.timestamp ? formatDate(transaction.timestamp.toDate()) : transaction.tanggal;
+  
+      // Show confirmation dialog
+      Swal.fire({
+        title: "Konfirmasi Hapus",
+        html: `
+          <p>Apakah Anda yakin ingin menghapus transaksi ini?</p>
+          <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <strong>Peringatan!</strong> Tindakan ini akan menghapus data secara permanen dan tidak dapat dikembalikan.
+          </div>
+          <div class="text-start">
+            <p><strong>Tanggal:</strong> ${date}</p>
+            <p><strong>Sales:</strong> ${transaction.sales || "Admin"}</p>
+            <p><strong>Jenis Penjualan:</strong> ${transaction.jenisPenjualan || "Tidak diketahui"}</p>
+            <p><strong>Total Harga:</strong> Rp ${parseInt(transaction.totalHarga || 0).toLocaleString("id-ID")}</p>
+          </div>
+        `,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Ya, Hapus",
+        cancelButtonText: "Batal",
+        confirmButtonColor: "#dc3545",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          this.deleteTransaction(transactionId);
+        }
+      });
+    } catch (error) {
+      console.error("Error confirming delete transaction:", error);
+      this.showError("Terjadi kesalahan saat menghapus transaksi: " + error.message);
     }
   },
-
-  // Delete transaction
-  async deleteTransaction() {
+  
+  // Fungsi untuk menghapus transaksi
+  async deleteTransaction(transactionId) {
     try {
       this.showLoading(true);
-
-      if (!this.currentDeleteId) {
-        throw new Error("ID transaksi tidak ditemukan");
-      }
-
+      
       // Delete transaction from Firestore
-      await deleteDoc(doc(firestore, "penjualanAksesoris", this.currentDeleteId));
-
-      // Tidak perlu menutup modal karena kita menggunakan SweetAlert2
-      // Hapus baris berikut:
-      // const confirmationModal = bootstrap.Modal.getInstance(document.getElementById("confirmationModal"));
-      // confirmationModal.hide();
-
-      // PERUBAHAN: Update data lokal dengan menghapus item dari array
-      this.salesData = this.salesData.filter((item) => item.id !== this.currentDeleteId);
-      this.filteredSalesData = this.filteredSalesData.filter((item) => item.id !== this.currentDeleteId);
-
-      // Render ulang tabel dengan data yang sudah diperbarui
+      await deleteDoc(doc(firestore, "penjualanAksesoris", transactionId));
+      
+      // Hapus data dari array lokal tanpa reload
+      this.salesData = this.salesData.filter(item => item.id !== transactionId);
+      this.filteredSalesData = this.filteredSalesData.filter(item => item.id !== transactionId);
+      
+      // Re-render tabel tanpa reload data
       this.renderSalesTable();
-
-      // Show success message
+      
+      this.showLoading(false);
       this.showSuccess("Transaksi berhasil dihapus");
-
-      this.showLoading(false);
     } catch (error) {
-      console.error("Error deleting transaction:", error);
-      this.showError("Error menghapus transaksi: " + error.message);
       this.showLoading(false);
+      console.error("Error deleting transaction:", error);
+      this.showError("Terjadi kesalahan saat menghapus transaksi: " + error.message);
     }
+  },
+  
+  // Fungsi untuk menampilkan pesan sukses
+  showSuccess(message) {
+    Swal.fire({
+      title: "Berhasil!",
+      text: message,
+      icon: "success",
+      confirmButtonText: "OK",
+    });
   },
 
   // Show success message
@@ -2922,6 +3347,30 @@ const laporanAksesorisHandler = {
   },
 };
 
+// Helper function to show loading indicator
+function showLoading(show) {
+  const loadingElement = document.getElementById("loadingIndicator");
+  if (loadingElement) {
+    loadingElement.style.display = show ? "flex" : "none";
+  }
+}
+
+// Helper function to show alerts
+function showAlert(message, title = "Informasi", type = "info") {
+  if (typeof Swal !== "undefined") {
+    return Swal.fire({
+      title: title,
+      text: message,
+      icon: type,
+      confirmButtonText: "OK",
+      confirmButtonColor: "#0d6efd",
+    });
+  } else {
+    alert(message);
+    return Promise.resolve();
+  }
+}
+
 // Initialize when document is ready
 document.addEventListener("DOMContentLoaded", function () {
   // Check if XLSX is loaded (for Excel export)
@@ -2938,7 +3387,7 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   // Confirm delete button handler
-  document.getElementById("confirmDeleteBtn").addEventListener("click", () => {
+  document.getElementById("confirmDeleteRangeBtn").addEventListener("click", () => {
     laporanAksesorisHandler.deleteTransaction();
   });
 
