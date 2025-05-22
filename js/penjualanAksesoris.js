@@ -77,18 +77,18 @@ $(document).ready(function () {
     $("#tanggal").datepicker("show");
   });
 
-    // Set focus to sales field when page loads
-    $("#sales").focus();
+  // Set focus to sales field when page loads
+  $("#sales").focus();
 
   console.log("Print event handlers initialized");
 });
 
 // Stock data cache
-  const stockCache = {
-    data: null,
-    lastFetched: null,
-    dirtyItems: new Set()
-  };
+const stockCache = {
+  data: null,
+  lastFetched: null,
+  dirtyItems: new Set()
+};
 
 // Load stock data on page load
 loadStockData();
@@ -240,7 +240,7 @@ function attachTableRowClickHandlers() {
       if (activeLockRow) {
         // Jika ini adalah baris input
         if (activeLockRow.hasClass("input-row")) {
-          $("#lockInputKodeLock").val(kode);
+          $("#manualInputKodeLock").val(kode);
         } else {
           // Jika ini adalah baris normal
           activeLockRow.find(".kode-lock-input").val(kode);
@@ -305,7 +305,6 @@ function addAksesorisToTable(kode, nama, stok, harga) {
   // Update grand total
   updateGrandTotal("aksesoris");
 }
-
 
 // Function to add kotak to table
 function addKotakToTable(kode, nama, stok, harga) {
@@ -443,7 +442,7 @@ function attachRowEventHandlers($row) {
     });
   }
 
-  // For kotak rows (keep existing code)
+  // For kotak rows
   if ($row.closest("table").attr("id") === "tableKotakDetail") {
     const $namaInput = $row.find(".nama-input");
     const $jumlahInput = $row.find(".jumlah-input");
@@ -498,7 +497,8 @@ function attachRowEventHandlers($row) {
   // Delete button handler
   $row.find(".btn-delete").on("click", function () {
     const tableId = $row.closest("table").attr("id");
-    const salesType = tableId === "tableAksesorisDetail" ? "aksesoris" : "kotak";
+    const salesType = tableId === "tableAksesorisDetail" ? "aksesoris" : 
+                      tableId === "tableKotakDetail" ? "kotak" : "manual";
 
     $row.remove();
     updateGrandTotal(salesType);
@@ -567,7 +567,7 @@ function updatePaymentMethodOptions(salesType) {
 // Function to update UI based on sales type
 function updateUIForSalesType(type) {
   // Hide all table containers first
-  $("#aksesorisTableContainer, #kotakTableContainer, #lockTableContainer, #manualTableContainer").hide();
+  $("#aksesorisTableContainer, #kotakTableContainer, #manualTableContainer").hide();
 
   // Hide/show appropriate buttons
   $("#btnTambah, #btnTambahBaris").hide();
@@ -590,15 +590,6 @@ function updateUIForSalesType(type) {
       $(".kotak-only").show();
       $(".payment-field").show();
       break;
-    case "gantiLock":
-      $("#lockTableContainer").show();
-      $("#btnTambahBaris").show(); // Tampilkan tombol "Tambah Baris"
-      detailTitle = "Detail Penggantian Lock";
-      $(".kotak-only").hide();
-      $(".payment-field").show();
-      // Reset tabel dan tambahkan baris input
-      resetTableAndAddInputRow("lock");
-      break;
     case "manual":
       $("#manualTableContainer").show();
       $("#btnTambahBaris").show(); // Tampilkan tombol "Tambah Baris"
@@ -608,16 +599,6 @@ function updateUIForSalesType(type) {
       // Reset tabel dan tambahkan baris input
       resetTableAndAddInputRow("manual");
       break;
-    case "gantiLock":
-      $("#lockTableContainer").show();
-      $("#btnTambah").show(); // Tampilkan tombol "Pilih Kode"
-      $("#btnTambahBaris").show(); // Tetap tampilkan tombol "Tambah Baris"
-      detailTitle = "Detail Penggantian Lock";
-      $(".kotak-only").hide();
-      $(".payment-field").show();
-      // Reset tabel dan tambahkan baris input
-      resetTableAndAddInputRow("lock");
-      break;
   }
 
   $("#detailTitle").text(detailTitle);
@@ -626,103 +607,96 @@ function updateUIForSalesType(type) {
   updatePaymentMethodOptions(type);
 }
 
-// Modifikasi fungsi addLockToTable
-function addLockToTable(kode, nama, stok, harga) {
-  // Default values
-  const berat = 0;
-  const totalHarga = 0;
+// Function to reset table and add input row
+function resetTableAndAddInputRow(type) {
+  // Clear existing rows
+  $("#tableManualDetail tbody").empty();
 
-  // Create new row
-  const newRow = `
-      <tr>
-        <td>${kode}</td>
-        <td>${nama}</td>
-        <td>
-          <div class="input-group input-group-sm">
-            <input type="text" class="form-control kode-lock-input" placeholder="Pilih kode" readonly>
-            <button class="btn btn-outline-secondary btn-pilih-kode-lock" type="button">
-              <i class="fas fa-search"></i>
-            </button>
-          </div>
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm berat-input" value="${berat}" min="0.01" step="0.01">
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm harga-per-gram-input" value="0" readonly>
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm total-harga-input" value="0">
-        </td>
-        <td>
-          <button class="btn btn-sm btn-danger btn-delete">
-            <i class="fas fa-trash"></i>
+  // Create input row for manual
+  const inputRow = `
+    <tr class="input-row">
+      <td><input type="text" class="form-control form-control-sm" id="manualInputKode" placeholder="Kode"></td>
+      <td><input type="text" class="form-control form-control-sm" id="manualInputNamaBarang" placeholder="Nama barang"></td>
+      <td>
+        <div class="input-group input-group-sm">
+          <input type="text" class="form-control" id="manualInputKodeLock" placeholder="Pilih kode" readonly>
+          <button class="btn btn-outline-secondary" id="manualBtnPilihKodeLock" type="button">
+            <i class="fas fa-search"></i>
           </button>
-        </td>
-      </tr>
-    `;
+        </div>
+      </td>
+      <td><input type="text" class="form-control form-control-sm" id="manualInputKadar" placeholder="Kadar" required></td>
+      <td><input type="text" class="form-control form-control-sm" id="manualInputBerat" placeholder="0.00" required></td>
+      <td><input type="text" class="form-control form-control-sm" id="manualInputHargaPerGram" placeholder="0" readonly></td>
+      <td><input type="text" class="form-control form-control-sm" id="manualInputTotalHarga" placeholder="0" required></td>
+      <td><input type="text" class="form-control form-control-sm" id="manualInputKeterangan" placeholder="Keterangan"></td>
+      <td></td>
+    </tr>
+  `;
 
-  // Add row to table
-  $("#tableLockDetail tbody").append(newRow);
+  // Add input row to table
+  $("#tableManualDetail tbody").append(inputRow);
 
-  // Get the new row
-  const $newRow = $("#tableLockDetail tbody tr:last-child");
-
-  // Attach event handler for pilih kode lock button
-  $newRow.find(".btn-pilih-kode-lock").on("click", function () {
-    // Set this row as the active row
-    activeLockRow = $newRow;
+  // Add event listeners
+  // Event listener for pilih kode lock button
+  $("#manualBtnPilihKodeLock").on("click", function () {
+    // Set baris input sebagai baris aktif
+    activeLockRow = $(this).closest("tr");
 
     // Show modal to select lock code
     $("#modalPilihLock").modal("show");
   });
 
-  // Attach other event handlers
-  attachLockRowEventHandlers($newRow);
+  // Event listeners for total price calculation
+  $("#manualInputBerat, #manualInputTotalHarga").on("input", function () {
+    calculateHargaPerGram("manual");
+  });
 
-  // Focus on the berat input
-  $newRow.find(".berat-input").focus();
-
-  // Update grand total
-  updateGrandTotal("gantiLock");
-}
-
-// Fungsi untuk menangani event pada baris lock
-function attachLockRowEventHandlers($row) {
-  const $beratInput = $row.find(".berat-input");
-  const $hargaPerGramInput = $row.find(".harga-per-gram-input");
-  const $totalHargaInput = $row.find(".total-harga-input");
-
-  // Calculate harga per gram when total harga or berat changes
-  $totalHargaInput.add($beratInput).on("input", function () {
-    const berat = parseFloat($beratInput.val()) || 0;
-    let totalHarga = $totalHargaInput.val().replace(/\./g, "");
-    totalHarga = parseFloat(totalHarga) || 0;
-
-    // Calculate harga per gram
-    let hargaPerGram = 0;
-    if (berat > 0) {
-      hargaPerGram = totalHarga / berat;
+  // Add keypress event listener to handle Enter key navigation
+  $("#manualInputKode").on("keypress", function (e) {
+    if (e.which === 13) {
+      e.preventDefault();
+      $("#manualInputNamaBarang").focus();
     }
-
-    // Update harga per gram field
-    $hargaPerGramInput.val(Math.round(hargaPerGram).toLocaleString("id-ID"));
-
-    // Update grand total
-    updateGrandTotal("gantiLock");
   });
 
-  // Format total harga with thousand separator
-  $totalHargaInput.on("blur", function () {
-    const value = $(this).val().replace(/\./g, "");
-    $(this).val(parseInt(value || 0).toLocaleString("id-ID"));
+  $("#manualInputNamaBarang").on("keypress", function (e) {
+    if (e.which === 13) {
+      e.preventDefault();
+      $("#manualInputKodeLock").focus();
+    }
   });
 
-  // Delete button handler
-  $row.find(".btn-delete").on("click", function () {
-    $row.remove();
-    updateGrandTotal("gantiLock");
+  $("#manualInputKadar").on("keypress", function (e) {
+    if (e.which === 13) {
+      e.preventDefault();
+      $("#manualInputBerat").focus();
+    }
   });
+
+  $("#manualInputBerat").on("keypress", function (e) {
+    if (e.which === 13) {
+      e.preventDefault();
+      $("#manualInputTotalHarga").focus();
+    }
+  });
+
+  $("#manualInputTotalHarga").on("keypress", function (e) {
+    if (e.which === 13) {
+      e.preventDefault();
+      $("#manualInputKeterangan").focus();
+    }
+  });
+
+  $("#manualInputKeterangan").on("keypress", function (e) {
+    if (e.which === 13) {
+      e.preventDefault();
+      addNewRow("manual");
+    }
+  });
+
+  // Focus on first field
+  $("#manualInputKode").focus();
 }
 
 // Function to calculate harga per gram based on total harga and berat
@@ -738,63 +712,12 @@ function calculateHargaPerGram(type) {
   $(`#${type}InputHargaPerGram`).val(Math.round(hargaPerGram).toLocaleString("id-ID"));
 }
 
-// Function to add input row if needed
-function addInputRowIfNeeded(type) {
-  let tableSelector, inputRowId;
-
-  if (type === "lock") {
-    tableSelector = "#tableLockDetail";
-    inputRowId = "lockInputRow";
-  } else {
-    // manual
-    tableSelector = "#tableManualDetail";
-    inputRowId = "manualInputRow";
-  }
-
-  // Check if input row already exists
-  if ($(tableSelector + " tbody tr#" + inputRowId).length === 0) {
-    // Create input row
-    const inputRow = `
-      <tr id="${inputRowId}" class="input-row">
-        <td><input type="text" class="form-control form-control-sm" id="${type}InputKode" placeholder="Kode"></td>
-        <td><input type="text" class="form-control form-control-sm" id="${type}InputNamaBarang" placeholder="Nama barang"></td>
-        <td><input type="number" class="form-control form-control-sm" id="${type}InputJumlah" value="1" min="1"></td>
-        <td><input type="text" class="form-control form-control-sm" id="${type}InputBerat" placeholder="0.00"></td>
-        <td><input type="text" class="form-control form-control-sm" id="${type}InputHargaPerGram" placeholder="0" readonly></td>
-        <td><input type="text" class="form-control form-control-sm" id="${type}InputTotalHarga" placeholder="0"></td>
-        <td></td>
-      </tr>
-    `;
-
-    // Add input row to table
-    $(tableSelector + " tbody").prepend(inputRow);
-
-    // Add event listeners to calculate total price
-    $(`#${type}InputJumlah, #${type}InputBerat, #${type}InputHargaPerGram`).on("input", function () {
-      calculateRowTotalPrice(type);
-    });
-  }
-}
-
-// Function to calculate total price for a row
-function calculateRowTotalPrice(type) {
-  const jumlah = parseFloat($(`#${type}InputJumlah`).val()) || 0;
-  const berat = parseFloat($(`#${type}InputBerat`).val()) || 0;
-  const hargaPerGram = parseFloat($(`#${type}InputHargaPerGram`).val()) || 0;
-
-  const totalHarga = jumlah * berat * hargaPerGram;
-  $(`#${type}InputTotalHarga`).val(totalHarga.toLocaleString("id-ID"));
-
-  return totalHarga;
-}
-
 // Add new row from input row
 $("#btnTambahBaris").on("click", function () {
   const salesType = $("#jenisPenjualan").val();
 
-  if (salesType === "gantiLock" || salesType === "manual") {
-    const type = salesType === "gantiLock" ? "lock" : "manual";
-    addNewRow(type);
+  if (salesType === "manual") {
+    addNewRow("manual");
   }
 });
 
@@ -807,9 +730,6 @@ $("#btnTambah").on("click", function () {
     $("#modalPilihAksesoris").modal("show");
   } else if (salesType === "kotak") {
     $("#modalPilihKotak").modal("show");
-  } else if (salesType === "gantiLock") {
-    // Untuk gantiLock, kita perlu memilih barang yang akan diganti locknya
-    $("#modalPilihAksesoris").modal("show");
   }
 });
 
@@ -882,9 +802,9 @@ function calculateKembalian() {
   const jumlahBayar = parseFloat($("#jumlahBayar").val().replace(/\./g, "").replace(",", ".")) || 0;
 
   if (paymentMethod === "dp") {
-    // For DP method, kembalian = jumlah bayar - sisa pembayaran
-    const sisaPembayaran = parseFloat($("#sisaPembayaran").val().replace(/\./g, "").replace(",", ".")) || 0;
-    const kembalian = jumlahBayar - sisaPembayaran;
+    // For DP method, kembalian = jumlah bayar - nominal DP
+    const nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "").replace(",", ".")) || 0;
+    const kembalian = jumlahBayar - nominalDP;
     $("#kembalian").val(kembalian >= 0 ? kembalian.toLocaleString("id-ID") : "0");
   } else {
     // For other methods, kembalian = jumlah bayar - total
@@ -908,10 +828,6 @@ function updateGrandTotal(salesType) {
       tableSelector = "#tableKotakDetail";
       grandTotalId = "#grand-total-kotak";
       break;
-    case "gantiLock":
-      tableSelector = "#tableLockDetail";
-      grandTotalId = "#grand-total-lock";
-      break;
     case "manual":
       tableSelector = "#tableManualDetail";
       grandTotalId = "#grand-total-manual";
@@ -927,8 +843,14 @@ function updateGrandTotal(salesType) {
       const value = $(this).val().replace(/\./g, "").replace(",", ".");
       total += parseFloat(value) || 0;
     });
+  } else if (salesType === "kotak") {
+    // For kotak, we get values from text cells
+    $(tableSelector + " tbody tr:not(.input-row) .total-harga").each(function () {
+      const value = $(this).text().replace(/\./g, "").replace(",", ".");
+      total += parseFloat(value) || 0;
+    });
   } else {
-    // For other types, we get values from text cells
+    // For manual, we get values from total-harga class
     $(tableSelector + " tbody tr:not(.input-row) .total-harga").each(function () {
       const value = $(this).text().replace(/\./g, "").replace(",", ".");
       total += parseFloat(value) || 0;
@@ -993,9 +915,6 @@ function updateTotal() {
     case "kotak":
       total = parseFloat($("#grand-total-kotak").text().replace(/\./g, "").replace(",", ".")) || 0;
       break;
-    case "gantiLock":
-      total = parseFloat($("#grand-total-lock").text().replace(/\./g, "").replace(",", ".")) || 0;
-      break;
     case "manual":
       total = parseFloat($("#grand-total-manual").text().replace(/\./g, "").replace(",", ".")) || 0;
       break;
@@ -1013,28 +932,6 @@ function updateTotal() {
 updateUIForSalesType("aksesoris");
 
 // Handle jumlah bayar input to calculate kembalian
-$("#jumlahBayar").on("input", function () {
-  const paymentMethod = $("#metodeBayar").val();
-  const jumlahBayar = parseFloat($(this).val().replace(/\./g, "").replace(",", ".")) || 0;
-
-  if (paymentMethod === "dp") {
-    const nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "").replace(",", ".")) || 0;
-    const kembalian = jumlahBayar - nominalDP;
-    $("#kembalian").val(kembalian >= 0 ? kembalian.toLocaleString("id-ID") : "0");
-  } else {
-    const total = parseFloat($("#totalOngkos").val().replace(/\./g, "").replace(",", ".")) || 0;
-    const kembalian = jumlahBayar - total;
-    $("#kembalian").val(kembalian >= 0 ? kembalian.toLocaleString("id-ID") : "0");
-  }
-});
-
-// Format number inputs with thousand separator
-function formatNumber(input) {
-  const value = input.value.replace(/\D/g, "");
-  input.value = parseInt(value || 0).toLocaleString("id-ID");
-}
-
-// Modify the jumlahBayar input handler
 $("#jumlahBayar").on("input", function () {
   calculateKembalian();
 });
@@ -1054,239 +951,47 @@ $("#btnBatal").on("click", async function () {
   }
 });
 
-// Modifikasi fungsi resetTableAndAddInputRow untuk lock
-function resetTableAndAddInputRow(type) {
-  let tableSelector;
-
-  if (type === "lock") {
-    tableSelector = "#tableLockDetail";
-  } else {
-    // manual
-    tableSelector = "#tableManualDetail";
-  }
-
-  // Clear existing rows
-  $(tableSelector + " tbody").empty();
-
-  // Create input row
-  const inputRow =
-    type === "lock"
-      ? `
-    <tr class="input-row">
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputKode" placeholder="Kode"></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputNamaBarang" placeholder="Nama barang"></td>
-      <td>
-        <div class="input-group input-group-sm">
-          <input type="text" class="form-control" id="${type}InputKodeLock" placeholder="Pilih kode" readonly>
-          <button class="btn btn-outline-secondary" id="${type}BtnPilihKodeLock" type="button">
-            <i class="fas fa-search"></i>
-          </button>
-        </div>
-      </td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputKadar" placeholder="Kadar" required></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputBerat" placeholder="0.00" required></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputHargaPerGram" placeholder="0" readonly></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputTotalHarga" placeholder="0" required></td>
-      <td></td>
-    </tr>
-  `
-      : `
-    <tr class="input-row">
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputKode" placeholder="Kode"></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputNamaBarang" placeholder="Nama barang"></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputKadar" placeholder="Kadar" required></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputBerat" placeholder="0.00" required></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputHargaPerGram" placeholder="0" readonly></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputTotalHarga" placeholder="0" required></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputKeterangan" placeholder="Keterangan"></td>
-      <td></td>
-    </tr>
-  `;
-
-  // Add input row to table
-  $(tableSelector + " tbody").append(inputRow);
-
-  // Add event listeners
-  if (type === "lock") {
-    // Event listener for pilih kode lock button
-    $(`#${type}BtnPilihKodeLock`).on("click", function () {
-      // Set baris input sebagai baris aktif
-      activeLockRow = $(this).closest("tr");
-
-      // Show modal to select lock code
-      $("#modalPilihLock").modal("show");
-    });
-
-    // Event listeners for total price calculation
-    $(`#${type}InputBerat, #${type}InputTotalHarga`).on("input", function () {
-      calculateHargaPerGram(type);
-    });
-
-    // Add keypress event listener to handle Enter key navigation
-    $(`#${type}InputKode`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputNamaBarang`).focus();
-      }
-    });
-
-    $(`#${type}InputNamaBarang`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputKodeLock`).focus();
-      }
-    });
-
-    $(`#${type}InputKadar`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputBerat`).focus();
-      }
-    });
-
-    $(`#${type}InputBerat`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputTotalHarga`).focus();
-      }
-    });
-
-    // Add keypress event listener to total harga input to handle Enter key
-    $(`#${type}InputTotalHarga`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        addNewRow(type);
-      }
-    });
-  } else {
-    // Event listeners for manual type
-    $(`#${type}InputBerat, #${type}InputTotalHarga`).on("input", function () {
-      calculateHargaPerGram(type);
-    });
-
-    // Add keypress event listener to handle Enter key navigation
-    $(`#${type}InputKode`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputNamaBarang`).focus();
-      }
-    });
-
-    $(`#${type}InputNamaBarang`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputKadar`).focus();
-      }
-    });
-
-    $(`#${type}InputKadar`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputBerat`).focus();
-      }
-    });
-
-    $(`#${type}InputBerat`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputTotalHarga`).focus();
-      }
-    });
-
-    $(`#${type}InputTotalHarga`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputKeterangan`).focus();
-      }
-    });
-
-    $(`#${type}InputKeterangan`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        addNewRow(type);
-      }
-    });
-  }
-
-  // Focus on first field
-  $(`#${type}InputKode`).focus();
-}
-
 // Function to add new row (extracted from btnTambahBaris click handler)
 function addNewRow(type) {
- // Get values from input row
- const kode = $(`#${type}InputKode`).val() || "-";
- const namaBarang = $(`#${type}InputNamaBarang`).val();
- const kadar = $(`#${type}InputKadar`).val() || "-";
- const berat = $(`#${type}InputBerat`).val() || 0;
- const totalHargaValue = $(`#${type}InputTotalHarga`).val() || "0";
- const totalHarga = parseFloat(totalHargaValue.replace(/\./g, "").replace(",", ".")) || 0;
- const hargaPerGram = $(`#${type}InputHargaPerGram`).val() || "0";
+  // Get values from input row
+  const kode = $(`#${type}InputKode`).val() || "-";
+  const namaBarang = $(`#${type}InputNamaBarang`).val();
+  const kodeLock = $(`#${type}InputKodeLock`).val() || "-";
+  const kadar = $(`#${type}InputKadar`).val() || "-";
+  const berat = $(`#${type}InputBerat`).val() || 0;
+  const totalHargaValue = $(`#${type}InputTotalHarga`).val() || "0";
+  const totalHarga = parseFloat(totalHargaValue.replace(/\./g, "").replace(",", ".")) || 0;
+  const hargaPerGram = $(`#${type}InputHargaPerGram`).val() || "0";
+  const keterangan = $(`#${type}InputKeterangan`).val() || "";
 
- // Ambil keterangan untuk tipe manual
- const keterangan = type === "manual" ? $(`#${type}InputKeterangan`).val() || "" : "";
-
- // Get kode lock for lock type
- const kodeLock = type === "lock" ? $(`#${type}InputKodeLock`).val() || "-" : "";
-
- // Validasi
- if (!namaBarang) {
-   showAlert("Nama barang harus diisi!");
-   $(`#${type}InputNamaBarang`).focus();
-   return;
- }
- if (!kadar) {
-   showAlert("Kadar harus diisi!");
-   $(`#${type}InputKadar`).focus();
-   return;
- }
- if (berat <= 0) {
-   showAlert("Berat harus lebih dari 0!");
-   $(`#${type}InputBerat`).focus();
-   return;
- }
- if (totalHarga <= 0) {
-   showAlert("Total harga harus lebih dari 0!");
-   $(`#${type}InputTotalHarga`).focus();
-   return;
- }
-
-  // Determine target table and sales type
-  let tableSelector;
-  let salesType;
-
-  if (type === "lock") {
-    tableSelector = "#tableLockDetail";
-    salesType = "gantiLock";
-  } else {
-    // manual
-    tableSelector = "#tableManualDetail";
-    salesType = "manual";
+  // Validasi
+  if (!namaBarang) {
+    showAlert("Nama barang harus diisi!");
+    $(`#${type}InputNamaBarang`).focus();
+    return;
+  }
+  if (!kadar) {
+    showAlert("Kadar harus diisi!");
+    $(`#${type}InputKadar`).focus();
+    return;
+  }
+  if (berat <= 0) {
+    showAlert("Berat harus lebih dari 0!");
+    $(`#${type}InputBerat`).focus();
+    return;
+  }
+  if (totalHarga <= 0) {
+    showAlert("Total harga harus lebih dari 0!");
+    $(`#${type}InputTotalHarga`).focus();
+    return;
   }
 
   // Create new row
-  const newRow =
-    type === "lock"
-      ? `
+  const newRow = `
     <tr>
       <td>${kode}</td>
       <td>${namaBarang}</td>
       <td>${kodeLock}</td>
-      <td>${kadar}</td>
-      <td>${berat}</td>
-      <td>${hargaPerGram}</td>
-      <td class="total-harga">${parseInt(totalHarga).toLocaleString("id-ID")}</td>
-      <td>
-        <button class="btn btn-sm btn-danger btn-delete">
-          <i class="fas fa-trash"></i>
-        </button>
-      </td>
-    </tr>
-  `
-      : `
-    <tr>
-      <td>${kode}</td>
-      <td>${namaBarang}</td>
       <td>${kadar}</td>
       <td>${berat}</td>
       <td>${hargaPerGram}</td>
@@ -1301,31 +1006,23 @@ function addNewRow(type) {
   `;
 
   // Add row to table
-  $(tableSelector + " tbody").append(newRow);
+  $(`#table${type.charAt(0).toUpperCase() + type.slice(1)}Detail tbody`).append(newRow);
 
   // Clear input row
   $(`#${type}InputKode`).val("");
   $(`#${type}InputNamaBarang`).val("");
+  $(`#${type}InputKodeLock`).val("");
   $(`#${type}InputKadar`).val("");
   $(`#${type}InputBerat`).val("");
   $(`#${type}InputHargaPerGram`).val("");
   $(`#${type}InputTotalHarga`).val("");
-
-  // Clear keterangan for manual type
-  if (type === "manual") {
-    $(`#${type}InputKeterangan`).val("");
-  }
-
-  // Clear kode lock for lock type
-  if (type === "lock") {
-    $(`#${type}InputKodeLock`).val("");
-  }
+  $(`#${type}InputKeterangan`).val("");
 
   // Focus on first field for next entry
   $(`#${type}InputKode`).focus();
 
   // Update grand total
-  updateGrandTotal(salesType);
+  updateGrandTotal(type);
 }
 
 // Fungsi simpan penjualan
@@ -1345,8 +1042,6 @@ $("#btnSimpanPenjualan").on("click", async function () {
         ? "#tableAksesorisDetail"
         : salesType === "kotak"
         ? "#tableKotakDetail"
-        : salesType === "gantiLock"
-        ? "#tableLockDetail"
         : "#tableManualDetail";
 
     // Check if table has rows
@@ -1420,7 +1115,8 @@ $("#btnSimpanPenjualan").on("click", async function () {
           hargaSatuan: hargaSatuan,
         });
       });
-    } else if (salesType === "gantiLock") {
+    } else {
+      // Manual
       $(tableSelector + " tbody tr:not(.input-row)").each(function () {
         const kode = $(this).find("td:nth-child(1)").text();
         const nama = $(this).find("td:nth-child(2)").text();
@@ -1430,32 +1126,12 @@ $("#btnSimpanPenjualan").on("click", async function () {
         const hargaPerGram =
           parseFloat($(this).find("td:nth-child(6)").text().replace(/\./g, "").replace(",", ".")) || 0;
         const totalHarga = parseFloat($(this).find("td:nth-child(7)").text().replace(/\./g, "").replace(",", ".")) || 0;
+        const keterangan = $(this).find("td:nth-child(8)").text() || "";
 
         items.push({
           kodeText: kode,
           nama: nama,
           kodeLock: kodeLock,
-          kadar: kadar,
-          berat: berat,
-          hargaPerGram: hargaPerGram,
-          totalHarga: totalHarga,
-        });
-      });
-    } else {
-      // Manual - Tambahkan kolom keterangan
-      $(tableSelector + " tbody tr:not(.input-row)").each(function () {
-        const kode = $(this).find("td:nth-child(1)").text();
-        const nama = $(this).find("td:nth-child(2)").text();
-        const kadar = $(this).find("td:nth-child(3)").text();
-        const berat = parseFloat($(this).find("td:nth-child(4)").text()) || 0;
-        const hargaPerGram =
-          parseFloat($(this).find("td:nth-child(5)").text().replace(/\./g, "").replace(",", ".")) || 0;
-        const totalHarga = parseFloat($(this).find("td:nth-child(6)").text().replace(/\./g, "").replace(",", ".")) || 0;
-        const keterangan = $(this).find("td:nth-child(7)").text() || "";
-
-        items.push({
-          kodeText: kode,
-          nama: nama,
           kadar: kadar,
           berat: berat,
           hargaPerGram: hargaPerGram,
@@ -1498,7 +1174,7 @@ $("#btnSimpanPenjualan").on("click", async function () {
     }
 
     // Show success message only after successful save
-    showAlert("Transaksi berhasil disimpan!");
+    showAlert("Transaksi berhasil disimpan!", "Sukses", "success");
 
     // Store the current transaction data in a global variable for printing
     currentTransactionData = {
@@ -1532,7 +1208,7 @@ $("#btnSimpanPenjualan").on("click", async function () {
     });
   } catch (error) {
     console.error("Error saving transaction: ", error);
-    showAlert("Terjadi kesalahan saat menyimpan transaksi: " + error.message);
+    showAlert("Terjadi kesalahan saat menyimpan transaksi: " + error.message, "Error", "error");
   }
 });
 
@@ -1869,8 +1545,6 @@ $("#btnCetak").on("click", function () {
         ? "#tableAksesorisDetail"
         : salesType === "kotak"
         ? "#tableKotakDetail"
-        : salesType === "gantiLock"
-        ? "#tableLockDetail"
         : "#tableManualDetail";
 
     // Periksa apakah ada item di tabel
@@ -1920,7 +1594,8 @@ $("#btnCetak").on("click", function () {
           hargaSatuan: hargaSatuan,
         });
       });
-    } else if (salesType === "gantiLock") {
+    } else {
+      // Manual
       $(tableSelector + " tbody tr:not(.input-row)").each(function () {
         const kode = $(this).find("td:nth-child(1)").text();
         const nama = $(this).find("td:nth-child(2)").text();
@@ -1930,6 +1605,7 @@ $("#btnCetak").on("click", function () {
         const hargaPerGram =
           parseFloat($(this).find("td:nth-child(6)").text().replace(/\./g, "").replace(",", ".")) || 0;
         const totalHarga = parseFloat($(this).find("td:nth-child(7)").text().replace(/\./g, "").replace(",", ".")) || 0;
+        const keterangan = $(this).find("td:nth-child(8)").text() || "";
 
         items.push({
           kodeText: kode,
@@ -1939,26 +1615,7 @@ $("#btnCetak").on("click", function () {
           berat: berat,
           hargaPerGram: hargaPerGram,
           totalHarga: totalHarga,
-        });
-      });
-    } else {
-      // Manual
-      $(tableSelector + " tbody tr:not(.input-row)").each(function () {
-        const kode = $(this).find("td:nth-child(1)").text();
-        const nama = $(this).find("td:nth-child(2)").text();
-        const kadar = $(this).find("td:nth-child(3)").text();
-        const berat = parseFloat($(this).find("td:nth-child(4)").text()) || 0;
-        const hargaPerGram =
-          parseFloat($(this).find("td:nth-child(5)").text().replace(/\./g, "").replace(",", ".")) || 0;
-        const totalHarga = parseFloat($(this).find("td:nth-child(6)").text().replace(/\./g, "").replace(",", ".")) || 0;
-
-        items.push({
-          kodeText: kode,
-          nama: nama,
-          kadar: kadar,
-          berat: berat,
-          hargaPerGram: hargaPerGram,
-          totalHarga: totalHarga,
+          keterangan: keterangan
         });
       });
     }
@@ -1970,189 +1627,28 @@ $("#btnCetak").on("click", function () {
       sales: $("#sales").val().trim() || "Admin",
       totalHarga: $("#totalOngkos").val(),
       items: items,
+      metodeBayar: $("#metodeBayar").val()
     };
 
-    console.log("Created transaction data from form:", currentTransactionData);
-  }
-
-  // Tampilkan modal print
-  $("#printModal").modal("show");
-});
-
-// Tambahkan event listener untuk tombol print di modal
-$(document).ready(function () {
-  // Pastikan event listener hanya ditambahkan sekali
-  $("#btnPrintReceipt")
-    .off("click")
-    .on("click", function () {
-      printReceipt();
-    });
-
-  $("#btnPrintInvoice")
-    .off("click")
-    .on("click", function () {
-      printInvoice();
-    });
-
-  // Set tanggal hari ini
-  const today = new Date();
-  const formattedDate = formatDate(today);
-  $("#tanggal").val(formattedDate);
-
-  // Initialize datepicker
-  $("#tanggal").datepicker({
-    format: "dd/mm/yyyy",
-    autoclose: true,
-    language: "id",
-    todayHighlight: true,
-  });
-
-  // Calendar icon click handler
-  $("#calendarIcon").on("click", function () {
-    $("#tanggal").datepicker("show");
-  });
-
-  console.log("Print event handlers initialized");
-});
-
-// Helper function untuk format tanggal
-function formatDate(date) {
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
-}
-
-// Variabel untuk menandai apakah print dipanggil setelah simpan
-let printAfterSave = false;
-
-// Modifikasi event handler untuk modal print
-$("#printModal").on("show.bs.modal", function () {
-  if (printAfterSave) {
-    // Jika dipanggil setelah simpan, tambahkan pesan
-    $(this).find(".modal-body").prepend(`
-      <div class="alert alert-success mb-3">
-        <i class="fas fa-check-circle me-2"></i>
-        Transaksi berhasil disimpan! Silakan pilih jenis nota yang akan dicetak.
-      </div>
-    `);
-
-    // Reset flag
-    printAfterSave = false;
-  } else {
-    // Hapus pesan jika ada
-    $(this).find(".alert").remove();
-  }
-});
-
-// Validasi nama sales saat blur
-$("#sales").on("blur", function () {
-  const salesName = $(this).val().trim();
-  if (!salesName) {
-    $(this).addClass("is-invalid");
-    if (!$(this).next(".invalid-feedback").length) {
-      $(this).after('<div class="invalid-feedback">Nama sales harus diisi!</div>');
+    // Tambahkan informasi DP jika metode pembayaran adalah DP
+    if ($("#metodeBayar").val() === "dp") {
+      currentTransactionData.nominalDP = $("#nominalDP").val();
+      currentTransactionData.sisaPembayaran = $("#sisaPembayaran").val();
     }
-  } else {
-    $(this).removeClass("is-invalid").addClass("is-valid");
-    $(this).next(".invalid-feedback").remove();
+
+    console.log("Created transaction data from form:", currentTransactionData);
+
+    // Tampilkan modal print
+    $("#printModal").modal("show");
   }
 });
 
-// Hapus validasi saat focus
-$("#sales").on("focus", function () {
-  $(this).removeClass("is-invalid is-valid");
-  $(this).next(".invalid-feedback").remove();
-});
-
-// Fungsi untuk menambahkan baris input pada tabel ganti lock
-function addLockInputRow() {
-  const inputRow = `
-    <tr class="input-row">
-      <td><input type="text" class="form-control form-control-sm" id="lockInputKode" placeholder="Kode"></td>
-      <td><input type="text" class="form-control form-control-sm" id="lockInputNamaBarang" placeholder="Nama barang"></td>
-      <td>
-        <div class="input-group input-group-sm">
-          <input type="text" class="form-control" id="lockInputKodeLock" placeholder="Pilih kode" readonly>
-          <button class="btn btn-outline-secondary" id="lockBtnPilihKodeLock" type="button">
-            <i class="fas fa-search"></i>
-          </button>
-        </div>
-      </td>
-      <td><input type="text" class="form-control form-control-sm" id="lockInputKadar" placeholder="Kadar"></td>
-      <td><input type="text" class="form-control form-control-sm" id="lockInputBerat" placeholder="0.00"></td>
-      <td><input type="text" class="form-control form-control-sm" id="lockInputHargaPerGram" placeholder="0" readonly></td>
-      <td><input type="text" class="form-control form-control-sm" id="lockInputTotalHarga" placeholder="0"></td>
-      <td></td>
-    </tr>
-  `;
-
-  // Add input row to table
-  $("#tableLockDetail tbody").append(inputRow);
-}
-
-// Fungsi untuk menambahkan baris input pada tabel manual
-function addManualInputRow() {
-  const inputRow = `
-    <tr class="input-row">
-      <td><input type="text" class="form-control form-control-sm" id="manualInputKode" placeholder="Kode"></td>
-      <td><input type="text" class="form-control form-control-sm" id="manualInputNamaBarang" placeholder="Nama barang"></td>
-      <td><input type="text" class="form-control form-control-sm" id="manualInputKadar" placeholder="Kadar"></td>
-      <td><input type="text" class="form-control form-control-sm" id="manualInputBerat" placeholder="0.00"></td>
-      <td><input type="text" class="form-control form-control-sm" id="manualInputHargaPerGram" placeholder="0" readonly></td>
-      <td><input type="text" class="form-control form-control-sm" id="manualInputTotalHarga" placeholder="0"></td>
-      <td></td>
-    </tr>
-  `;
-
-  // Add input row to table
-  $("#tableManualDetail tbody").append(inputRow);
-}
-
-// Fungsi untuk reset form setelah simpan
-function resetFormAfterSave() {
-  // Simpan jenis penjualan saat ini
-  const currentSalesType = $("#jenisPenjualan").val();
-
-  // Reset semua tabel
-  $("#tableAksesorisDetail tbody, #tableKotakDetail tbody, #tableLockDetail tbody, #tableManualDetail tbody").empty();
-
-  // Reset total-total
-  $("#grand-total-aksesoris, #grand-total-kotak, #grand-total-lock, #grand-total-manual").text("0");
-
-  // Reset form pembayaran
-  $("#totalOngkos").val("0");
-  $("#jumlahBayar").val("");
-  $("#kembalian").val("0");
-  $("#nominalDP").val("");
-  $("#sisaPembayaran").val("0");
-
-  // Refresh UI untuk jenis penjualan yang sama
-  updateUIForSalesType(currentSalesType);
-
-  // Jika jenis penjualan adalah gantiLock atau manual, tambahkan baris input baru
-  if (currentSalesType === "gantiLock") {
-    resetTableAndAddInputRow("lock");
-  } else if (currentSalesType === "manual") {
-    resetTableAndAddInputRow("manual");
-  }
-
-  // Fokus ke field pertama yang relevan
-  if (currentSalesType === "aksesoris" || currentSalesType === "kotak") {
-    $("#btnTambah").focus();
-  } else if (currentSalesType === "gantiLock") {
-    $("#lockInputKode").focus();
-  } else if (currentSalesType === "manual") {
-    $("#manualInputKode").focus();
-  }
-}
-
-// Fungsi untuk memperbarui stok setelah penjualan
+// Function to update stock after sales
 async function updateStock(salesType, items) {
   try {
     for (const item of items) {
       const kode = item.kodeText;
-      if (!kode || salesType === "gantiLock" || salesType === "manual") continue;
+      if (!kode || salesType === "manual") continue;
 
       const stockQuery = query(collection(firestore, "stokAksesoris"), where("kode", "==", kode));
       const stockSnapshot = await getDocs(stockQuery);
@@ -2173,7 +1669,7 @@ async function updateStock(salesType, items) {
         await addDoc(collection(firestore, "stokAksesorisTransaksi"), {
           kode, nama: item.nama || "", 
           kategori: salesType === "kotak" ? "kotak" : "aksesoris",
-          jenis: salesType === "free" ? "free" : "laku",
+          jenis: "laku",
           jumlah, stokSebelum: currentStock, stokSesudah: newStock, stokAkhir: newStock,
           timestamp: serverTimestamp(),
           keterangan: `Penjualan ${salesType} oleh ${$("#sales").val() || "Admin"}`
@@ -2217,7 +1713,6 @@ function resetForm() {
     // Clear all tables
     $("#tableAksesorisDetail tbody").empty();
     $("#tableKotakDetail tbody").empty();
-    $("#tableLockDetail tbody").empty();
     $("#tableManualDetail tbody").empty();
 
     // Reset payment fields
@@ -2231,7 +1726,6 @@ function resetForm() {
     // Reset grand totals
     $("#grand-total-aksesoris").text("0");
     $("#grand-total-kotak").text("0");
-    $("#grand-total-lock").text("0");
     $("#grand-total-manual").text("0");
 
     // Set focus to sales field after reset
@@ -2243,6 +1737,13 @@ function resetForm() {
   }
 }
 
+// Helper function untuk format tanggal
+function formatDate(date) {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
 
 // Tambah tombol refresh stok
 $(document).ready(function() {
@@ -2264,7 +1765,6 @@ $(document).ready(function() {
     loadStockData(true);
   });
 });
-
 
 // Search functionality for aksesoris modal
 $("#searchAksesoris").on("input", function () {
@@ -2297,3 +1797,43 @@ $("#searchKotak").on("input", function () {
     }
   });
 });
+
+// Search functionality for lock modal
+$("#searchLock").on("input", function () {
+  const searchText = $(this).val().toLowerCase();
+
+  $("#tableLock tbody tr").each(function () {
+    const kode = $(this).find("td:nth-child(1)").text().toLowerCase();
+    const nama = $(this).find("td:nth-child(2)").text().toLowerCase();
+
+    if (kode.includes(searchText) || nama.includes(searchText)) {
+      $(this).show();
+    } else {
+      $(this).hide();
+    }
+  });
+});
+
+// Validasi nama sales saat blur
+$("#sales").on("blur", function () {
+  const salesName = $(this).val().trim();
+  if (!salesName) {
+    $(this).addClass("is-invalid");
+    if (!$(this).next(".invalid-feedback").length) {
+      $(this).after('<div class="invalid-feedback">Nama sales harus diisi!</div>');
+    }
+  } else {
+    $(this).removeClass("is-invalid").addClass("is-valid");
+    $(this).next(".invalid-feedback").remove();
+  }
+});
+
+// Hapus validasi saat focus
+$("#sales").on("focus", function () {
+  $(this).removeClass("is-invalid is-valid");
+  $(this).next(".invalid-feedback").remove();
+});
+
+
+
+
