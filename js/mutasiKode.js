@@ -15,7 +15,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
 // Konstanta untuk caching
-const CACHE_KEY = 'kodeDataCache';
+const CACHE_KEY = "kodeDataCache";
 const CACHE_DURATION = 5 * 60 * 1000; // 5 menit dalam milidetik
 
 // Fungsi untuk menampilkan alert yang lebih menarik
@@ -24,8 +24,8 @@ function showAlert(message, title = "Informasi", type = "info") {
     title: title,
     text: message,
     icon: type, // 'success', 'error', 'warning', 'info', 'question'
-    confirmButtonText: 'OK',
-    confirmButtonColor: '#0d6efd' // Warna primary Bootstrap
+    confirmButtonText: "OK",
+    confirmButtonColor: "#0d6efd", // Warna primary Bootstrap
   });
 }
 
@@ -34,12 +34,12 @@ function showConfirm(message, title = "Konfirmasi") {
   return Swal.fire({
     title: title,
     text: message,
-    icon: 'question',
+    icon: "question",
     showCancelButton: true,
-    confirmButtonText: 'Ya',
-    cancelButtonText: 'Batal',
-    confirmButtonColor: '#0d6efd',
-    cancelButtonColor: '#6c757d'
+    confirmButtonText: "Ya",
+    cancelButtonText: "Batal",
+    confirmButtonColor: "#0d6efd",
+    cancelButtonColor: "#6c757d",
   }).then((result) => {
     return result.isConfirmed;
   });
@@ -47,31 +47,31 @@ function showConfirm(message, title = "Konfirmasi") {
 
 // Definisi jenis barang
 const jenisBarang = {
-  "C": "Cincin",
-  "K": "Kalung",
-  "L": "Liontin",
-  "A": "Anting",
-  "G": "Gelang",
-  "S": "Giwang"
+  C: "Cincin",
+  K: "Kalung",
+  L: "Liontin",
+  A: "Anting",
+  G: "Gelang",
+  S: "Giwang",
 };
 
 // State untuk menyimpan data kode
 let kodeData = {
   active: [],
-  mutated: []
+  mutated: [],
 };
 
 // State untuk menyimpan kode yang dipilih
 let selectedKodes = {
   active: new Set(),
-  mutated: new Set()
+  mutated: new Set(),
 };
 
 // Fungsi untuk memeriksa apakah cache masih valid
 function isCacheValid() {
   const cachedData = localStorage.getItem(CACHE_KEY);
   if (!cachedData) return false;
-  
+
   try {
     const { timestamp, data } = JSON.parse(cachedData);
     return Date.now() - timestamp < CACHE_DURATION;
@@ -86,7 +86,7 @@ function saveToCache(data) {
   try {
     const cacheData = {
       timestamp: Date.now(),
-      data: data
+      data: data,
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
     console.log("Data saved to cache");
@@ -124,36 +124,36 @@ async function loadKodeData(forceRefresh = false) {
         return;
       }
     }
-    
+
     console.log("Fetching fresh data from Firestore");
-    
+
     // Reset data
     kodeData = {
       active: [],
-      mutated: []
+      mutated: [],
     };
-    
+
     // Query untuk mengambil data penjualan manual
     const penjualanQuery = query(
       collection(firestore, "penjualanAksesoris"),
       where("jenisPenjualan", "==", "manual"),
       orderBy("timestamp", "desc")
     );
-    
+
     const penjualanSnapshot = await getDocs(penjualanQuery);
-    
+
     // Proses setiap dokumen penjualan
-    penjualanSnapshot.forEach(doc => {
+    penjualanSnapshot.forEach((doc) => {
       const penjualan = { id: doc.id, ...doc.data() };
-      
+
       // Proses setiap item dalam penjualan
       if (penjualan.items && Array.isArray(penjualan.items)) {
-        penjualan.items.forEach(item => {
+        penjualan.items.forEach((item) => {
           // Periksa apakah kode memenuhi pola (huruf diikuti angka)
           if (item.kodeText && /^[a-zA-Z]+-\d+$/.test(item.kodeText)) {
             // Ekstrak prefix kode (huruf pertama)
             const prefix = item.kodeText.charAt(0).toUpperCase();
-            
+
             // Periksa apakah prefix ada dalam daftar jenis barang
             if (prefix in jenisBarang) {
               // Buat objek kode
@@ -171,9 +171,9 @@ async function loadKodeData(forceRefresh = false) {
                 isMutated: item.isMutated || false,
                 tanggalMutasi: item.tanggalMutasi || null,
                 mutasiKeterangan: item.mutasiKeterangan || "",
-                mutasiHistory: item.mutasiHistory || []
+                mutasiHistory: item.mutasiHistory || [],
               };
-              
+
               // Tambahkan ke array yang sesuai berdasarkan status mutasi
               if (kodeItem.isMutated) {
                 kodeData.mutated.push(kodeItem);
@@ -185,18 +185,17 @@ async function loadKodeData(forceRefresh = false) {
         });
       }
     });
-    
+
     // Simpan data ke cache
     saveToCache(kodeData);
-    
+
     // Update tampilan
     updateKodeDisplay();
-    
+
     // Update counter
     updateCounters();
-    
+
     console.log("Data kode berhasil dimuat:", kodeData);
-    
   } catch (error) {
     console.error("Error loading kode data:", error);
     showAlert("Gagal memuat data kode: " + error.message, "Error", "error");
@@ -208,13 +207,13 @@ function updateKodeDisplay() {
   // Filter berdasarkan kriteria yang dipilih
   const filteredActive = filterKodeData(kodeData.active);
   const filteredMutated = filterKodeData(kodeData.mutated);
-  
+
   // Render tabel kode aktif
   renderKodeTable(filteredActive, "active");
-  
+
   // Render tabel kode yang sudah dimutasi
   renderKodeTable(filteredMutated, "mutated");
-  
+
   // Update counter
   updateCounters();
 }
@@ -223,23 +222,23 @@ function updateKodeDisplay() {
 function filterKodeData(data) {
   const jenisFilter = $("#filterJenis").val();
   const searchText = $("#searchKode").val().toLowerCase();
-  
-  return data.filter(item => {
+
+  return data.filter((item) => {
     // Filter berdasarkan jenis barang
     if (jenisFilter && item.jenisPrefix !== jenisFilter) {
       return false;
     }
-    
+
     // Filter berdasarkan teks pencarian
     if (searchText) {
       const matchesKode = item.kode.toLowerCase().includes(searchText);
       const matchesNama = item.nama.toLowerCase().includes(searchText);
-      
+
       if (!matchesKode && !matchesNama) {
         return false;
       }
     }
-    
+
     return true;
   });
 }
@@ -248,19 +247,19 @@ function filterKodeData(data) {
 function renderKodeTable(data, type) {
   const tableId = type === "active" ? "tableActiveKode" : "tableMutatedKode";
   const tableBody = $(`#${tableId} tbody`);
-  
+
   // Kosongkan tabel
   tableBody.empty();
-  
+
   // Jika tidak ada data, tampilkan pesan
   if (data.length === 0) {
     const colSpan = type === "active" ? 6 : 6;
     tableBody.html(`<tr><td colspan="${colSpan}" class="text-center">Tidak ada data kode</td></tr>`);
     return;
   }
-  
+
   // Render baris untuk setiap item
-  data.forEach(item => {
+  data.forEach((item) => {
     const row = `
       <tr data-id="${item.id}">
         <td>
@@ -275,22 +274,26 @@ function renderKodeTable(data, type) {
           <button class="btn btn-sm btn-info btn-detail" data-id="${item.id}" data-type="${type}">
             <i class="fas fa-info-circle"></i>
           </button>
-          ${type === "active" ? `
+          ${
+            type === "active"
+              ? `
           <button class="btn btn-sm btn-warning btn-mutasi" data-id="${item.id}">
             <i class="fas fa-exchange-alt"></i>
           </button>
-          ` : `
+          `
+              : `
           <button class="btn btn-sm btn-secondary btn-restore" data-id="${item.id}">
             <i class="fas fa-undo"></i>
           </button>
-          `}
+          `
+          }
         </td>
       </tr>
     `;
-    
+
     tableBody.append(row);
   });
-  
+
   // Attach event handlers
   attachTableEventHandlers(type);
 }
@@ -298,49 +301,49 @@ function renderKodeTable(data, type) {
 // Fungsi untuk menambahkan event handler ke tabel
 function attachTableEventHandlers(type) {
   // Handler untuk checkbox
-  $(`#table${type.charAt(0).toUpperCase() + type.slice(1)}Kode .kode-checkbox`).on("change", function() {
+  $(`#table${type.charAt(0).toUpperCase() + type.slice(1)}Kode .kode-checkbox`).on("change", function () {
     const id = $(this).data("id");
     const checkboxType = $(this).data("type");
-    
+
     if ($(this).is(":checked")) {
       selectedKodes[checkboxType].add(id);
     } else {
       selectedKodes[checkboxType].delete(id);
     }
-    
+
     // Update status tombol mutasi/restore
     updateButtonStatus(checkboxType);
   });
-  
+
   // Handler untuk tombol detail
-  $(`#table${type.charAt(0).toUpperCase() + type.slice(1)}Kode .btn-detail`).on("click", function() {
+  $(`#table${type.charAt(0).toUpperCase() + type.slice(1)}Kode .btn-detail`).on("click", function () {
     const id = $(this).data("id");
     const itemType = $(this).data("type");
-    
+
     showKodeDetail(id, itemType);
   });
-  
+
   // Handler untuk tombol mutasi (hanya untuk kode aktif)
   if (type === "active") {
-    $(`#tableActiveKode .btn-mutasi`).on("click", function() {
+    $(`#tableActiveKode .btn-mutasi`).on("click", function () {
       const id = $(this).data("id");
-      
+
       // Tambahkan ke set kode yang dipilih
       selectedKodes.active = new Set([id]);
-      
+
       // Tampilkan modal mutasi
       showMutasiModal();
     });
   }
-  
+
   // Handler untuk tombol restore (hanya untuk kode yang sudah dimutasi)
   if (type === "mutated") {
-    $(`#tableMutatedKode .btn-restore`).on("click", function() {
+    $(`#tableMutatedKode .btn-restore`).on("click", function () {
       const id = $(this).data("id");
-      
+
       // Tambahkan ke set kode yang dipilih
       selectedKodes.mutated = new Set([id]);
-      
+
       // Konfirmasi restore
       confirmRestoreKode();
     });
@@ -362,15 +365,16 @@ function updateButtonStatus(type) {
 // Fungsi untuk menampilkan detail kode
 function showKodeDetail(id, type) {
   // Cari item berdasarkan id
-  const item = type === "active" 
-    ? kodeData.active.find(item => item.id === id)
-    : kodeData.mutated.find(item => item.id === id);
-  
+  const item =
+    type === "active"
+      ? kodeData.active.find((item) => item.id === id)
+      : kodeData.mutated.find((item) => item.id === id);
+
   if (!item) {
     showAlert("Data kode tidak ditemukan", "Error", "error");
     return;
   }
-  
+
   // Isi modal dengan data item
   $("#detailKode").val(item.kode);
   $("#detailNama").val(item.nama);
@@ -379,24 +383,24 @@ function showKodeDetail(id, type) {
   $("#detailTanggal").val(item.tanggalInput);
   $("#detailJenis").val(item.jenisNama);
   $("#detailKeterangan").val(item.keterangan);
-  
+
   // Tambahan informasi untuk kode yang sudah dimutasi
   if (type === "mutated") {
     $("#mutasiInfoContainer").show();
     $("#detailTanggalMutasi").val(item.tanggalMutasi);
     $("#detailKeteranganMutasi").val(item.mutasiKeterangan);
-    
+
     // Tampilkan riwayat mutasi jika ada
     const historyContainer = $("#mutasiHistoryContainer");
     historyContainer.empty();
-    
+
     if (item.mutasiHistory && item.mutasiHistory.length > 0) {
       historyContainer.show();
-      
+
       // Buat daftar riwayat
       const historyList = $("<ul class='list-group'></ul>");
-      
-      item.mutasiHistory.forEach(history => {
+
+      item.mutasiHistory.forEach((history) => {
         const historyItem = $(`
           <li class="list-group-item">
             <div class="d-flex justify-content-between">
@@ -406,10 +410,10 @@ function showKodeDetail(id, type) {
             <div class="mt-1">${history.keterangan}</div>
           </li>
         `);
-        
+
         historyList.append(historyItem);
       });
-      
+
       historyContainer.append(historyList);
     } else {
       historyContainer.hide();
@@ -418,7 +422,7 @@ function showKodeDetail(id, type) {
     $("#mutasiInfoContainer").hide();
     $("#mutasiHistoryContainer").hide();
   }
-  
+
   // Tampilkan modal
   $("#kodeDetailModal").modal("show");
 }
@@ -427,15 +431,15 @@ function showKodeDetail(id, type) {
 function showMutasiModal() {
   // Reset form
   $("#mutasiForm")[0].reset();
-  
+
   // Tampilkan kode yang dipilih
   const selectedIds = Array.from(selectedKodes.active);
-  const selectedItems = kodeData.active.filter(item => selectedIds.includes(item.id));
-  
+  const selectedItems = kodeData.active.filter((item) => selectedIds.includes(item.id));
+
   const kodeList = $("#selectedKodeList");
   kodeList.empty();
-  
-  selectedItems.forEach(item => {
+
+  selectedItems.forEach((item) => {
     kodeList.append(`
       <li class="list-group-item d-flex justify-content-between align-items-center">
         ${item.kode} - ${item.nama}
@@ -443,12 +447,14 @@ function showMutasiModal() {
       </li>
     `);
   });
-  
+
   // Set tanggal hari ini
   const today = new Date();
-  const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+  const formattedDate = `${today.getDate().toString().padStart(2, "0")}/${(today.getMonth() + 1)
+    .toString()
+    .padStart(2, "0")}/${today.getFullYear()}`;
   $("#tanggalMutasi").val(formattedDate);
-  
+
   // Tampilkan modal
   $("#mutasiModal").modal("show");
 }
@@ -456,7 +462,7 @@ function showMutasiModal() {
 // Fungsi untuk mengonfirmasi restore kode
 async function confirmRestoreKode() {
   const confirmed = await showConfirm("Apakah Anda yakin ingin mengembalikan kode yang dipilih ke status aktif?");
-  
+
   if (confirmed) {
     restoreSelectedKodes();
   }
@@ -468,126 +474,125 @@ async function mutateSelectedKodes() {
     // Ambil data dari form
     const tanggalMutasi = $("#tanggalMutasi").val();
     const keteranganMutasi = $("#keteranganMutasi").val();
-    
+
     if (!tanggalMutasi || !keteranganMutasi) {
       showAlert("Tanggal dan keterangan mutasi harus diisi", "Validasi", "warning");
       return;
     }
-    
+
     // Ambil kode yang dipilih
     const selectedIds = Array.from(selectedKodes.active);
-    const selectedItems = kodeData.active.filter(item => selectedIds.includes(item.id));
-    
+    const selectedItems = kodeData.active.filter((item) => selectedIds.includes(item.id));
+
     if (selectedItems.length === 0) {
       showAlert("Tidak ada kode yang dipilih", "Validasi", "warning");
       return;
     }
-    
+
     // Tampilkan loading
     Swal.fire({
-      title: 'Memproses Mutasi',
-      text: 'Mohon tunggu...',
+      title: "Memproses Mutasi",
+      text: "Mohon tunggu...",
       allowOutsideClick: false,
       didOpen: () => {
         Swal.showLoading();
-      }
+      },
     });
-    
+
     // Proses setiap kode yang dipilih
     for (const item of selectedItems) {
       // Ambil referensi dokumen penjualan
       const penjualanRef = doc(firestore, "penjualanAksesoris", item.penjualanId);
       const penjualanDoc = await getDoc(penjualanRef);
-      
+
       if (!penjualanDoc.exists()) {
         console.error(`Dokumen penjualan ${item.penjualanId} tidak ditemukan`);
         continue;
       }
-      
+
       const penjualanData = penjualanDoc.data();
-      
+
       // Cari item dalam array items
       if (!penjualanData.items || !Array.isArray(penjualanData.items)) {
         console.error(`Dokumen penjualan ${item.penjualanId} tidak memiliki array items`);
         continue;
       }
-      
+
       // Cari indeks item dengan kode yang sesuai
-      const itemIndex = penjualanData.items.findIndex(i => i.kodeText === item.kode);
-      
+      const itemIndex = penjualanData.items.findIndex((i) => i.kodeText === item.kode);
+
       if (itemIndex === -1) {
         console.error(`Item dengan kode ${item.kode} tidak ditemukan dalam dokumen penjualan ${item.penjualanId}`);
         continue;
       }
-      
+
       // Buat objek riwayat mutasi
       const mutasiHistory = {
         tanggal: tanggalMutasi,
         status: "Mutasi",
-        keterangan: keteranganMutasi
+        keterangan: keteranganMutasi,
       };
-      
+
       // Update item
       penjualanData.items[itemIndex].isMutated = true;
       penjualanData.items[itemIndex].tanggalMutasi = tanggalMutasi;
       penjualanData.items[itemIndex].mutasiKeterangan = keteranganMutasi;
-      
+
       // Tambahkan ke riwayat mutasi jika belum ada
       if (!penjualanData.items[itemIndex].mutasiHistory) {
         penjualanData.items[itemIndex].mutasiHistory = [];
       }
-      
+
       penjualanData.items[itemIndex].mutasiHistory.unshift(mutasiHistory);
-      
+
       // Update dokumen penjualan
       await updateDoc(penjualanRef, {
-        items: penjualanData.items
+        items: penjualanData.items,
       });
-      
+
       // Update data lokal
       // Hapus dari array active
-      kodeData.active = kodeData.active.filter(i => i.id !== item.id);
-      
+      kodeData.active = kodeData.active.filter((i) => i.id !== item.id);
+
       // Tambahkan ke array mutated dengan data yang diperbarui
       const mutatedItem = {
         ...item,
         isMutated: true,
         tanggalMutasi: tanggalMutasi,
         mutasiKeterangan: keteranganMutasi,
-        mutasiHistory: [mutasiHistory, ...(item.mutasiHistory || [])]
+        mutasiHistory: [mutasiHistory, ...(item.mutasiHistory || [])],
       };
-      
+
       kodeData.mutated.push(mutatedItem);
     }
-    
+
     // Update cache dengan data terbaru
     saveToCache(kodeData);
-    
+
     // Reset selected kodes
     selectedKodes.active = new Set();
-    
+
     // Update tampilan
     updateKodeDisplay();
-    
+
     // Tutup modal
     $("#mutasiModal").modal("hide");
-    
+
     // Tampilkan pesan sukses
     Swal.fire({
-      title: 'Berhasil',
+      title: "Berhasil",
       text: `${selectedItems.length} kode berhasil dimutasi`,
-      icon: 'success',
-      confirmButtonText: 'OK'
+      icon: "success",
+      confirmButtonText: "OK",
     });
-    
   } catch (error) {
     console.error("Error mutating kodes:", error);
-    
+
     Swal.fire({
-      title: 'Error',
+      title: "Error",
       text: `Gagal memutasi kode: ${error.message}`,
-      icon: 'error',
-      confirmButtonText: 'OK'
+      icon: "error",
+      confirmButtonText: "OK",
     });
   }
 }
@@ -597,114 +602,115 @@ async function restoreSelectedKodes() {
   try {
     // Ambil kode yang dipilih
     const selectedIds = Array.from(selectedKodes.mutated);
-    const selectedItems = kodeData.mutated.filter(item => selectedIds.includes(item.id));
-    
+    const selectedItems = kodeData.mutated.filter((item) => selectedIds.includes(item.id));
+
     if (selectedItems.length === 0) {
       showAlert("Tidak ada kode yang dipilih", "Validasi", "warning");
       return;
     }
-    
+
     // Tampilkan loading
     Swal.fire({
-      title: 'Memproses Pengembalian',
-      text: 'Mohon tunggu...',
+      title: "Memproses Pengembalian",
+      text: "Mohon tunggu...",
       allowOutsideClick: false,
       didOpen: () => {
         Swal.showLoading();
-      }
+      },
     });
-    
+
     // Proses setiap kode yang dipilih
     for (const item of selectedItems) {
       // Ambil referensi dokumen penjualan
       const penjualanRef = doc(firestore, "penjualanAksesoris", item.penjualanId);
       const penjualanDoc = await getDoc(penjualanRef);
-      
+
       if (!penjualanDoc.exists()) {
         console.error(`Dokumen penjualan ${item.penjualanId} tidak ditemukan`);
         continue;
       }
-      
+
       const penjualanData = penjualanDoc.data();
-      
+
       // Cari item dalam array items
       if (!penjualanData.items || !Array.isArray(penjualanData.items)) {
         console.error(`Dokumen penjualan ${item.penjualanId} tidak memiliki array items`);
         continue;
       }
-      
+
       // Cari indeks item dengan kode yang sesuai
-      const itemIndex = penjualanData.items.findIndex(i => i.kodeText === item.kode);
-      
+      const itemIndex = penjualanData.items.findIndex((i) => i.kodeText === item.kode);
+
       if (itemIndex === -1) {
         console.error(`Item dengan kode ${item.kode} tidak ditemukan dalam dokumen penjualan ${item.penjualanId}`);
         continue;
       }
-      
+
       // Buat objek riwayat restore
       const today = new Date();
-      const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
-      
+      const formattedDate = `${today.getDate().toString().padStart(2, "0")}/${(today.getMonth() + 1)
+        .toString()
+        .padStart(2, "0")}/${today.getFullYear()}`;
+
       const restoreHistory = {
         tanggal: formattedDate,
         status: "Dikembalikan",
-        keterangan: "Kode dikembalikan ke status aktif"
+        keterangan: "Kode dikembalikan ke status aktif",
       };
-      
+
       // Update item
       penjualanData.items[itemIndex].isMutated = false;
-      
+
       // Tambahkan ke riwayat mutasi
       if (!penjualanData.items[itemIndex].mutasiHistory) {
         penjualanData.items[itemIndex].mutasiHistory = [];
       }
-      
+
       penjualanData.items[itemIndex].mutasiHistory.unshift(restoreHistory);
-      
+
       // Update dokumen penjualan
       await updateDoc(penjualanRef, {
-        items: penjualanData.items
+        items: penjualanData.items,
       });
-      
+
       // Update data lokal
       // Hapus dari array mutated
-      kodeData.mutated = kodeData.mutated.filter(i => i.id !== item.id);
-      
+      kodeData.mutated = kodeData.mutated.filter((i) => i.id !== item.id);
+
       // Tambahkan ke array active dengan data yang diperbarui
       const activeItem = {
         ...item,
         isMutated: false,
-        mutasiHistory: [restoreHistory, ...(item.mutasiHistory || [])]
+        mutasiHistory: [restoreHistory, ...(item.mutasiHistory || [])],
       };
-      
+
       kodeData.active.push(activeItem);
     }
-    
+
     // Update cache dengan data terbaru
     saveToCache(kodeData);
-    
+
     // Reset selected kodes
     selectedKodes.mutated = new Set();
-    
+
     // Update tampilan
     updateKodeDisplay();
-    
+
     // Tampilkan pesan sukses
     Swal.fire({
-      title: 'Berhasil',
+      title: "Berhasil",
       text: `${selectedItems.length} kode berhasil dikembalikan`,
-      icon: 'success',
-      confirmButtonText: 'OK'
+      icon: "success",
+      confirmButtonText: "OK",
     });
-    
   } catch (error) {
     console.error("Error restoring kodes:", error);
-    
+
     Swal.fire({
-      title: 'Error',
+      title: "Error",
       text: `Gagal mengembalikan kode: ${error.message}`,
-      icon: 'error',
-      confirmButtonText: 'OK'
+      icon: "error",
+      confirmButtonText: "OK",
     });
   }
 }
@@ -714,32 +720,32 @@ function updateCounters() {
   // Filter berdasarkan kriteria yang dipilih
   const filteredActive = filterKodeData(kodeData.active);
   const filteredMutated = filterKodeData(kodeData.mutated);
-  
+
   // Update counter
   $("#activeKodeCount").text(filteredActive.length);
   $("#mutatedKodeCount").text(filteredMutated.length);
-  
+
   // Update counter per jenis barang
   const jenisCountActive = {};
   const jenisCountMutated = {};
-  
+
   // Inisialisasi counter untuk semua jenis barang
-  Object.keys(jenisBarang).forEach(prefix => {
+  Object.keys(jenisBarang).forEach((prefix) => {
     jenisCountActive[prefix] = 0;
     jenisCountMutated[prefix] = 0;
   });
-  
+
   // Hitung jumlah kode per jenis barang
-  filteredActive.forEach(item => {
+  filteredActive.forEach((item) => {
     jenisCountActive[item.jenisPrefix] = (jenisCountActive[item.jenisPrefix] || 0) + 1;
   });
-  
-  filteredMutated.forEach(item => {
+
+  filteredMutated.forEach((item) => {
     jenisCountMutated[item.jenisPrefix] = (jenisCountMutated[item.jenisPrefix] || 0) + 1;
   });
-  
+
   // Update badge counter
-  Object.keys(jenisBarang).forEach(prefix => {
+  Object.keys(jenisBarang).forEach((prefix) => {
     $(`#activeCount${prefix}`).text(jenisCountActive[prefix] || 0);
     $(`#mutatedCount${prefix}`).text(jenisCountMutated[prefix] || 0);
   });
@@ -748,10 +754,12 @@ function updateCounters() {
 // Fungsi untuk memformat timestamp
 function formatTimestamp(timestamp) {
   if (!timestamp) return "-";
-  
+
   try {
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+    return `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}/${date.getFullYear()}`;
   } catch (error) {
     console.error("Error formatting timestamp:", error);
     return "-";
@@ -766,84 +774,83 @@ async function deleteSelectedKodes() {
       "Apakah Anda yakin ingin menghapus kode yang dipilih? Tindakan ini tidak dapat dibatalkan.",
       "Konfirmasi Penghapusan"
     );
-    
+
     if (!confirmed) return;
-    
+
     // Ambil kode yang dipilih
     const selectedIds = Array.from(selectedKodes.mutated);
-    const selectedItems = kodeData.mutated.filter(item => selectedIds.includes(item.id));
-    
+    const selectedItems = kodeData.mutated.filter((item) => selectedIds.includes(item.id));
+
     if (selectedItems.length === 0) {
       showAlert("Tidak ada kode yang dipilih", "Validasi", "warning");
       return;
     }
-    
+
     // Tampilkan loading
     Swal.fire({
-      title: 'Memproses Penghapusan',
-      text: 'Mohon tunggu...',
+      title: "Memproses Penghapusan",
+      text: "Mohon tunggu...",
       allowOutsideClick: false,
       didOpen: () => {
         Swal.showLoading();
-      }
+      },
     });
-    
+
     // Proses setiap kode yang dipilih
     for (const item of selectedItems) {
       // Ambil referensi dokumen penjualan
       const penjualanRef = doc(firestore, "penjualanAksesoris", item.penjualanId);
       const penjualanDoc = await getDoc(penjualanRef);
-      
+
       if (!penjualanDoc.exists()) {
         console.error(`Dokumen penjualan ${item.penjualanId} tidak ditemukan`);
         continue;
       }
-      
+
       const penjualanData = penjualanDoc.data();
-      
+
       // Cari item dalam array items
       if (!penjualanData.items || !Array.isArray(penjualanData.items)) {
         console.error(`Dokumen penjualan ${item.penjualanId} tidak memiliki array items`);
         continue;
       }
-      
+
       // Filter array items untuk menghapus item dengan kode yang sesuai
-      penjualanData.items = penjualanData.items.filter(i => i.kodeText !== item.kode);
-      
+      penjualanData.items = penjualanData.items.filter((i) => i.kodeText !== item.kode);
+
       // Update dokumen penjualan
       await updateDoc(penjualanRef, {
-        items: penjualanData.items
+        items: penjualanData.items,
       });
-      
+
       // Update data lokal
-      kodeData.mutated = kodeData.mutated.filter(i => i.id !== item.id);
+      kodeData.mutated = kodeData.mutated.filter((i) => i.id !== item.id);
     }
-    
+
     // Update cache dengan data terbaru
     saveToCache(kodeData);
-    
+
     // Reset selected kodes
     selectedKodes.mutated = new Set();
-    
+
     // Update tampilan
     updateKodeDisplay();
-    
+
     // Tampilkan pesan sukses
     Swal.fire({
-      title: 'Berhasil',
+      title: "Berhasil",
       text: `${selectedItems.length} kode berhasil dihapus`,
-      icon: 'success',
-      confirmButtonText: 'OK'
+      icon: "success",
+      confirmButtonText: "OK",
     });
-    
   } catch (error) {
     console.error("Error deleting kodes:", error);
-    
+
     Swal.fire({
-      title: 'Error',
+      title: "Error",
       text: `Gagal menghapus kode: ${error.message}`,
-      icon: 'error',
-      confirmButtonText: 'OK'
+      icon: "error",
+      confirmButtonText: "OK",
     });
   }
 }
@@ -853,36 +860,113 @@ async function initializePage() {
   try {
     // Tampilkan loading
     Swal.fire({
-      title: 'Memuat Data',
-      text: 'Mohon tunggu...',
+      title: "Memuat Data",
+      text: "Mohon tunggu...",
       allowOutsideClick: false,
       didOpen: () => {
         Swal.showLoading();
-      }
+      },
     });
-    
+
     // Muat data kode
     await loadKodeData();
-    
+
     // Sembunyikan loading
     Swal.close();
-    
+
     // Inisialisasi event handler
     initializeEventHandlers();
-    
   } catch (error) {
     console.error("Error initializing page:", error);
-    
+
     Swal.fire({
-      title: 'Error',
+      title: "Error",
       text: `Gagal memuat data: ${error.message}`,
-      icon: 'error',
-      confirmButtonText: 'OK'
+      icon: "error",
+      confirmButtonText: "OK",
     });
   }
 }
 
-// Fungsi untuk menginisialisasi event handler
+// Fungsi untuk export data ke Excel
+function exportToExcel(data, filename, sheetName = "Data") {
+  try {
+    // Cek apakah XLSX library tersedia
+    if (typeof XLSX === 'undefined') {
+      showAlert("Library Excel tidak tersedia. Pastikan XLSX library sudah dimuat.", "Error", "error");
+      return;
+    }
+    
+    if (!data || data.length === 0) {
+      showAlert("Tidak ada data untuk di-export", "Informasi", "info");
+      return;
+    }
+    
+    // Siapkan data untuk export
+    const exportData = data.map((item) => ({
+      Kode: item.kode,
+      "Nama Barang": item.nama,
+      Kadar: item.kadar,
+      Berat: item.berat,
+      "Tanggal Input": item.tanggalInput,
+      Status: item.isMutated ? "Sudah Dimutasi" : "Belum Dimutasi",
+      "Tanggal Mutasi": item.tanggalMutasi || "-",
+      "Keterangan Mutasi": item.mutasiKeterangan || "-",
+      Keterangan: item.keterangan,
+    }));
+    
+    // Buat workbook dan worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    
+    // Set column widths
+    const colWidths = [
+      { wch: 10 }, // Kode
+      { wch: 25 }, // Nama Barang
+      { wch: 7 }, // Kadar
+      { wch: 7 }, // Berat
+      { wch: 15 }, // Tanggal Input
+      { wch: 15 }, // Status
+      { wch: 15 }, // Tanggal Mutasi
+      { wch: 25 }, // Keterangan Mutasi
+      { wch: 25 }, // Keterangan
+    ];
+    ws["!cols"] = colWidths;
+    
+    // Tambahkan worksheet ke workbook
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    
+    // Generate filename dengan timestamp
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+    const fullFilename = `${filename}_${timestamp}.xlsx`;
+    
+    // Download file
+    XLSX.writeFile(wb, fullFilename);
+    
+    showAlert(`Data berhasil di-export ke ${fullFilename}`, "Berhasil", "success");
+  } catch (error) {
+    console.error("Error exporting to Excel:", error);
+    showAlert("Gagal export data: " + error.message, "Error", "error");
+  }
+}
+
+// Fungsi untuk export kode aktif
+function exportActiveKodes() {
+  console.log("Export active kodes clicked"); // Debug log
+  const filteredData = filterKodeData(kodeData.active);
+  console.log("Filtered active data:", filteredData); // Debug log
+  exportToExcel(filteredData, "Kode_Aktif", "Kode Aktif");
+}
+
+// Fungsi untuk export kode yang sudah dimutasi
+function exportMutatedKodes() {
+  console.log("Export mutated kodes clicked"); // Debug log
+  const filteredData = filterKodeData(kodeData.mutated);
+  console.log("Filtered mutated data:", filteredData); // Debug log
+  exportToExcel(filteredData, "Kode_Dimutasi", "Kode Dimutasi");
+}
+
+// Fungsi untuk menginisialisasi event handler - DIPERBAIKI
 function initializeEventHandlers() {
   // Handler untuk filter jenis barang
   $("#filterJenis").on("change", function() {
@@ -891,7 +975,6 @@ function initializeEventHandlers() {
   
   // Handler untuk pencarian
   $("#searchKode").on("input", function() {
-    // Gunakan debounce untuk mengurangi jumlah pembaruan
     clearTimeout(window.searchTimeout);
     window.searchTimeout = setTimeout(() => {
       updateKodeDisplay();
@@ -900,7 +983,27 @@ function initializeEventHandlers() {
   
   // Handler untuk tombol refresh
   $("#btnRefresh").on("click", function() {
-    loadKodeData(true); // Force refresh dari Firestore
+    loadKodeData(true);
+  });
+  
+  // Handler untuk export Excel - PINDAHKAN KE SINI
+  $("#btnExportActive").on("click", function() {
+    exportActiveKodes();
+  });
+  
+  $("#btnExportMutated").on("click", function() {
+    exportMutatedKodes();
+  });
+  
+  // Handler untuk tombol filter dan reset
+  $("#btnFilter").on("click", function() {
+    updateKodeDisplay();
+  });
+  
+  $("#btnReset").on("click", function() {
+    $("#filterJenis").val("");
+    $("#searchKode").val("");
+    updateKodeDisplay();
   });
   
   // Handler untuk tombol mutasi terpilih
@@ -938,90 +1041,74 @@ function initializeEventHandlers() {
   // Handler untuk checkbox "Pilih Semua" pada tab aktif
   $("#selectAllActive").on("change", function() {
     const isChecked = $(this).is(":checked");
-    
-    // Update semua checkbox
     $("#tableActiveKode .kode-checkbox").prop("checked", isChecked);
     
-    // Update set kode yang dipilih
     if (isChecked) {
-      // Tambahkan semua kode yang ditampilkan ke set
       const filteredActive = filterKodeData(kodeData.active);
       filteredActive.forEach(item => {
         selectedKodes.active.add(item.id);
       });
     } else {
-      // Kosongkan set
       selectedKodes.active = new Set();
     }
     
-    // Update status tombol
     updateButtonStatus("active");
   });
   
   // Handler untuk checkbox "Pilih Semua" pada tab mutasi
   $("#selectAllMutated").on("change", function() {
     const isChecked = $(this).is(":checked");
-    
-    // Update semua checkbox
     $("#tableMutatedKode .kode-checkbox").prop("checked", isChecked);
     
-    // Update set kode yang dipilih
     if (isChecked) {
-      // Tambahkan semua kode yang ditampilkan ke set
       const filteredMutated = filterKodeData(kodeData.mutated);
       filteredMutated.forEach(item => {
         selectedKodes.mutated.add(item.id);
       });
     } else {
-      // Kosongkan set
       selectedKodes.mutated = new Set();
     }
     
-    // Update status tombol
     updateButtonStatus("mutated");
   });
   
   // Handler untuk tab
   $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
-    // Reset checkbox "Pilih Semua"
     $("#selectAllActive").prop("checked", false);
     $("#selectAllMutated").prop("checked", false);
     
-    // Reset set kode yang dipilih
     selectedKodes.active = new Set();
     selectedKodes.mutated = new Set();
     
-    // Update status tombol
     updateButtonStatus("active");
     updateButtonStatus("mutated");
   });
 }
 
+
 // Inisialisasi halaman saat dokumen siap
-$(document).ready(function() {
+$(document).ready(function () {
   initializePage();
 });
 
 // Fungsi untuk menangani logout
 function handleLogout() {
   // Clear session storage
-  sessionStorage.removeItem('currentUser');
-  
+  sessionStorage.removeItem("currentUser");
+
   // Redirect ke halaman login
-  window.location.href = 'login.html';
+  window.location.href = "index.html";
 }
 
 // Fungsi untuk memeriksa status login
 async function checkLoginStatus() {
-  const user = sessionStorage.getItem('currentUser');
-  
+  const user = sessionStorage.getItem("currentUser");
+
   if (!user) {
     // Redirect ke halaman login jika tidak ada user yang login
-    window.location.href = 'login.html';
+    window.location.href = "index.html";
   }
 }
 
 // Periksa status login saat halaman dimuat
 checkLoginStatus();
-
-

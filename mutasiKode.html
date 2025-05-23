@@ -25,6 +25,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/locales/bootstrap-datepicker.id.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/pages/absensi-modern.css" />
     <!-- Favicon sederhana -->
@@ -295,7 +296,7 @@
                 aria-labelledby="active-tab"
                 tabindex="0"
               >
-                <div class="card mb-4">
+                <div class="card mb-0">
                   <div class="card-header d-flex justify-content-between align-items-center">
                     <h2>
                       <i class="fas fa-list"></i>
@@ -329,82 +330,74 @@
                         </tbody>
                       </table>
                     </div>
-                    <div class="mt-3">
+                    <div class="mt-3 mb-0">
                       <div class="d-flex justify-content-between align-items-center">
                         <div>
-                          <span id="activeCount" class="badge bg-primary">0</span>
+                          <span id="activeKodeCount" class="badge bg-primary">0</span>
                           kode aktif ditemukan
                         </div>
-                        <div>
-                          <button type="button" class="btn btn-outline-primary btn-sm" id="btnExportActive">
-                            <i class="fas fa-file-export me-2"></i>
-                            Export Excel
-                          </button>
-                        </div>
+                        <button type="button" class="btn btn-outline-success btn-sm" id="btnExportActive">
+                          <i class="fas fa-file-export me-2"></i>
+                          Export Excel
+                        </button>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
+            </div>
 
-              <!-- Mutated Codes Tab -->
-              <div
-                class="tab-pane fade"
-                id="mutated-tab-pane"
-                role="tabpanel"
-                aria-labelledby="mutated-tab"
-                tabindex="0"
-              >
-                <div class="card mb-4">
-                  <div class="card-header d-flex justify-content-between align-items-center">
-                    <h2>
-                      <i class="fas fa-list"></i>
-                      Daftar Kode Sudah Dimutasi
-                    </h2>
-                    <div>
-                      <button type="button" class="btn btn-warning me-2" id="btnRestoreSelected" disabled>
-                        <i class="fas fa-undo me-2"></i>
-                        Kembalikan Terpilih
-                      </button>
-                      <button type="button" class="btn btn-danger" id="btnDeleteSelected" disabled>
-                        <i class="fas fa-trash me-2"></i>
-                        Hapus Terpilih
-                      </button>
-                    </div>
+            <!-- Mutated Codes Tab -->
+            <div class="tab-pane fade" id="mutated-tab-pane" role="tabpanel" aria-labelledby="mutated-tab" tabindex="0">
+              <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <h2>
+                    <i class="fas fa-list"></i>
+                    Daftar Kode Sudah Dimutasi
+                  </h2>
+                  <div>
+                    <button type="button" class="btn btn-warning me-2" id="btnRestoreSelected" disabled>
+                      <i class="fas fa-undo me-2"></i>
+                      Kembalikan Terpilih
+                    </button>
+                    <button type="button" class="btn btn-danger" id="btnDeleteSelected" disabled>
+                      <i class="fas fa-trash me-2"></i>
+                      Hapus Terpilih
+                    </button>
                   </div>
-                  <div class="card-body">
-                    <div class="table-container">
-                      <table class="table table-hover" id="tableMutatedKode">
-                        <thead class="table-light">
-                          <tr>
-                            <th style="width: 5%">
-                              <input type="checkbox" class="form-check-input" id="selectAllMutated" />
-                            </th>
-                            <th style="width: 15%">Kode</th>
-                            <th style="width: 30%">Nama Barang</th>
-                            <th style="width: 15%">Kadar</th>
-                            <th style="width: 10%">Berat</th>
-                            <th style="width: 15%">Tanggal Mutasi</th>
-                            <th style="width: 10%">Aksi</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <!-- Data kode yang sudah dimutasi akan ditampilkan di sini -->
-                        </tbody>
-                      </table>
-                    </div>
-                    <div class="mt-3">
-                      <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                          <span id="mutatedCount" class="badge bg-secondary">0</span>
-                          kode sudah dimutasi
-                        </div>
-                        <div>
-                          <button type="button" class="btn btn-outline-primary btn-sm" id="btnExportMutated">
-                            <i class="fas fa-file-export me-2"></i>
-                            Export Excel
-                          </button>
-                        </div>
+                </div>
+                <div class="card-body">
+                  <div class="table-container">
+                    <table class="table table-hover" id="tableMutatedKode">
+                      <thead class="table-light">
+                        <tr>
+                          <th style="width: 5%">
+                            <input type="checkbox" class="form-check-input" id="selectAllMutated" />
+                          </th>
+                          <th style="width: 15%">Kode</th>
+                          <th style="width: 30%">Nama Barang</th>
+                          <th style="width: 15%">Kadar</th>
+                          <th style="width: 10%">Berat</th>
+                          <th style="width: 15%">Tanggal Mutasi</th>
+                          <th style="width: 10%">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <!-- Data kode yang sudah dimutasi akan ditampilkan di sini -->
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="mt-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <span id="mutatedKodeCount" class="badge bg-secondary">0</span>
+                        kode sudah dimutasi
+                      </div>
+                      <div>
+                        <button type="button" class="btn btn-outline-success btn-sm" id="btnExportMutated">
+                          <i class="fas fa-file-export me-2"></i>
+                          Export Excel
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -416,18 +409,18 @@
       </main>
     </div>
 
-    <!-- Modal Detail Kode -->
+    <!-- Modal Detail Kode - UPDATE ID -->
     <div
       class="modal fade"
-      id="modalDetailKode"
+      id="kodeDetailModal"
       tabindex="-1"
-      aria-labelledby="modalDetailKodeLabel"
+      aria-labelledby="kodeDetailModalLabel"
       aria-hidden="true"
     >
       <div class="modal-dialog modal-lg">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title" id="modalDetailKodeLabel">Detail Kode</h5>
+            <h5 class="modal-title" id="kodeDetailModalLabel">Detail Kode</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -456,8 +449,8 @@
                   <input type="text" class="form-control" id="detailTanggal" readonly />
                 </div>
                 <div class="mb-3">
-                  <label class="form-label">Status</label>
-                  <input type="text" class="form-control" id="detailStatus" readonly />
+                  <label class="form-label">Jenis Barang</label>
+                  <input type="text" class="form-control" id="detailJenis" readonly />
                 </div>
               </div>
             </div>
@@ -465,10 +458,37 @@
               <label class="form-label">Keterangan</label>
               <textarea class="form-control" id="detailKeterangan" rows="3" readonly></textarea>
             </div>
-            <div id="mutasiHistorySection">
-              <h6 class="mt-4 mb-3">Riwayat Mutasi</h6>
+
+            <!-- Container untuk informasi mutasi -->
+            <div id="mutasiInfoContainer" style="display: none">
+              <hr />
+              <h6 class="mb-3">Informasi Mutasi</h6>
+              <div class="row mb-3">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label class="form-label">Tanggal Mutasi</label>
+                    <input type="text" class="form-control" id="detailTanggalMutasi" readonly />
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label class="form-label">Status</label>
+                    <span class="badge bg-secondary">Sudah Dimutasi</span>
+                  </div>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Keterangan Mutasi</label>
+                <textarea class="form-control" id="detailKeteranganMutasi" rows="2" readonly></textarea>
+              </div>
+            </div>
+
+            <!-- Container untuk riwayat mutasi -->
+            <div id="mutasiHistoryContainer" style="display: none">
+              <hr />
+              <h6 class="mb-3">Riwayat Mutasi</h6>
               <div class="table-responsive">
-                <table class="table table-sm" id="tableMutasiHistory">
+                <table class="table table-sm">
                   <thead>
                     <tr>
                       <th>Tanggal</th>
@@ -476,8 +496,8 @@
                       <th>Keterangan</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    <!-- Riwayat mutasi akan ditampilkan di sini -->
+                  <tbody id="mutasiHistoryTableBody">
+                    <!-- Riwayat mutasi akan ditampilkan di sini oleh JavaScript -->
                   </tbody>
                 </table>
               </div>
@@ -491,40 +511,40 @@
     </div>
 
     <!-- Modal Mutasi Kode -->
-    <div
-      class="modal fade"
-      id="modalMutasiKode"
-      tabindex="-1"
-      aria-labelledby="modalMutasiKodeLabel"
-      aria-hidden="true"
-    >
+    <div class="modal fade" id="mutasiModal" tabindex="-1" aria-labelledby="mutasiModalLabel" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title" id="modalMutasiKodeLabel">Mutasi Kode</h5>
+            <h5 class="modal-title" id="mutasiModalLabel">Mutasi Kode</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
-          <div class="modal-body">
-            <div class="mb-3">
-              <label for="mutasiKeterangan" class="form-label">Keterangan Mutasi</label>
-              <textarea
-                class="form-control"
-                id="mutasiKeterangan"
-                rows="3"
-                placeholder="Masukkan keterangan mutasi"
-              ></textarea>
+          <form id="mutasiForm">
+            <div class="modal-body">
+              <div class="mb-3">
+                <label for="tanggalMutasi" class="form-label">Tanggal Mutasi</label>
+                <input type="text" class="form-control" id="tanggalMutasi" readonly />
+              </div>
+              <div class="mb-3">
+                <label for="keteranganMutasi" class="form-label">Keterangan Mutasi</label>
+                <textarea
+                  class="form-control"
+                  id="keteranganMutasi"
+                  rows="3"
+                  placeholder="Masukkan keterangan mutasi"
+                ></textarea>
+              </div>
+              <div id="selectedKodeList" class="mb-3">
+                <label class="form-label">Kode yang akan dimutasi:</label>
+                <ul class="list-group">
+                  <!-- Daftar kode yang akan dimutasi -->
+                </ul>
+              </div>
             </div>
-            <div id="mutasiKodeList" class="mb-3">
-              <label class="form-label">Kode yang akan dimutasi:</label>
-              <ul class="list-group">
-                <!-- Daftar kode yang akan dimutasi -->
-              </ul>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+              <button type="button" class="btn btn-primary" id="btnSaveMutasi">Konfirmasi Mutasi</button>
             </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-            <button type="button" class="btn btn-primary" id="btnConfirmMutasi">Konfirmasi Mutasi</button>
-          </div>
+          </form>
         </div>
       </div>
     </div>

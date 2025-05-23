@@ -605,7 +605,7 @@ document.getElementById('simpan-kurang-batu').addEventListener('click', function
 // Function to handle logout
 function handleLogout() {
     // Clear session or perform logout actions
-    window.location.href = 'login.html';
+    window.location.href = 'index.html';
 }
 
 // Setup real-time listener for critical updates

@@ -1,585 +1,579 @@
 // Import Firebase modules
 import {
-    collection,
-    query,
-    where,
-    getDocs,
-    orderBy,
-    doc,
-    getDoc,
-    Timestamp,
-    serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
-  import { firestore } from "./configFirebase.js";
-  
-  // Utility functions
-  const formatRupiah = (angka) => {
-    if (!angka && angka !== 0) return "0";
-    const number = typeof angka === "string" ? parseInt(angka) : angka;
-    return new Intl.NumberFormat("id-ID").format(number);
-  };
-  
-  const parseDate = (dateString) => {
-    if (!dateString) return null;
-    const parts = dateString.split("/");
-    return new Date(parts[2], parts[1] - 1, parts[0]);
-  };
-  
-  const formatDate = (date) => {
-    if (!date) return "";
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
-  
-  // Main handler object
-  const laporanStokHandler = {
-    // Data properties
-    stockData: [],
-    filteredStockData: [],
-    
-    // Cache properties
-    cache: {},
-  
-    // Initialize the module
-    init() {
-      this.initDatePickers();
-      this.attachEventListeners();
-      this.setDefaultDates();
-      this.initDataTable();
-      this.prepareEmptyTable();
-    },
-  
-    // Initialize date pickers
-    initDatePickers() {
-      $(".datepicker").datepicker({
-        format: "dd/mm/yyyy",
-        autoclose: true,
-        language: "id",
-        todayHighlight: true,
-      });
-    },
-  
-    // Set default dates (current month)
-    setDefaultDates() {
-      const today = new Date();
-      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-      
-      document.getElementById("startDate").value = formatDate(firstDay);
-      document.getElementById("endDate").value = formatDate(today);
-    },
-  
-    // Initialize DataTable
-    initDataTable() {
-      $("#stockTable").DataTable({
-        responsive: true,
-        language: {
-          search: "Cari:",
-          lengthMenu: "Tampilkan _MENU_ data",
-          info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",
-          infoEmpty: "Menampilkan 0 sampai 0 dari 0 data",
-          infoFiltered: "(disaring dari _MAX_ total data)",
-          paginate: {
-            first: "Pertama",
-            last: "Terakhir",
-            next: "Selanjutnya",
-            previous: "Sebelumnya",
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+  doc,
+  getDoc,
+  Timestamp,
+  serverTimestamp,
+} from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+import { firestore } from "./configFirebase.js";
+
+// Utility functions
+const formatRupiah = (angka) => {
+  if (!angka && angka !== 0) return "0";
+  const number = typeof angka === "string" ? parseInt(angka) : angka;
+  return new Intl.NumberFormat("id-ID").format(number);
+};
+
+const parseDate = (dateString) => {
+  if (!dateString) return null;
+  const parts = dateString.split("/");
+  return new Date(parts[2], parts[1] - 1, parts[0]);
+};
+
+const formatDate = (date) => {
+  if (!date) return "";
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
+// Main handler object
+const laporanStokHandler = {
+  // Data properties
+  stockData: [],
+  filteredStockData: [],
+
+  // Cache properties
+  cache: {},
+
+  // Initialize the module
+  init() {
+    this.initDatePickers();
+    this.attachEventListeners();
+    this.setDefaultDates();
+    this.initDataTable();
+    this.prepareEmptyTable();
+  },
+
+  // Initialize date pickers
+  initDatePickers() {
+    $(".datepicker").datepicker({
+      format: "dd/mm/yyyy",
+      autoclose: true,
+      language: "id",
+      todayHighlight: true,
+    });
+  },
+
+  // Set default dates (current month)
+  setDefaultDates() {
+    const today = new Date();
+
+    document.getElementById("startDate").value = formatDate(today);
+    document.getElementById("endDate").value = formatDate(today);
+  },
+  // Initialize DataTable
+  initDataTable() {
+    $("#stockTable").DataTable({
+      responsive: true,
+      language: {
+        search: "Cari:",
+        lengthMenu: "Tampilkan _MENU_ data",
+        info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",
+        infoEmpty: "Menampilkan 0 sampai 0 dari 0 data",
+        infoFiltered: "(disaring dari _MAX_ total data)",
+        paginate: {
+          first: "Pertama",
+          last: "Terakhir",
+          next: "Selanjutnya",
+          previous: "Sebelumnya",
+        },
+      },
+      dom: "Bfrtip",
+      buttons: [
+        {
+          extend: "excel",
+          text: '<i class="fas fa-file-excel me-2"></i>Excel',
+          className: "btn btn-success btn-sm me-1",
+          exportOptions: {
+            columns: ":visible",
+          },
+          title: "Laporan Stok",
+        },
+        {
+          extend: "pdf",
+          text: '<i class="fas fa-file-pdf me-2"></i>PDF',
+          className: "btn btn-danger btn-sm me-1",
+          exportOptions: {
+            columns: ":visible",
+          },
+          title: "Laporan Stok",
+          customize: function (doc) {
+            doc.defaultStyle.fontSize = 8;
+            doc.styles.tableHeader.fontSize = 9;
           },
         },
-        dom: "Bfrtip",
-        buttons: [
-          {
-            extend: "excel",
-            text: '<i class="fas fa-file-excel me-2"></i>Excel',
-            className: "btn btn-success btn-sm me-1",
-            exportOptions: {
-              columns: ":visible",
-            },
-            title: "Laporan Stok",
+        {
+          extend: "print",
+          text: '<i class="fas fa-print me-2"></i>Print',
+          className: "btn btn-primary btn-sm",
+          exportOptions: {
+            columns: ":visible",
           },
-          {
-            extend: "pdf",
-            text: '<i class="fas fa-file-pdf me-2"></i>PDF',
-            className: "btn btn-danger btn-sm me-1",
-            exportOptions: {
-              columns: ":visible",
-            },
-            title: "Laporan Stok",
-            customize: function(doc) {
-              doc.defaultStyle.fontSize = 8;
-              doc.styles.tableHeader.fontSize = 9;
-            }
-          },
-          {
-            extend: "print",
-            text: '<i class="fas fa-print me-2"></i>Print',
-            className: "btn btn-primary btn-sm",
-            exportOptions: {
-              columns: ":visible",
-            },
-            title: "Laporan Stok",
-          },
-        ],
-      });
-    },
-  
-    // Prepare empty table
-    prepareEmptyTable() {
-      const tableBody = document.querySelector("#stockTable tbody");
-      if (tableBody) {
-        tableBody.innerHTML = `
+          title: "Laporan Stok",
+        },
+      ],
+    });
+  },
+
+  // Prepare empty table
+  prepareEmptyTable() {
+    const tableBody = document.querySelector("#stockTable tbody");
+    if (tableBody) {
+      tableBody.innerHTML = `
           <tr>
             <td colspan="9" class="text-center">Silakan pilih filter dan klik tombol "Tampilkan" untuk melihat data</td>
           </tr>
         `;
+    }
+  },
+
+  // Attach event listeners
+  attachEventListeners() {
+    // Filter button
+    const filterBtn = document.getElementById("filterStockBtn");
+    if (filterBtn) {
+      filterBtn.addEventListener("click", () => {
+        this.loadAndFilterStockData();
+      });
+    }
+
+    // Reset filter button
+    const resetBtn = document.getElementById("resetStockFilterBtn");
+    if (resetBtn) {
+      resetBtn.addEventListener("click", () => {
+        this.resetFilters();
+      });
+    }
+  },
+
+  // Reset filters
+  resetFilters() {
+    const today = new Date();
+
+    document.getElementById("startDate").value = formatDate(today);
+    document.getElementById("endDate").value = formatDate(today);
+
+    this.loadAndFilterStockData();
+  },
+
+  // Load and filter stock data
+  async loadAndFilterStockData() {
+    try {
+      this.showLoading(true);
+
+      // Get filter values
+      const startDateStr = document.getElementById("startDate").value;
+      const endDateStr = document.getElementById("endDate").value;
+
+      // Validate dates
+      if (!startDateStr || !endDateStr) {
+        this.showError("Tanggal awal dan akhir harus diisi");
+        this.showLoading(false);
+        return;
       }
-    },
-  
-    // Attach event listeners
-    attachEventListeners() {
-      // Filter button
-      const filterBtn = document.getElementById("filterStockBtn");
-      if (filterBtn) {
-        filterBtn.addEventListener("click", () => {
-          this.loadAndFilterStockData();
-        });
+
+      const startDate = parseDate(startDateStr);
+      const endDate = parseDate(endDateStr);
+
+      if (!startDate || !endDate) {
+        this.showError("Format tanggal tidak valid");
+        this.showLoading(false);
+        return;
       }
-  
-      // Reset filter button
-      const resetBtn = document.getElementById("resetStockFilterBtn");
-      if (resetBtn) {
-        resetBtn.addEventListener("click", () => {
-          this.resetFilters();
-        });
-      }
-    },
-  
-    // Reset filters
-    resetFilters() {
-      const today = new Date();
-      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-      
-      document.getElementById("startDate").value = formatDate(firstDay);
-      document.getElementById("endDate").value = formatDate(today);
-      
-      this.loadAndFilterStockData();
-    },
-  
-    // Load and filter stock data
-    async loadAndFilterStockData() {
-      try {
-        this.showLoading(true);
-        
-        // Get filter values
-        const startDateStr = document.getElementById("startDate").value;
-        const endDateStr = document.getElementById("endDate").value;
-        
-        // Validate dates
-        if (!startDateStr || !endDateStr) {
-          this.showError("Tanggal awal dan akhir harus diisi");
-          this.showLoading(false);
-          return;
-        }
-        
-        const startDate = parseDate(startDateStr);
-        const endDate = parseDate(endDateStr);
-        
-        if (!startDate || !endDate) {
-          this.showError("Format tanggal tidak valid");
-          this.showLoading(false);
-          return;
-        }
-        
-        // Add time to end date to include the whole day
-        endDate.setHours(23, 59, 59, 999);
-        
-        // Check cache
-        const cacheKey = `stock_${startDateStr}_${endDateStr}`;
-        if (this.cache[cacheKey] && this.cache[cacheKey].data) {
-          console.log("Using cached stock data");
-          this.filteredStockData = [...this.cache[cacheKey].data];
-          this.renderStockTable();
-          this.showLoading(false);
-          return;
-        }
-        
-        // Load stock data
-        await this.loadStockData();
-        
-        // Calculate stock continuity
-        await this.calculateStockContinuity(startDate, endDate);
-        
-        // Cache the result
-        this.cache[cacheKey] = {
-          data: [...this.filteredStockData],
-          lastFetched: new Date().getTime()
-        };
-        
-        // Render table
+
+      // Add time to end date to include the whole day
+      endDate.setHours(23, 59, 59, 999);
+
+      // Check cache
+      const cacheKey = `stock_${startDateStr}_${endDateStr}`;
+      if (this.cache[cacheKey] && this.cache[cacheKey].data) {
+        console.log("Using cached stock data");
+        this.filteredStockData = [...this.cache[cacheKey].data];
         this.renderStockTable();
-        
         this.showLoading(false);
-      } catch (error) {
-        console.error("Error loading and filtering stock data:", error);
-        this.showError("Terjadi kesalahan saat memuat data: " + error.message);
-        this.showLoading(false);
+        return;
       }
-    },
-  
-    // Load stock data
-    async loadStockData() {
-      try {
-        // Get stock data from Firestore
-        const stockRef = collection(firestore, "stokAksesoris");
-        const stockSnapshot = await getDocs(stockRef);
-        
-        this.stockData = [];
-        stockSnapshot.forEach((doc) => {
-          const data = doc.data();
+
+      // Load stock data
+      await this.loadStockData();
+
+      // Calculate stock continuity
+      await this.calculateStockContinuity(startDate, endDate);
+
+      // Cache the result
+      this.cache[cacheKey] = {
+        data: [...this.filteredStockData],
+        lastFetched: new Date().getTime(),
+      };
+
+      // Render table
+      this.renderStockTable();
+
+      this.showLoading(false);
+    } catch (error) {
+      console.error("Error loading and filtering stock data:", error);
+      this.showError("Terjadi kesalahan saat memuat data: " + error.message);
+      this.showLoading(false);
+    }
+  },
+
+  // Load stock data
+  async loadStockData() {
+    try {
+      // Get stock data from Firestore
+      const stockRef = collection(firestore, "stokAksesoris");
+      const stockSnapshot = await getDocs(stockRef);
+
+      this.stockData = [];
+      stockSnapshot.forEach((doc) => {
+        const data = doc.data();
+        this.stockData.push({
+          id: doc.id,
+          ...data,
+        });
+      });
+
+      // Load all kode aksesoris
+      await this.loadAllKodeAksesoris();
+
+      return Promise.resolve();
+    } catch (error) {
+      console.error("Error loading stock data:", error);
+      return Promise.reject(error);
+    }
+  },
+
+  // Load all kode aksesoris
+  async loadAllKodeAksesoris() {
+    try {
+      // Get kotak data
+      const kotakSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "kotak"));
+
+      // Get aksesoris data
+      const aksesorisSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "aksesoris"));
+
+      // Process kotak data
+      kotakSnapshot.forEach((doc) => {
+        const data = doc.data();
+        const existingIndex = this.stockData.findIndex((item) => item.kode === data.text);
+
+        if (existingIndex === -1) {
           this.stockData.push({
-            id: doc.id,
-            ...data
+            id: null,
+            kode: data.text,
+            nama: data.nama,
+            kategori: "kotak",
+            stokAwal: 0,
+            tambahStok: 0,
+            laku: 0,
+            free: 0,
+            gantiLock: 0,
+            stokAkhir: 0,
+            lastUpdate: new Date(),
           });
-        });
-        
-        // Load all kode aksesoris
-        await this.loadAllKodeAksesoris();
-        
-        return Promise.resolve();
-      } catch (error) {
-        console.error("Error loading stock data:", error);
-        return Promise.reject(error);
-      }
-    },
-  
-    // Load all kode aksesoris
-    async loadAllKodeAksesoris() {
-      try {
-        // Get kotak data
-        const kotakSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "kotak"));
-        
-        // Get aksesoris data
-        const aksesorisSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "aksesoris"));
-        
-        // Process kotak data
-        kotakSnapshot.forEach((doc) => {
-          const data = doc.data();
-          const existingIndex = this.stockData.findIndex((item) => item.kode === data.text);
-          
-          if (existingIndex === -1) {
-            this.stockData.push({
-              id: null,
-              kode: data.text,
-              nama: data.nama,
-              kategori: "kotak",
-              stokAwal: 0,
-              tambahStok: 0,
-              laku: 0,
-              free: 0,
-              gantiLock: 0,
-              stokAkhir: 0,
-              lastUpdate: new Date()
-            });
-          } else {
-            this.stockData[existingIndex].kategori = "kotak";
-          }
-        });
-        
-        // Process aksesoris data
-        aksesorisSnapshot.forEach((doc) => {
-          const data = doc.data();
-          const existingIndex = this.stockData.findIndex((item) => item.kode === data.text);
-          
-          if (existingIndex === -1) {
-            this.stockData.push({
-              id: null,
-              kode: data.text,
-              nama: data.nama,
-              kategori: "aksesoris",
-              stokAwal: 0,
-              tambahStok: 0,
-              laku: 0,
-              free: 0,
-              gantiLock: 0,
-              stokAkhir: 0,
-              lastUpdate: new Date()
-            });
-          } else {
-            this.stockData[existingIndex].kategori = "aksesoris";
-          }
-        });
-      } catch (error) {
-        console.error("Error loading kode aksesoris:", error);
-        throw error;
-      }
-    },
-  
-    // Calculate stock continuity
-    async calculateStockContinuity(startDate, endDate) {
-      try {
-        // Create day before start date
-        const previousDay = new Date(startDate);
-        previousDay.setDate(previousDay.getDate() - 1);
-        previousDay.setHours(23, 59, 59, 999);
-        
-        // Get stock transactions
-        const stockTransactionsRef = collection(firestore, "stokAksesorisTransaksi");
-        const transactionsQuery = query(
-          stockTransactionsRef,
-          where("timestamp", "<=", Timestamp.fromDate(endDate)),
-          orderBy("timestamp", "asc")
-        );
-        
-        const transactionsSnapshot = await getDocs(transactionsQuery);
-        
-        // Map to store stock data by code
-        const stockByCode = {};
-        
-        // Process all transactions
-        transactionsSnapshot.forEach((doc) => {
-          const transaction = doc.data();
-          const kode = transaction.kode;
-          const timestamp = transaction.timestamp.toDate();
-          
-          if (!kode) return;
-          
-          if (!stockByCode[kode]) {
-            stockByCode[kode] = {
-              before: {
-                stokAwal: 0,
-                tambahStok: 0,
-                laku: 0,
-                free: 0,
-                gantiLock: 0
-              },
-              during: {
-                tambahStok: 0,
-                laku: 0,
-                free: 0,
-                gantiLock: 0
-              },
-              nama: transaction.nama || "",
-              kategori: transaction.kategori || ""
-            };
-          }
-          
-          // Determine if transaction is before or during the selected period
-          const isPeriodBefore = timestamp <= previousDay;
-          const isPeriodDuring = timestamp > previousDay && timestamp <= endDate;
-          
-          // Update data based on transaction type and period
-          if (isPeriodBefore) {
-            switch (transaction.jenis) {
-              case "stokAwal":
-                stockByCode[kode].before.stokAwal = transaction.jumlah || 0;
-                break;
-              case "tambah":
-                stockByCode[kode].before.tambahStok += transaction.jumlah || 0;
-                break;
-              case "laku":
-                stockByCode[kode].before.laku += transaction.jumlah || 0;
-                break;
-              case "free":
-                stockByCode[kode].before.free += transaction.jumlah || 0;
-                break;
-              case "gantiLock":
-                stockByCode[kode].before.gantiLock += transaction.jumlah || 0;
-                break;
-            }
-          } else if (isPeriodDuring) {
-            switch (transaction.jenis) {
-              case "tambah":
-                stockByCode[kode].during.tambahStok += transaction.jumlah || 0;
-                break;
-              case "laku":
-                stockByCode[kode].during.laku += transaction.jumlah || 0;
-                break;
-              case "free":
-                stockByCode[kode].during.free += transaction.jumlah || 0;
-                break;
-              case "gantiLock":
-                stockByCode[kode].during.gantiLock += transaction.jumlah || 0;
-                break;
-            }
-          }
-        });
-        
-        // Get additional stock data from stockAdditions if any
-        const stockAddRef = collection(firestore, "stockAdditions");
-        const stockAddSnapshot = await getDocs(stockAddRef);
-        
-        stockAddSnapshot.forEach((doc) => {
-          const data = doc.data();
-          if (!data.timestamp) return;
-          
-          const timestamp = data.timestamp.toDate();
-          
-          if (data.items && data.items.length) {
-            data.items.forEach((item) => {
-              const kode = item.kodeText;
-              if (!kode) return;
-              
-              const quantity = parseInt(item.jumlah) || 0;
-              
-              if (!stockByCode[kode]) {
-                stockByCode[kode] = {
-                  before: {
-                    stokAwal: 0,
-                    tambahStok: 0,
-                    laku: 0,
-                    free: 0,
-                    gantiLock: 0
-                  },
-                  during: {
-                    tambahStok: 0,
-                    laku: 0,
-                    free: 0,
-                    gantiLock: 0
-                  },
-                  nama: item.nama || "",
-                  kategori: ""
-                };
-              }
-              
-              // Categorize based on date
-              if (timestamp <= previousDay) {
-                stockByCode[kode].before.tambahStok += quantity;
-            } else if (timestamp <= endDate) {
-                stockByCode[kode].during.tambahStok += quantity;
-              }
-            });
-          }
-        });
-        
-        // Create stock data with correct continuity
-        this.filteredStockData = this.stockData.map((item) => {
-          const kode = item.kode;
-          const stockInfo = stockByCode[kode] || {
+        } else {
+          this.stockData[existingIndex].kategori = "kotak";
+        }
+      });
+
+      // Process aksesoris data
+      aksesorisSnapshot.forEach((doc) => {
+        const data = doc.data();
+        const existingIndex = this.stockData.findIndex((item) => item.kode === data.text);
+
+        if (existingIndex === -1) {
+          this.stockData.push({
+            id: null,
+            kode: data.text,
+            nama: data.nama,
+            kategori: "aksesoris",
+            stokAwal: 0,
+            tambahStok: 0,
+            laku: 0,
+            free: 0,
+            gantiLock: 0,
+            stokAkhir: 0,
+            lastUpdate: new Date(),
+          });
+        } else {
+          this.stockData[existingIndex].kategori = "aksesoris";
+        }
+      });
+    } catch (error) {
+      console.error("Error loading kode aksesoris:", error);
+      throw error;
+    }
+  },
+
+  // Calculate stock continuity
+  async calculateStockContinuity(startDate, endDate) {
+    try {
+      // Create day before start date
+      const previousDay = new Date(startDate);
+      previousDay.setDate(previousDay.getDate() - 1);
+      previousDay.setHours(23, 59, 59, 999);
+
+      // Get stock transactions
+      const stockTransactionsRef = collection(firestore, "stokAksesorisTransaksi");
+      const transactionsQuery = query(
+        stockTransactionsRef,
+        where("timestamp", "<=", Timestamp.fromDate(endDate)),
+        orderBy("timestamp", "asc")
+      );
+
+      const transactionsSnapshot = await getDocs(transactionsQuery);
+
+      // Map to store stock data by code
+      const stockByCode = {};
+
+      // Process all transactions
+      transactionsSnapshot.forEach((doc) => {
+        const transaction = doc.data();
+        const kode = transaction.kode;
+        const timestamp = transaction.timestamp.toDate();
+
+        if (!kode) return;
+
+        if (!stockByCode[kode]) {
+          stockByCode[kode] = {
             before: {
               stokAwal: 0,
               tambahStok: 0,
               laku: 0,
               free: 0,
-              gantiLock: 0
+              gantiLock: 0,
             },
             during: {
               tambahStok: 0,
               laku: 0,
               free: 0,
-              gantiLock: 0
+              gantiLock: 0,
+            },
+            nama: transaction.nama || "",
+            kategori: transaction.kategori || "",
+          };
+        }
+
+        // Determine if transaction is before or during the selected period
+        const isPeriodBefore = timestamp <= previousDay;
+        const isPeriodDuring = timestamp > previousDay && timestamp <= endDate;
+
+        // Update data based on transaction type and period
+        if (isPeriodBefore) {
+          switch (transaction.jenis) {
+            case "stokAwal":
+              stockByCode[kode].before.stokAwal = transaction.jumlah || 0;
+              break;
+            case "tambah":
+              stockByCode[kode].before.tambahStok += transaction.jumlah || 0;
+              break;
+            case "laku":
+              stockByCode[kode].before.laku += transaction.jumlah || 0;
+              break;
+            case "free":
+              stockByCode[kode].before.free += transaction.jumlah || 0;
+              break;
+            case "gantiLock":
+              stockByCode[kode].before.gantiLock += transaction.jumlah || 0;
+              break;
+          }
+        } else if (isPeriodDuring) {
+          switch (transaction.jenis) {
+            case "tambah":
+              stockByCode[kode].during.tambahStok += transaction.jumlah || 0;
+              break;
+            case "laku":
+              stockByCode[kode].during.laku += transaction.jumlah || 0;
+              break;
+            case "free":
+              stockByCode[kode].during.free += transaction.jumlah || 0;
+              break;
+            case "gantiLock":
+              stockByCode[kode].during.gantiLock += transaction.jumlah || 0;
+              break;
+          }
+        }
+      });
+
+      // Get additional stock data from stockAdditions if any
+      const stockAddRef = collection(firestore, "stockAdditions");
+      const stockAddSnapshot = await getDocs(stockAddRef);
+
+      stockAddSnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (!data.timestamp) return;
+
+        const timestamp = data.timestamp.toDate();
+
+        if (data.items && data.items.length) {
+          data.items.forEach((item) => {
+            const kode = item.kodeText;
+            if (!kode) return;
+
+            const quantity = parseInt(item.jumlah) || 0;
+
+            if (!stockByCode[kode]) {
+              stockByCode[kode] = {
+                before: {
+                  stokAwal: 0,
+                  tambahStok: 0,
+                  laku: 0,
+                  free: 0,
+                  gantiLock: 0,
+                },
+                during: {
+                  tambahStok: 0,
+                  laku: 0,
+                  free: 0,
+                  gantiLock: 0,
+                },
+                nama: item.nama || "",
+                kategori: "",
+              };
             }
-          };
-          
-          // Calculate initial stock (end stock from previous period)
-          const initialStock = 
-            stockInfo.before.stokAwal + 
-            stockInfo.before.tambahStok - 
-            stockInfo.before.laku - 
-            stockInfo.before.free - 
-            stockInfo.before.gantiLock;
-          
-          // Calculate final stock
-          const finalStock = 
-            Math.max(0, initialStock) + 
-            stockInfo.during.tambahStok - 
-            stockInfo.during.laku - 
-            stockInfo.during.free - 
-            stockInfo.during.gantiLock;
-          
-          // Create stock object with correct continuity
-          return {
-            ...item,
-            stokAwal: Math.max(0, initialStock),
-            tambahStok: stockInfo.during.tambahStok,
-            laku: stockInfo.during.laku,
-            free: stockInfo.during.free,
-            gantiLock: stockInfo.during.gantiLock,
-            stokAkhir: Math.max(0, finalStock)
-          };
-        });
-        
-        // Sort by category then by code
-        this.filteredStockData.sort((a, b) => {
-          // Prioritize category
-          if ((a.kategori || "unknown") !== (b.kategori || "unknown")) {
-            return (a.kategori || "unknown") === "kotak" ? -1 : 1;
-          }
-          
-          // If category is the same, sort by code
-          return (a.kode || "").localeCompare(b.kode || "");
-        });
-      } catch (error) {
-        console.error("Error calculating stock continuity:", error);
-        throw error;
+
+            // Categorize based on date
+            if (timestamp <= previousDay) {
+              stockByCode[kode].before.tambahStok += quantity;
+            } else if (timestamp <= endDate) {
+              stockByCode[kode].during.tambahStok += quantity;
+            }
+          });
+        }
+      });
+
+      // Create stock data with correct continuity
+      this.filteredStockData = this.stockData.map((item) => {
+        const kode = item.kode;
+        const stockInfo = stockByCode[kode] || {
+          before: {
+            stokAwal: 0,
+            tambahStok: 0,
+            laku: 0,
+            free: 0,
+            gantiLock: 0,
+          },
+          during: {
+            tambahStok: 0,
+            laku: 0,
+            free: 0,
+            gantiLock: 0,
+          },
+        };
+
+        // Calculate initial stock (end stock from previous period)
+        const initialStock =
+          stockInfo.before.stokAwal +
+          stockInfo.before.tambahStok -
+          stockInfo.before.laku -
+          stockInfo.before.free -
+          stockInfo.before.gantiLock;
+
+        // Calculate final stock
+        const finalStock =
+          Math.max(0, initialStock) +
+          stockInfo.during.tambahStok -
+          stockInfo.during.laku -
+          stockInfo.during.free -
+          stockInfo.during.gantiLock;
+
+        // Create stock object with correct continuity
+        return {
+          ...item,
+          stokAwal: Math.max(0, initialStock),
+          tambahStok: stockInfo.during.tambahStok,
+          laku: stockInfo.during.laku,
+          free: stockInfo.during.free,
+          gantiLock: stockInfo.during.gantiLock,
+          stokAkhir: Math.max(0, finalStock),
+        };
+      });
+
+      // Sort by category then by code
+      this.filteredStockData.sort((a, b) => {
+        // Prioritize category
+        if ((a.kategori || "unknown") !== (b.kategori || "unknown")) {
+          return (a.kategori || "unknown") === "kotak" ? -1 : 1;
+        }
+
+        // If category is the same, sort by code
+        return (a.kode || "").localeCompare(b.kode || "");
+      });
+    } catch (error) {
+      console.error("Error calculating stock continuity:", error);
+      throw error;
+    }
+  },
+
+  // Render stock table
+  renderStockTable() {
+    try {
+      // Check if table exists
+      const tableElement = document.getElementById("stockTable");
+      if (!tableElement) {
+        console.error("Table element #stockTable not found");
+        return;
       }
-    },
-  
-    // Render stock table
-    renderStockTable() {
+
+      // Safely destroy DataTable if it exists
       try {
-        // Check if table exists
-        const tableElement = document.getElementById("stockTable");
-        if (!tableElement) {
-          console.error("Table element #stockTable not found");
-          return;
+        if ($.fn.DataTable.isDataTable("#stockTable")) {
+          $("#stockTable").DataTable().destroy();
         }
-        
-        // Safely destroy DataTable if it exists
-        try {
-          if ($.fn.DataTable.isDataTable("#stockTable")) {
-            $("#stockTable").DataTable().destroy();
-          }
-        } catch (error) {
-          console.warn("Error destroying DataTable:", error);
-        }
-        
-        // Get table body
-        const tableBody = document.querySelector("#stockTable tbody");
-        if (!tableBody) {
-          console.error("Table body not found");
-          return;
-        }
-        
-        // Check if there's data to display
-        if (!this.filteredStockData || this.filteredStockData.length === 0) {
-          tableBody.innerHTML = `
+      } catch (error) {
+        console.warn("Error destroying DataTable:", error);
+      }
+
+      // Get table body
+      const tableBody = document.querySelector("#stockTable tbody");
+      if (!tableBody) {
+        console.error("Table body not found");
+        return;
+      }
+
+      // Check if there's data to display
+      if (!this.filteredStockData || this.filteredStockData.length === 0) {
+        tableBody.innerHTML = `
             <tr>
               <td colspan="9" class="text-center">Tidak ada data yang sesuai dengan filter</td>
             </tr>
           `;
-          
-          // Initialize empty DataTable
-          $("#stockTable").DataTable({
-            responsive: true,
-            language: {
-              emptyTable: "Tidak ada data yang tersedia"
-            }
-          });
-          
-          return;
-        }
-        
-        // Group data by category
-        const kotakItems = this.filteredStockData.filter(item => item.kategori === "kotak");
-        const aksesorisItems = this.filteredStockData.filter(item => item.kategori === "aksesoris");
-        const otherItems = this.filteredStockData.filter(item => 
-          item.kategori !== "kotak" && item.kategori !== "aksesoris"
-        );
-        
-        // Create HTML for table
-        let html = "";
-        let rowIndex = 1;
-        
-        // Add all items
-        [...kotakItems, ...aksesorisItems, ...otherItems].forEach(item => {
-          const categoryClass = item.kategori === "kotak" 
-            ? "kotak-item" 
-            : item.kategori === "aksesoris" 
-              ? "aksesoris-item" 
-              : "other-item";
-          
-          html += `
+
+        // Initialize empty DataTable
+        $("#stockTable").DataTable({
+          responsive: true,
+          language: {
+            emptyTable: "Tidak ada data yang tersedia",
+          },
+        });
+
+        return;
+      }
+
+      // Group data by category
+      const kotakItems = this.filteredStockData.filter((item) => item.kategori === "kotak");
+      const aksesorisItems = this.filteredStockData.filter((item) => item.kategori === "aksesoris");
+      const otherItems = this.filteredStockData.filter(
+        (item) => item.kategori !== "kotak" && item.kategori !== "aksesoris"
+      );
+
+      // Create HTML for table
+      let html = "";
+      let rowIndex = 1;
+
+      // Add all items
+      [...kotakItems, ...aksesorisItems, ...otherItems].forEach((item) => {
+        const categoryClass =
+          item.kategori === "kotak" ? "kotak-item" : item.kategori === "aksesoris" ? "aksesoris-item" : "other-item";
+
+        html += `
             <tr class="${categoryClass}">
               <td class="text-center">${rowIndex++}</td>
               <td class="text-center">${item.kode || "-"}</td>
@@ -592,27 +586,27 @@ import {
               <td class="text-center">${item.stokAkhir || 0}</td>
             </tr>
           `;
-        });
-        
-        // Set table body HTML
-        if (html.trim() === "") {
-          tableBody.innerHTML = `
+      });
+
+      // Set table body HTML
+      if (html.trim() === "") {
+        tableBody.innerHTML = `
             <tr>
               <td colspan="9" class="text-center">Tidak ada data yang valid untuk ditampilkan</td>
             </tr>
           `;
-        } else {
-          tableBody.innerHTML = html;
-        }
-        
-        // Get current date for title
-        const today = new Date();
-        const formattedDate = formatDate(today);
-        
-        // Add CSS for text wrapping and equal column widths
-        const styleElement = document.createElement("style");
-        styleElement.id = "stockTableStyle";
-        styleElement.textContent = `
+      } else {
+        tableBody.innerHTML = html;
+      }
+
+      // Get current date for title
+      const today = new Date();
+      const formattedDate = formatDate(today);
+
+      // Add CSS for text wrapping and equal column widths
+      const styleElement = document.createElement("style");
+      styleElement.id = "stockTableStyle";
+      styleElement.textContent = `
           #stockTable th, #stockTable td {
             white-space: normal;
             word-wrap: break-word;
@@ -638,65 +632,64 @@ import {
             }
           }
         `;
-        document.head.appendChild(styleElement);
-        
-        // Initialize DataTable with export buttons
-        $("#stockTable").DataTable({
-          responsive: true,
-          dom: "Bfrtip",
-          ordering: false,
-          autoWidth: false,
-          buttons: [
-            {
-              extend: "excel",
-              text: '<i class="fas fa-file-excel me-2"></i>Excel',
-              className: "btn btn-success btn-sm me-1",
-              exportOptions: {
-                columns: ":visible"
-              },
-              title: `Laporan Stok (${formattedDate})`,
-              customize: function(xlsx) {
-                var sheet = xlsx.xl.worksheets["sheet1.xml"];
-                $('row c[r^="C"]', sheet).attr("s", "55"); // Nama column - wider with wrap text
-                $("row:not(:first-child) c", sheet).attr("s", "55");
-              }
+      document.head.appendChild(styleElement);
+
+      // Initialize DataTable with export buttons
+      $("#stockTable").DataTable({
+        responsive: true,
+        dom: "Bfrtip",
+        ordering: false,
+        autoWidth: false,
+        buttons: [
+          {
+            extend: "excel",
+            text: '<i class="fas fa-file-excel me-2"></i>Excel',
+            className: "btn btn-success btn-sm me-1",
+            exportOptions: {
+              columns: ":visible",
             },
-            {
-              extend: "pdf",
-              text: '<i class="fas fa-file-pdf me-2"></i>PDF',
-              className: "btn btn-danger btn-sm me-1",
-              exportOptions: {
-                columns: ":visible"
-              },
-              title: `Laporan Stok (${formattedDate})`,
-              customize: function(doc) {
-                doc.defaultStyle.fontSize = 8;
-                doc.styles.tableHeader.fontSize = 9;
-                doc.content[1].table.widths = [
-                  "5%", "10%", "35%", "8.33%", "8.33%", "8.33%", "8.33%", "8.33%", "8.33%"
-                ];
-                doc.styles.tableHeader.alignment = "center";
-                doc.styles.tableBodyEven.alignment = "center";
-                doc.styles.tableBodyOdd.alignment = "center";
-                doc.content[1].table.body.forEach(function(row, rowIndex) {
-                  row.forEach(function(cell, cellIndex) {
-                    if (cellIndex !== 2) { // Skip the name column (index 2)
-                      cell.alignment = "center";
-                    }
-                  });
+            title: `Laporan Stok (${formattedDate})`,
+            customize: function (xlsx) {
+              var sheet = xlsx.xl.worksheets["sheet1.xml"];
+              $('row c[r^="C"]', sheet).attr("s", "55"); // Nama column - wider with wrap text
+              $("row:not(:first-child) c", sheet).attr("s", "55");
+            },
+          },
+          {
+            extend: "pdf",
+            text: '<i class="fas fa-file-pdf me-2"></i>PDF',
+            className: "btn btn-danger btn-sm me-1",
+            exportOptions: {
+              columns: ":visible",
+            },
+            title: `Laporan Stok (${formattedDate})`,
+            customize: function (doc) {
+              doc.defaultStyle.fontSize = 8;
+              doc.styles.tableHeader.fontSize = 9;
+              doc.content[1].table.widths = ["5%", "10%", "35%", "8.33%", "8.33%", "8.33%", "8.33%", "8.33%", "8.33%"];
+              doc.styles.tableHeader.alignment = "center";
+              doc.styles.tableBodyEven.alignment = "center";
+              doc.styles.tableBodyOdd.alignment = "center";
+              doc.content[1].table.body.forEach(function (row, rowIndex) {
+                row.forEach(function (cell, cellIndex) {
+                  if (cellIndex !== 2) {
+                    // Skip the name column (index 2)
+                    cell.alignment = "center";
+                  }
                 });
-              }
+              });
             },
-            {
-              extend: "print",
-              text: '<i class="fas fa-print me-2"></i>Print',
-              className: "btn btn-primary btn-sm",
-              exportOptions: {
-                columns: ":visible"
-              },
-              title: `Laporan Stok (${formattedDate})`,
-              customize: function(win) {
-                $(win.document.head).append(`
+          },
+          {
+            extend: "print",
+            text: '<i class="fas fa-print me-2"></i>Print',
+            className: "btn btn-primary btn-sm",
+            exportOptions: {
+              columns: ":visible",
+            },
+            title: `Laporan Stok (${formattedDate})`,
+            customize: function (win) {
+              $(win.document.head).append(`
                   <style>
                     @page { size: landscape; }
                     table.dataTable {
@@ -730,91 +723,100 @@ import {
                     }
                   </style>
                 `);
-                $(win.document.body).find("table td:not(:nth-child(3))").css("text-align", "center");
-                $(win.document.body).find("table").css("width", "100%");
-              }
-            }
-          ],
-          columnDefs: [
-            { className: "text-center", targets: [0, 1, 3, 4, 5, 6, 7, 8] },
-            { className: "text-wrap", targets: "_all" },
-            { width: "5%", targets: 0 },
-            { width: "10%", targets: 1 },
-            { width: "35%", targets: 2 },
-            { width: "8.33%", targets: [3, 4, 5, 6, 7, 8] }
-          ],
-          language: {
-            search: "Cari:",
-            lengthMenu: "Tampilkan _MENU_ data",
-            info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",
-            infoEmpty: "Menampilkan 0 sampai 0 dari 0 data",
-            infoFiltered: "(disaring dari _MAX_ total data)",
-            paginate: {
-              first: "Pertama",
-              last: "Terakhir",
-              next: "Selanjutnya",
-              previous: "Sebelumnya"
-            }
-          }
-        });
-        
-        // Add category headers
-        this.addCategoryHeaders(kotakItems, aksesorisItems, otherItems);
-      } catch (error) {
-        console.error("Error rendering stock table:", error);
-        this.showError("Terjadi kesalahan saat menampilkan data: " + error.message);
-        
-        // Reset table to clean state
-        try {
-          const tableBody = document.querySelector("#stockTable tbody");
-          if (tableBody) {
-            tableBody.innerHTML = `
+              $(win.document.body).find("table td:not(:nth-child(3))").css("text-align", "center");
+              $(win.document.body).find("table").css("width", "100%");
+            },
+          },
+        ],
+        columnDefs: [
+          { className: "text-center", targets: [0, 1, 3, 4, 5, 6, 7, 8] },
+          { className: "text-wrap", targets: "_all" },
+          { width: "5%", targets: 0 },
+          { width: "10%", targets: 1 },
+          { width: "35%", targets: 2 },
+          { width: "8.33%", targets: [3, 4, 5, 6, 7, 8] },
+        ],
+        language: {
+          search: "Cari:",
+          lengthMenu: "Tampilkan _MENU_ data",
+          info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",
+          infoEmpty: "Menampilkan 0 sampai 0 dari 0 data",
+          infoFiltered: "(disaring dari _MAX_ total data)",
+          paginate: {
+            first: "Pertama",
+            last: "Terakhir",
+            next: "Selanjutnya",
+            previous: "Sebelumnya",
+          },
+        },
+      });
+
+      // Add category headers
+      this.addCategoryHeaders(kotakItems, aksesorisItems, otherItems);
+    } catch (error) {
+      console.error("Error rendering stock table:", error);
+      this.showError("Terjadi kesalahan saat menampilkan data: " + error.message);
+
+      // Reset table to clean state
+      try {
+        const tableBody = document.querySelector("#stockTable tbody");
+        if (tableBody) {
+          tableBody.innerHTML = `
               <tr>
                 <td colspan="9" class="text-center">Terjadi kesalahan saat memuat data</td>
               </tr>
             `;
-          }
-          
-          if (!$.fn.DataTable.isDataTable("#stockTable")) {
-            $("#stockTable").DataTable({
-              responsive: true,
-              language: {
-                emptyTable: "Tidak ada data yang tersedia"
-              }
-            });
-          }
-        } catch (innerError) {
-          console.warn("Error resetting table:", innerError);
         }
+
+        if (!$.fn.DataTable.isDataTable("#stockTable")) {
+          $("#stockTable").DataTable({
+            responsive: true,
+            language: {
+              emptyTable: "Tidak ada data yang tersedia",
+            },
+          });
+        }
+      } catch (innerError) {
+        console.warn("Error resetting table:", innerError);
       }
-    },
-  
-    // Add category headers
-    addCategoryHeaders(kotakItems, aksesorisItems, otherItems) {
-      // Add container for category headers above the table
-      const tableContainer = document.querySelector("#stockTable_wrapper");
-      if (!tableContainer) return;
-      
-      // Check if category header container already exists
-      let categoryHeaderContainer = document.querySelector(".category-headers");
-      if (!categoryHeaderContainer) {
-        categoryHeaderContainer = document.createElement("div");
-        categoryHeaderContainer.className = "category-headers mb-3 mt-3";
-        tableContainer.insertBefore(categoryHeaderContainer, tableContainer.querySelector(".dataTables_filter"));
-      }
-      
-      // Create HTML for category headers
-      categoryHeaderContainer.innerHTML = `
+    }
+  },
+
+  // Add category headers
+  addCategoryHeaders(kotakItems, aksesorisItems, otherItems) {
+    // Add container for category headers above the table
+    const tableContainer = document.querySelector("#stockTable_wrapper");
+    if (!tableContainer) return;
+
+    // Check if category header container already exists
+    let categoryHeaderContainer = document.querySelector(".category-headers");
+    if (!categoryHeaderContainer) {
+      categoryHeaderContainer = document.createElement("div");
+      categoryHeaderContainer.className = "category-headers mb-3 mt-3";
+      tableContainer.insertBefore(categoryHeaderContainer, tableContainer.querySelector(".dataTables_filter"));
+    }
+
+    // Create HTML for category headers
+    categoryHeaderContainer.innerHTML = `
               <div class="d-flex flex-wrap gap-2">
-        ${kotakItems.length > 0 ? 
-          `<div class="category-badge badge bg-primary p-2">${kotakItems.length} Kotak Perhiasan</div>` : ''}
-        ${aksesorisItems.length > 0 ? 
-          `<div class="category-badge badge bg-success p-2">${aksesorisItems.length} Aksesoris Perhiasan</div>` : ''}
-        ${otherItems.length > 0 ? 
-          `<div class="category-badge badge bg-secondary p-2">${otherItems.length} Lainnya</div>` : ''}
+        ${
+          kotakItems.length > 0
+            ? `<div class="category-badge badge bg-primary p-2">${kotakItems.length} Kotak Perhiasan</div>`
+            : ""
+        }
+        ${
+          aksesorisItems.length > 0
+            ? `<div class="category-badge badge bg-success p-2">${aksesorisItems.length} Aksesoris Perhiasan</div>`
+            : ""
+        }
+        ${
+          otherItems.length > 0
+            ? `<div class="category-badge badge bg-secondary p-2">${otherItems.length} Lainnya</div>`
+            : ""
+        }
       </div>
     `;
-    
+
     // Add CSS for styling
     const styleElement = document.createElement("style");
     styleElement.textContent = `
@@ -833,13 +835,13 @@ import {
       }
     `;
     document.head.appendChild(styleElement);
-    
+
     // Add event listeners for category filtering
-    document.querySelectorAll(".category-badge").forEach(badge => {
-      badge.addEventListener("click", function() {
+    document.querySelectorAll(".category-badge").forEach((badge) => {
+      badge.addEventListener("click", function () {
         const text = this.textContent.toLowerCase();
         let categoryClass = "";
-        
+
         if (text.includes("kotak")) {
           categoryClass = "kotak-item";
         } else if (text.includes("aksesoris")) {
@@ -847,26 +849,26 @@ import {
         } else {
           categoryClass = "other-item";
         }
-        
+
         // Toggle active state
         this.classList.toggle("active");
         const isActive = this.classList.contains("active");
-        
+
         // Update badge style
         if (isActive) {
           this.style.opacity = "1";
         } else {
           this.style.opacity = "0.6";
         }
-        
+
         // Filter table
         const table = $("#stockTable").DataTable();
-        
+
         // Custom filtering function
-        $.fn.dataTable.ext.search.push(function(settings, data, dataIndex, row) {
+        $.fn.dataTable.ext.search.push(function (settings, data, dataIndex, row) {
           // Get all active categories
           const activeCategories = [];
-          document.querySelectorAll(".category-badge.active").forEach(activeBadge => {
+          document.querySelectorAll(".category-badge.active").forEach((activeBadge) => {
             const badgeText = activeBadge.textContent.toLowerCase();
             if (badgeText.includes("kotak")) {
               activeCategories.push("kotak-item");
@@ -876,17 +878,17 @@ import {
               activeCategories.push("other-item");
             }
           });
-          
+
           // If no categories are active, show all rows
           if (activeCategories.length === 0) {
             return true;
           }
-          
+
           // Check if row belongs to any active category
           const rowNode = table.row(dataIndex).node();
-          return activeCategories.some(category => rowNode.classList.contains(category));
+          return activeCategories.some((category) => rowNode.classList.contains(category));
         });
-        
+
         // Redraw the table
         table.draw();
       });
@@ -910,8 +912,8 @@ import {
         html: message,
         confirmButtonColor: "#dc3545",
         showClass: {
-          popup: "animate__animated animate__shakeX"
-        }
+          popup: "animate__animated animate__shakeX",
+        },
       });
     } else {
       alert(message);
@@ -929,11 +931,11 @@ import {
         timer: 3000,
         timerProgressBar: true,
         showClass: {
-          popup: "animate__animated animate__fadeInDown"
+          popup: "animate__animated animate__fadeInDown",
         },
         hideClass: {
-          popup: "animate__animated animate__fadeOutUp"
-        }
+          popup: "animate__animated animate__fadeOutUp",
+        },
       });
     } else {
       alert(message);
@@ -944,31 +946,31 @@ import {
   cleanupCache() {
     const now = new Date().getTime();
     const cacheExpiry = 30 * 60 * 1000; // 30 minutes
-    
+
     // Clean up expired cache
-    Object.keys(this.cache).forEach(key => {
+    Object.keys(this.cache).forEach((key) => {
       if (key.startsWith("stock_") && this.cache[key].lastFetched && now - this.cache[key].lastFetched > cacheExpiry) {
         console.log(`Cleaning up expired cache for ${key}`);
         delete this.cache[key];
       }
     });
-    
+
     // Limit number of cache entries
     const maxCacheEntries = 10;
-    const cacheKeys = Object.keys(this.cache).filter(key => key.startsWith("stock_"));
-    
+    const cacheKeys = Object.keys(this.cache).filter((key) => key.startsWith("stock_"));
+
     if (cacheKeys.length > maxCacheEntries) {
       // Sort by last fetched time (oldest first)
       cacheKeys.sort((a, b) => this.cache[a].lastFetched - this.cache[b].lastFetched);
-      
+
       // Remove oldest cache entries
       const keysToRemove = cacheKeys.slice(0, cacheKeys.length - maxCacheEntries);
-      keysToRemove.forEach(key => {
+      keysToRemove.forEach((key) => {
         console.log(`Removing excess cache for ${key}`);
         delete this.cache[key];
       });
     }
-  }
+  },
 };
 
 // Helper function to show loading indicator
@@ -987,7 +989,7 @@ function showAlert(message, title = "Informasi", type = "info") {
       text: message,
       icon: type,
       confirmButtonText: "OK",
-      confirmButtonColor: "#0d6efd"
+      confirmButtonColor: "#0d6efd",
     });
   } else {
     alert(message);
@@ -996,10 +998,10 @@ function showAlert(message, title = "Informasi", type = "info") {
 }
 
 // Initialize when document is ready
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("DOMContentLoaded", function () {
   // Initialize the handler
   laporanStokHandler.init();
-  
+
   // Set interval to clean up cache periodically
   setInterval(() => {
     laporanStokHandler.cleanupCache();
@@ -1008,6 +1010,3 @@ document.addEventListener("DOMContentLoaded", function() {
 
 // Export the handler for potential use in other modules
 export default laporanStokHandler;
-
-  
-  

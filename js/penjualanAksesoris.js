@@ -23,8 +23,8 @@ function showAlert(message, title = "Informasi", type = "info") {
     title: title,
     text: message,
     icon: type, // 'success', 'error', 'warning', 'info', 'question'
-    confirmButtonText: 'OK',
-    confirmButtonColor: '#0d6efd' // Warna primary Bootstrap
+    confirmButtonText: "OK",
+    confirmButtonColor: "#0d6efd", // Warna primary Bootstrap
   });
 }
 
@@ -33,12 +33,12 @@ function showConfirm(message, title = "Konfirmasi") {
   return Swal.fire({
     title: title,
     text: message,
-    icon: 'question',
+    icon: "question",
     showCancelButton: true,
-    confirmButtonText: 'Ya',
-    cancelButtonText: 'Batal',
-    confirmButtonColor: '#0d6efd',
-    cancelButtonColor: '#6c757d'
+    confirmButtonText: "Ya",
+    cancelButtonText: "Batal",
+    confirmButtonColor: "#0d6efd",
+    cancelButtonColor: "#6c757d",
   }).then((result) => {
     return result.isConfirmed;
   });
@@ -87,7 +87,7 @@ $(document).ready(function () {
 const stockCache = {
   data: null,
   lastFetched: null,
-  dirtyItems: new Set()
+  dirtyItems: new Set(),
 };
 
 // Load stock data on page load
@@ -98,8 +98,13 @@ async function loadStockData(forceRefresh = false) {
   try {
     // Gunakan cache jika valid dan tidak ada perubahan
     const now = new Date().getTime();
-    if (!forceRefresh && stockCache.lastFetched && (now - stockCache.lastFetched < 2 * 60 * 1000) 
-        && stockCache.data && stockCache.dirtyItems.size === 0) {
+    if (
+      !forceRefresh &&
+      stockCache.lastFetched &&
+      now - stockCache.lastFetched < 2 * 60 * 1000 &&
+      stockCache.data &&
+      stockCache.dirtyItems.size === 0
+    ) {
       console.log("Using cached stock data");
       populateStockTables(stockCache.data);
       return;
@@ -108,7 +113,7 @@ async function loadStockData(forceRefresh = false) {
     // Ambil data baru
     const stockSnapshot = await getDocs(collection(firestore, "stokAksesoris"));
     const stockData = [];
-    stockSnapshot.forEach(doc => stockData.push({ id: doc.id, ...doc.data() }));
+    stockSnapshot.forEach((doc) => stockData.push({ id: doc.id, ...doc.data() }));
 
     // Update cache
     stockCache.data = stockData;
@@ -128,8 +133,8 @@ function populateStockTables(stockData) {
   const aksesorisTable = $("#tableAksesoris tbody");
   aksesorisTable.empty();
 
-  const aksesorisItems = stockData.filter((item) => 
-    item.kategori === "aksesoris" && (item.stokAkhir > 0) // Only show items with stock > 0
+  const aksesorisItems = stockData.filter(
+    (item) => item.kategori === "aksesoris" && item.stokAkhir > 0 // Only show items with stock > 0
   );
 
   if (aksesorisItems.length === 0) {
@@ -137,7 +142,9 @@ function populateStockTables(stockData) {
   } else {
     aksesorisItems.forEach((item) => {
       const row = `
-          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${item.hargaJual || 0}">
+          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${
+        item.hargaJual || 0
+      }">
             <td>${item.kode || "-"}</td>
             <td>${item.nama || "-"}</td>
             <td>${item.stokAkhir || 0}</td>
@@ -151,8 +158,8 @@ function populateStockTables(stockData) {
   const kotakTable = $("#tableKotak tbody");
   kotakTable.empty();
 
-  const kotakItems = stockData.filter((item) => 
-    item.kategori === "kotak" && (item.stokAkhir > 0) // Only show items with stock > 0
+  const kotakItems = stockData.filter(
+    (item) => item.kategori === "kotak" && item.stokAkhir > 0 // Only show items with stock > 0
   );
 
   if (kotakItems.length === 0) {
@@ -160,7 +167,9 @@ function populateStockTables(stockData) {
   } else {
     kotakItems.forEach((item) => {
       const row = `
-          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${item.hargaJual || 0}">
+          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${
+        item.hargaJual || 0
+      }">
             <td>${item.kode || "-"}</td>
             <td>${item.nama || "-"}</td>
             <td>${item.stokAkhir || 0}</td>
@@ -174,8 +183,8 @@ function populateStockTables(stockData) {
   const lockTable = $("#tableLock tbody");
   lockTable.empty();
 
-  const lockItems = stockData.filter((item) => 
-    item.kategori === "aksesoris" && (item.stokAkhir > 0) // Only show items with stock > 0
+  const lockItems = stockData.filter(
+    (item) => item.kategori === "aksesoris" && item.stokAkhir > 0 // Only show items with stock > 0
   );
 
   if (lockItems.length === 0) {
@@ -183,7 +192,9 @@ function populateStockTables(stockData) {
   } else {
     lockItems.forEach((item) => {
       const row = `
-        <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${item.hargaJual || 0}">
+        <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${
+        item.hargaJual || 0
+      }">
           <td>${item.kode || "-"}</td>
           <td>${item.nama || "-"}</td>
           <td>${item.stokAkhir || 0}</td>
@@ -200,8 +211,8 @@ function populateStockTables(stockData) {
 // Function to attach click handlers to table rows
 function attachTableRowClickHandlers() {
   // Aksesoris table row click
-  $("#tableAksesoris tbody tr").on("click", function() {
-    if ($(this).data('kode')) {
+  $("#tableAksesoris tbody tr").on("click", function () {
+    if ($(this).data("kode")) {
       const kode = $(this).data("kode");
       const nama = $(this).data("nama");
       const stok = $(this).data("stok");
@@ -216,8 +227,8 @@ function attachTableRowClickHandlers() {
   });
 
   // Kotak table row click
-  $("#tableKotak tbody tr").on("click", function() {
-    if ($(this).data('kode')) {
+  $("#tableKotak tbody tr").on("click", function () {
+    if ($(this).data("kode")) {
       const kode = $(this).data("kode");
       const nama = $(this).data("nama");
       const stok = $(this).data("stok");
@@ -232,8 +243,8 @@ function attachTableRowClickHandlers() {
   });
 
   // Lock table row click
-  $("#tableLock tbody tr").on("click", function() {
-    if ($(this).data('kode')) {
+  $("#tableLock tbody tr").on("click", function () {
+    if ($(this).data("kode")) {
       const kode = $(this).data("kode");
       const nama = $(this).data("nama");
 
@@ -497,8 +508,8 @@ function attachRowEventHandlers($row) {
   // Delete button handler
   $row.find(".btn-delete").on("click", function () {
     const tableId = $row.closest("table").attr("id");
-    const salesType = tableId === "tableAksesorisDetail" ? "aksesoris" : 
-                      tableId === "tableKotakDetail" ? "kotak" : "manual";
+    const salesType =
+      tableId === "tableAksesorisDetail" ? "aksesoris" : tableId === "tableKotakDetail" ? "kotak" : "manual";
 
     $row.remove();
     updateGrandTotal(salesType);
@@ -1131,7 +1142,7 @@ $("#btnSimpanPenjualan").on("click", async function () {
         items.push({
           kodeText: kode,
           nama: nama,
-          kodeLock: kodeLock,
+          kodeLock: kodeLock !== "-" ? kodeLock : null,
           kadar: kadar,
           berat: berat,
           hargaPerGram: hargaPerGram,
@@ -1152,6 +1163,11 @@ $("#btnSimpanPenjualan").on("click", async function () {
       items: items,
     };
 
+    // PERBAIKAN: Tandai sebagai ganti lock jika ada kodeLock
+    if (salesType === "manual" && items.some((item) => item.kodeLock)) {
+      transactionData.isGantiLock = true;
+    }
+
     // Tambahkan detail pembayaran
     if (paymentMethod === "dp") {
       transactionData.nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "").replace(",", ".")) || 0;
@@ -1167,7 +1183,7 @@ $("#btnSimpanPenjualan").on("click", async function () {
 
     // Simpan transaksi
     const docRef = await addDoc(collection(firestore, "penjualanAksesoris"), transactionData);
-    
+
     // Update stok jika tidak free
     if (paymentMethod !== "free") {
       await updateStock(salesType, transactionData.items);
@@ -1332,7 +1348,7 @@ function printReceipt() {
     // Format DP and remaining balance with thousand separators
     const dpAmount = parseFloat(transaction.nominalDP.replace(/\./g, "").replace(",", "."));
     const remainingAmount = parseFloat(transaction.sisaPembayaran.replace(/\./g, "").replace(",", "."));
-    
+
     receiptHTML += `
         <div class="payment-info">
           <table>
@@ -1386,13 +1402,13 @@ function printInvoice() {
     showAlert("Tidak ada data transaksi untuk dicetak!");
     return;
   }
-  
+
   const transaction = currentTransactionData;
   console.log("Printing invoice with data:", transaction);
-  
+
   // Buat jendela baru untuk print
   const printWindow = window.open("", "_blank");
-  
+
   // Buat konten HTML untuk invoice
   let invoiceHTML = `
   <!DOCTYPE html>
@@ -1472,16 +1488,16 @@ function printInvoice() {
       <hr>
 `;
 
-// Tambahkan item ke invoice
-let hasKeterangan = false;
-let keteranganText = "";
-let totalHarga = 0;
+  // Tambahkan item ke invoice
+  let hasKeterangan = false;
+  let keteranganText = "";
+  let totalHarga = 0;
 
-transaction.items.forEach((item) => {
-  const itemHarga = parseInt(item.totalHarga) || 0;
-  totalHarga += itemHarga;
-  
-  invoiceHTML += `
+  transaction.items.forEach((item) => {
+    const itemHarga = parseInt(item.totalHarga) || 0;
+    totalHarga += itemHarga;
+
+    invoiceHTML += `
       <div class="item-details">
         <div class="item-data">
           <span>${item.kodeText || "-"}</span>
@@ -1493,32 +1509,32 @@ transaction.items.forEach((item) => {
         </div>
       </div>
   `;
-  
-  // Simpan keterangan jika ada
-  if (item.keterangan && item.keterangan.trim() !== "") {
-    hasKeterangan = true;
-    keteranganText += `${item.nama}: ${item.keterangan}; `;
-  }
-});
 
-// Tambahkan total di pojok kanan bawah
-invoiceHTML += `
+    // Simpan keterangan jika ada
+    if (item.keterangan && item.keterangan.trim() !== "") {
+      hasKeterangan = true;
+      keteranganText += `${item.nama}: ${item.keterangan}; `;
+    }
+  });
+
+  // Tambahkan total di pojok kanan bawah
+  invoiceHTML += `
       <div class="total-row">
         Rp ${totalHarga.toLocaleString("id-ID")}
       </div>
     <div class="sales">${transaction.sales || "-"}</div>
 `;
 
-// Tambahkan keterangan jika ada
-if (hasKeterangan && transaction.jenisPenjualan === "manual") {
-  invoiceHTML += `
+  // Tambahkan keterangan jika ada
+  if (hasKeterangan && transaction.jenisPenjualan === "manual") {
+    invoiceHTML += `
       <div class="keterangan">
         ${keteranganText}
       </div>
   `;
-}
+  }
 
-invoiceHTML += `
+  invoiceHTML += `
     </div>
     <script>
       window.onload = function() {
@@ -1529,7 +1545,7 @@ invoiceHTML += `
   </body>
   </html>
 `;
-  
+
   // Tulis HTML ke jendela baru
   printWindow.document.write(invoiceHTML);
   printWindow.document.close();
@@ -1615,7 +1631,7 @@ $("#btnCetak").on("click", function () {
           berat: berat,
           hargaPerGram: hargaPerGram,
           totalHarga: totalHarga,
-          keterangan: keterangan
+          keterangan: keterangan,
         });
       });
     }
@@ -1627,7 +1643,7 @@ $("#btnCetak").on("click", function () {
       sales: $("#sales").val().trim() || "Admin",
       totalHarga: $("#totalOngkos").val(),
       items: items,
-      metodeBayar: $("#metodeBayar").val()
+      metodeBayar: $("#metodeBayar").val(),
     };
 
     // Tambahkan informasi DP jika metode pembayaran adalah DP
@@ -1662,22 +1678,26 @@ async function updateStock(salesType, items) {
         // Update stok di Firestore
         await updateDoc(doc(firestore, "stokAksesoris", stockDoc.id), {
           stokAkhir: newStock,
-          lastUpdate: serverTimestamp()
+          lastUpdate: serverTimestamp(),
         });
 
         // Tambah log transaksi
         await addDoc(collection(firestore, "stokAksesorisTransaksi"), {
-          kode, nama: item.nama || "", 
+          kode,
+          nama: item.nama || "",
           kategori: salesType === "kotak" ? "kotak" : "aksesoris",
           jenis: "laku",
-          jumlah, stokSebelum: currentStock, stokSesudah: newStock, stokAkhir: newStock,
+          jumlah,
+          stokSebelum: currentStock,
+          stokSesudah: newStock,
+          stokAkhir: newStock,
           timestamp: serverTimestamp(),
-          keterangan: `Penjualan ${salesType} oleh ${$("#sales").val() || "Admin"}`
+          keterangan: `Penjualan ${salesType} oleh ${$("#sales").val() || "Admin"}`,
         });
 
         // Update cache lokal
         if (stockCache.data) {
-          const cacheItem = stockCache.data.find(i => i.kode === kode);
+          const cacheItem = stockCache.data.find((i) => i.kode === kode);
           if (cacheItem) {
             cacheItem.stokAkhir = newStock;
             stockCache.dirtyItems.add(kode);
@@ -1688,7 +1708,7 @@ async function updateStock(salesType, items) {
 
     // Refresh tampilan jika ada cache
     if (stockCache.data) populateStockTables(stockCache.data);
-    
+
     return true;
   } catch (error) {
     console.error("Error updating stock:", error);
@@ -1746,22 +1766,22 @@ function formatDate(date) {
 }
 
 // Tambah tombol refresh stok
-$(document).ready(function() {
+$(document).ready(function () {
   if ($("#refreshStok").length === 0) {
     $(".catalog-select").before(`
       <button type="button" class="btn btn-outline-primary me-2" id="refreshStok">
         <i class="fas fa-sync-alt me-1"></i> Refresh Stok
       </button>
     `);
-    
-    $("#refreshStok").on("click", function() {
+
+    $("#refreshStok").on("click", function () {
       loadStockData(true);
       showAlert("Data stok berhasil diperbarui", "Sukses", "success");
     });
   }
-  
+
   // Refresh stok setelah transaksi selesai
-  $("#printModal").on("hidden.bs.modal", function() {
+  $("#printModal").on("hidden.bs.modal", function () {
     loadStockData(true);
   });
 });
@@ -1833,7 +1853,3 @@ $("#sales").on("focus", function () {
   $(this).removeClass("is-invalid is-valid");
   $(this).next(".invalid-feedback").remove();
 });
-
-
-
-
