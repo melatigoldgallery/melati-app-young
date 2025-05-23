@@ -40,18 +40,18 @@
         border-radius: 8px;
         padding: 15px;
         margin-bottom: 20px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
       }
       .stock-card {
         border-radius: 8px;
         padding: 15px;
         margin-bottom: 15px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         transition: all 0.3s ease;
       }
       .stock-card:hover {
         transform: translateY(-3px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
       }
       .stock-card h3 {
         font-size: 1.1rem;
@@ -63,20 +63,179 @@
         font-weight: 700;
         color: #3a3a3a;
       }
-      .kalung-card { background-color: #e3f2fd; }
-      .liontin-card { background-color: #e8f5e9; }
-      .anting-card { background-color: #fff3e0; }
-      .cincin-card { background-color: #f3e5f5; }
-      .hala-card { background-color: #e0f7fa; }
-      .gelang-card { background-color: #fff8e1; }
-      .giwang-card { background-color: #f1f8e9; }
-      .batu-card { background-color: #fce4ec; }
+      .kalung-card {
+        background-color: #e3f2fd;
+      }
+      .liontin-card {
+        background-color: #e8f5e9;
+      }
+      .anting-card {
+        background-color: #fff3e0;
+      }
+      .cincin-card {
+        background-color: #f3e5f5;
+      }
+      .hala-card {
+        background-color: #e0f7fa;
+      }
+      .gelang-card {
+        background-color: #fff8e1;
+      }
+      .giwang-card {
+        background-color: #f1f8e9;
+      }
+      .batu-card {
+        background-color: #fce4ec;
+      }
     </style>
   </head>
   <body>
-    <!-- ... [kode sidebar dan header tetap sama] ... -->
+    <div class="app-container">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <img src="img/Melati.jfif" alt="Logo" class="logo" />
+          <h1 class="brand-name">Melati Gold Shop</h1>
+        </div>
+        <div class="sidebar-menu">
+          <ul class="nav flex-column" id="sidebarAccordion">
+            <li class="nav-item">
+              <a class="nav-link" href="dashboard.html">
+                <i class="fas fa-tachometer-alt"></i>
+                <span class="menu-text">Dashboard</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="buyback.html">
+                <i class="fas fa-exchange-alt"></i>
+                <span class="menu-text">Buyback</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="manajemenStok.html">
+                <i class="fa-solid fa-boxes-stacked"></i>
+                <span class="menu-text">Manajemen Stok</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="mutasiKode.html">
+                <i class="fa-solid fa-calendar-xmark"></i>
+                <span class="menu-text">Mutasi Kode</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a
+                class="nav-link collapsed"
+                href="#"
+                data-bs-toggle="collapse"
+                data-bs-target="#antrianSubmenu"
+                aria-expanded="false"
+              >
+                <i class="fas fa-ticket-alt"></i>
+                <span class="menu-text">Antrian</span>
+                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
+              </a>
+              <div class="collapse" id="antrianSubmenu" data-bs-parent="#sidebarAccordion">
+                <ul class="nav flex-column ms-3">
+                  <li class="nav-item">
+                    <a class="nav-link" href="admin.html">
+                      <i class="fas fa-user-cog"></i>
+                      <span class="menu-text">Admin Antrian</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="display.html">
+                      <i class="fas fa-desktop"></i>
+                      <span class="menu-text">Display Antrian</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="analisis.html">
+                      <i class="fas fa-chart-bar"></i>
+                      <span class="menu-text">Laporan Antrian</span>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </li>
+            <li class="nav-item">
+              <a
+                class="nav-link collapsed"
+                href="#"
+                data-bs-toggle="collapse"
+                data-bs-target="#aksesorisSubmenu"
+                aria-expanded="false"
+              >
+                <i class="fas fa-gem"></i>
+                <span class="menu-text">Aksesoris</span>
+                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
+              </a>
+              <div class="collapse" id="aksesorisSubmenu" data-bs-parent="#sidebarAccordion">
+                <ul class="nav flex-column ms-3">
+                  <li class="nav-item">
+                    <a class="nav-link" href="tambahAksesoris.html">
+                      <i class="fas fa-plus-circle"></i>
+                      <span class="menu-text">Tambah Aksesoris</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="penjualanAksesoris.html">
+                      <i class="fas fa-shopping-cart"></i>
+                      <span class="menu-text">Penjualan Aksesoris</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="laporanPenjualan.html">
+                      <i class="fas fa-chart-line"></i>
+                      <span class="menu-text">Laporan Penjualan</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="laporanStok.html">
+                      <i class="fas fa-boxes"></i>
+                      <span class="menu-text">Laporan Stok</span>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </li>
+          </ul>
+        </div>
+        <div class="sidebar-footer">
+          <p>© 2025 Melati Gold Shop</p>
+        </div>
+      </aside>
 
-        <!-- Page Content -->
+      <!-- Page Content -->
+      <main class="main-content">
+        <!-- Top Navigation -->
+        <header class="top-nav">
+          <div class="menu-toggle d-md-flex d-none">
+            <i class="fa-solid fa-minimize"></i>
+          </div>
+          <div class="hamburger d-md-none d-flex">
+            <i class="fas fa-bars"></i>
+          </div>
+          <div class="nav-right">
+            <div class="date-time">
+              <div class="current-date" id="current-date"></div>
+              <div class="current-time" id="current-time"></div>
+            </div>
+            <div class="user-profile dropdown">
+              <div class="profile-img" data-bs-toggle="dropdown" aria-expanded="false">
+                <span class="user-avatar">M</span>
+              </div>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                  <button class="dropdown-item" id="logoutBtn" onclick="handleLogout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Logout
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </header>
         <div class="page-content">
           <div class="page-header">
             <h1>Manajemen Stok</h1>
@@ -103,28 +262,40 @@
                   <div class="row">
                     <div class="col-md-3 col-sm-6">
                       <div class="stock-card kalung-card">
-                        <h3><i class="fas fa-link me-2"></i>KALUNG</h3>
+                        <h3>
+                          <i class="fas fa-link me-2"></i>
+                          KALUNG
+                        </h3>
                         <div class="number" id="total-kalung">0</div>
                         <small>Total dari semua lokasi</small>
                       </div>
                     </div>
                     <div class="col-md-3 col-sm-6">
                       <div class="stock-card liontin-card">
-                        <h3><i class="fas fa-gem me-2"></i>LIONTIN</h3>
+                        <h3>
+                          <i class="fas fa-gem me-2"></i>
+                          LIONTIN
+                        </h3>
                         <div class="number" id="total-liontin">0</div>
                         <small>Total dari semua lokasi</small>
                       </div>
                     </div>
                     <div class="col-md-3 col-sm-6">
                       <div class="stock-card anting-card">
-                        <h3><i class="fas fa-dot-circle me-2"></i>ANTING</h3>
+                        <h3>
+                          <i class="fas fa-dot-circle me-2"></i>
+                          ANTING
+                        </h3>
                         <div class="number" id="total-anting">0</div>
                         <small>Total dari semua lokasi</small>
                       </div>
                     </div>
                     <div class="col-md-3 col-sm-6">
                       <div class="stock-card cincin-card">
-                        <h3><i class="fas fa-circle me-2"></i>CINCIN</h3>
+                        <h3>
+                          <i class="fas fa-circle me-2"></i>
+                          CINCIN
+                        </h3>
                         <div class="number" id="total-cincin">0</div>
                         <small>Total dari semua lokasi</small>
                       </div>
@@ -133,21 +304,30 @@
                   <div class="row mt-3">
                     <div class="col-md-3 col-sm-6">
                       <div class="stock-card hala-card">
-                        <h3><i class="fas fa-ring me-2"></i>HALA</h3>
+                        <h3>
+                          <i class="fas fa-ring me-2"></i>
+                          HALA
+                        </h3>
                         <div class="number" id="total-hala">0</div>
                         <small>Total dari semua lokasi</small>
                       </div>
                     </div>
                     <div class="col-md-3 col-sm-6">
                       <div class="stock-card gelang-card">
-                        <h3><i class="fas fa-circle-notch me-2"></i>GELANG</h3>
+                        <h3>
+                          <i class="fas fa-circle-notch me-2"></i>
+                          GELANG
+                        </h3>
                         <div class="number" id="total-gelang">0</div>
                         <small>Total dari semua lokasi</small>
                       </div>
                     </div>
                     <div class="col-md-3 col-sm-6">
                       <div class="stock-card giwang-card">
-                        <h3><i class="fas fa-dot-circle me-2"></i>GIWANG</h3>
+                        <h3>
+                          <i class="fas fa-dot-circle me-2"></i>
+                          GIWANG
+                        </h3>
                         <div class="number" id="total-giwang">0</div>
                         <small>Total dari semua lokasi</small>
                       </div>
@@ -188,19 +368,6 @@
               <li class="nav-item" role="presentation">
                 <button
                   class="nav-link"
-                  id="barang-rusak-tab"
-                  data-bs-toggle="tab"
-                  data-bs-target="#barang-rusak"
-                  type="button"
-                  role="tab"
-                >
-                  <i class="fas fa-exclamation-triangle me-2"></i>
-                  BARANG RUSAK
-                </button>
-              </li>
-              <li class="nav-item" role="presentation">
-                <button
-                  class="nav-link"
                   id="posting-tab"
                   data-bs-toggle="tab"
                   data-bs-target="#posting"
@@ -209,6 +376,19 @@
                 >
                   <i class="fas fa-share-alt me-2"></i>
                   POSTING
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button
+                  class="nav-link"
+                  id="barang-rusak-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#barang-rusak"
+                  type="button"
+                  role="tab"
+                >
+                  <i class="fas fa-exclamation-triangle me-2"></i>
+                  BARANG RUSAK
                 </button>
               </li>
               <li class="nav-item" role="presentation">
@@ -243,11 +423,17 @@
                       Stok Brankas
                     </h2>
                     <div>
-                      <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#tambahStokBrankasModal">
-                        <i class="fas fa-plus-circle me-2"></i> Tambah Stok
+                      <button
+                        class="btn btn-primary me-2"
+                        data-bs-toggle="modal"
+                        data-bs-target="#tambahStokBrankasModal"
+                      >
+                        <i class="fas fa-plus-circle me-2"></i>
+                        Tambah Stok
                       </button>
                       <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#kurangiStokBrankasModal">
-                        <i class="fas fa-minus-circle me-2"></i> Kurangi Stok
+                        <i class="fas fa-minus-circle me-2"></i>
+                        Kurangi Stok
                       </button>
                     </div>
                   </div>
@@ -273,13 +459,7 @@
               </div>
 
               <!-- ADMIN Tab -->
-              <div
-                class="tab-pane fade"
-                id="admin"
-                role="tabpanel"
-                aria-labelledby="admin-tab"
-                tabindex="0"
-              >
+              <div class="tab-pane fade" id="admin" role="tabpanel" aria-labelledby="admin-tab" tabindex="0">
                 <div class="card mb-4">
                   <div class="card-header d-flex justify-content-between align-items-center">
                     <h2>
@@ -287,11 +467,17 @@
                       Stok Admin
                     </h2>
                     <div>
-                      <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#tambahStokAdminModal">
-                        <i class="fas fa-plus-circle me-2"></i> Tambah Stok
+                      <button
+                        class="btn btn-primary me-2"
+                        data-bs-toggle="modal"
+                        data-bs-target="#tambahStokAdminModal"
+                      >
+                        <i class="fas fa-plus-circle me-2"></i>
+                        Tambah Stok
                       </button>
                       <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#kurangiStokAdminModal">
-                        <i class="fas fa-minus-circle me-2"></i> Kurangi Stok
+                        <i class="fas fa-minus-circle me-2"></i>
+                        Kurangi Stok
                       </button>
                     </div>
                   </div>
@@ -316,58 +502,8 @@
                 </div>
               </div>
 
-              <!-- BARANG RUSAK Tab -->
-              <div
-                class="tab-pane fade"
-                id="barang-rusak"
-                role="tabpanel"
-                aria-labelledby="barang-rusak-tab"
-                tabindex="0"
-              >
-                <div class="card mb-4">
-                  <div class="card-header d-flex justify-content-between align-items-center">
-                    <h2>
-                      <i class="fas fa-exclamation-triangle"></i>
-                      Stok Barang Rusak
-                    </h2>
-                    <div>
-                      <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#tambahStokBarangRusakModal">
-                        <i class="fas fa-plus-circle me-2"></i> Tambah Stok
-                      </button>
-                      <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#kurangiStokBarangRusakModal">
-                        <i class="fas fa-minus-circle me-2"></i> Kurangi Stok
-                      </button>
-                    </div>
-                  </div>
-                  <div class="card-body">
-                    <div class="table-container">
-                      <table class="table table-hover">
-                        <thead class="table-light">
-                          <tr>
-                            <th>No</th>
-                            <th>Jenis Barang</th>
-                            <th>Jumlah</th>
-                            <th>Terakhir Diperbarui</th>
-                            <th>Riwayat</th>
-                          </tr>
-                        </thead>
-                        <tbody id="barang-rusak-table-body">
-                          <!-- Data will be populated by JavaScript -->
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               <!-- POSTING Tab -->
-<div
-                class="tab-pane fade"
-                id="posting"
-                role="tabpanel"
-                aria-labelledby="posting-tab"
-                tabindex="0"
-              >
+              <div class="tab-pane fade" id="posting" role="tabpanel" aria-labelledby="posting-tab" tabindex="0">
                 <div class="card mb-4">
                   <div class="card-header d-flex justify-content-between align-items-center">
                     <h2>
@@ -375,11 +511,17 @@
                       Stok Posting
                     </h2>
                     <div>
-                      <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#tambahStokPostingModal">
-                        <i class="fas fa-plus-circle me-2"></i> Tambah Stok
+                      <button
+                        class="btn btn-primary me-2"
+                        data-bs-toggle="modal"
+                        data-bs-target="#tambahStokPostingModal"
+                      >
+                        <i class="fas fa-plus-circle me-2"></i>
+                        Tambah Stok
                       </button>
                       <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#kurangiStokPostingModal">
-                        <i class="fas fa-minus-circle me-2"></i> Kurangi Stok
+                        <i class="fas fa-minus-circle me-2"></i>
+                        Kurangi Stok
                       </button>
                     </div>
                   </div>
@@ -404,26 +546,36 @@
                 </div>
               </div>
 
-              <!-- BATU LEPAS Tab -->
+              <!-- BARANG RUSAK Tab -->
               <div
                 class="tab-pane fade"
-                id="batu-lepas"
+                id="barang-rusak"
                 role="tabpanel"
-                aria-labelledby="batu-lepas-tab"
+                aria-labelledby="barang-rusak-tab"
                 tabindex="0"
               >
                 <div class="card mb-4">
                   <div class="card-header d-flex justify-content-between align-items-center">
                     <h2>
-                      <i class="fas fa-gem"></i>
-                      Stok Batu Lepas
+                      <i class="fas fa-exclamation-triangle"></i>
+                      Stok Barang Rusak
                     </h2>
                     <div>
-                      <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#tambahStokBatuLepasModal">
-                        <i class="fas fa-plus-circle me-2"></i> Tambah Stok
+                      <button
+                        class="btn btn-primary me-2"
+                        data-bs-toggle="modal"
+                        data-bs-target="#tambahStokBarangRusakModal"
+                      >
+                        <i class="fas fa-plus-circle me-2"></i>
+                        Tambah Stok
                       </button>
-                      <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#kurangiStokBatuLepasModal">
-                        <i class="fas fa-minus-circle me-2"></i> Kurangi Stok
+                      <button
+                        class="btn btn-danger"
+                        data-bs-toggle="modal"
+                        data-bs-target="#kurangiStokBarangRusakModal"
+                      >
+                        <i class="fas fa-minus-circle me-2"></i>
+                        Kurangi Stok
                       </button>
                     </div>
                   </div>
@@ -433,7 +585,51 @@
                         <thead class="table-light">
                           <tr>
                             <th>No</th>
-                            <th>Jenis Batu</th>
+                            <th>Jenis Barang</th>
+                            <th>Jumlah</th>
+                            <th>Terakhir Diperbarui</th>
+                            <th>Riwayat</th>
+                          </tr>
+                        </thead>
+                        <tbody id="barang-rusak-table-body">
+                          <!-- Data will be populated by JavaScript -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- BATU LEPAS Tab -->
+              <div class="tab-pane fade" id="batu-lepas" role="tabpanel" aria-labelledby="batu-lepas-tab" tabindex="0">
+                <div class="card mb-4">
+                  <div class="card-header d-flex justify-content-between align-items-center">
+                    <h2>
+                      <i class="fas fa-gem"></i>
+                      Stok Batu Lepas
+                    </h2>
+                    <div>
+                      <button
+                        class="btn btn-primary me-2"
+                        data-bs-toggle="modal"
+                        data-bs-target="#tambahStokBatuLepasModal"
+                      >
+                        <i class="fas fa-plus-circle me-2"></i>
+                        Tambah Stok
+                      </button>
+                      <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#kurangiStokBatuLepasModal">
+                        <i class="fas fa-minus-circle me-2"></i>
+                        Kurangi Stok
+                      </button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="table-container">
+                      <table class="table table-hover">
+                        <thead class="table-light">
+                          <tr>
+                            <th>No</th>
+                            <th>Jenis Barang</th>
                             <th>Jumlah</th>
                             <th>Terakhir Diperbarui</th>
                             <th>Riwayat</th>
@@ -453,12 +649,15 @@
       </main>
     </div>
 
-   <!-- Modals for BRANKAS -->
+    <!-- Modals for BRANKAS -->
     <div class="modal fade" id="tambahStokBrankasModal" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Tambah Stok Brankas</h5>
+            <h5 class="modal-title">
+              <i class="fas fa-plus-circle me-2"></i>
+              Tambah Stok Brankas
+            </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -478,35 +677,40 @@
               </div>
               <div class="mb-3">
                 <label for="jumlah-brankas-tambah" class="form-label">Jumlah</label>
-                <input type="number" class="form-control" id="jumlah-brankas-tambah" min="1" required>
+                <input type="number" class="form-control" id="jumlah-brankas-tambah" min="1" required />
               </div>
               <div class="mb-3">
                 <label for="penambah-brankas" class="form-label">Penambah Stok</label>
-                <input type="text" class="form-control" id="penambah-brankas" required>
+                <input type="text" class="form-control" id="penambah-brankas" required />
               </div>
               <div class="mb-3">
                 <label for="penerima-brankas" class="form-label">Penerima Stok</label>
-                <input type="text" class="form-control" id="penerima-brankas" required>
+                <input type="text" class="form-control" id="penerima-brankas" required />
               </div>
             </form>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-              <i class="fas fa-times me-2"></i>Batal
+              <i class="fas fa-times me-2"></i>
+              Batal
             </button>
             <button type="button" class="btn btn-primary" id="simpan-tambah-brankas">
-              <i class="fas fa-save me-2"></i>Simpan
+              <i class="fas fa-save me-2"></i>
+              Simpan
             </button>
           </div>
         </div>
       </div>
     </div>
-    
+
     <div class="modal fade" id="kurangiStokBrankasModal" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title"><i class="fas fa-minus-circle me-2"></i>Kurangi Stok Brankas</h5>
+            <h5 class="modal-title">
+              <i class="fas fa-minus-circle me-2"></i>
+              Kurangi Stok Brankas
+            </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -526,11 +730,11 @@
               </div>
               <div class="mb-3">
                 <label for="jumlah-brankas-kurang" class="form-label">Jumlah</label>
-                <input type="number" class="form-control" id="jumlah-brankas-kurang" min="1" required>
+                <input type="number" class="form-control" id="jumlah-brankas-kurang" min="1" required />
               </div>
               <div class="mb-3">
                 <label for="pengurang-brankas" class="form-label">Pengurang Stok</label>
-                <input type="text" class="form-control" id="pengurang-brankas" required>
+                <input type="text" class="form-control" id="pengurang-brankas" required />
               </div>
               <div class="mb-3">
                 <label for="keterangan-brankas" class="form-label">Keterangan</label>
@@ -540,22 +744,27 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-              <i class="fas fa-times me-2"></i>Batal
+              <i class="fas fa-times me-2"></i>
+              Batal
             </button>
             <button type="button" class="btn btn-primary" id="simpan-kurang-brankas">
-              <i class="fas fa-save me-2"></i>Simpan
+              <i class="fas fa-save me-2"></i>
+              Simpan
             </button>
           </div>
         </div>
       </div>
     </div>
-    
+
     <!-- Modals for ADMIN -->
     <div class="modal fade" id="tambahStokAdminModal" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Tambah Stok Admin</h5>
+            <h5 class="modal-title">
+              <i class="fas fa-plus-circle me-2"></i>
+              Tambah Stok Admin
+            </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -575,35 +784,40 @@
               </div>
               <div class="mb-3">
                 <label for="jumlah-admin-tambah" class="form-label">Jumlah</label>
-                <input type="number" class="form-control" id="jumlah-admin-tambah" min="1" required>
+                <input type="number" class="form-control" id="jumlah-admin-tambah" min="1" required />
               </div>
               <div class="mb-3">
                 <label for="penambah-admin" class="form-label">Penambah Stok</label>
-                <input type="text" class="form-control" id="penambah-admin" required>
+                <input type="text" class="form-control" id="penambah-admin" required />
               </div>
               <div class="mb-3">
                 <label for="penerima-admin" class="form-label">Penerima Stok</label>
-                <input type="text" class="form-control" id="penerima-admin" required>
+                <input type="text" class="form-control" id="penerima-admin" required />
               </div>
             </form>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-              <i class="fas fa-times me-2"></i>Batal
+              <i class="fas fa-times me-2"></i>
+              Batal
             </button>
             <button type="button" class="btn btn-primary" id="simpan-tambah-admin">
-              <i class="fas fa-save me-2"></i>Simpan
+              <i class="fas fa-save me-2"></i>
+              Simpan
             </button>
           </div>
         </div>
       </div>
     </div>
-    
+
     <div class="modal fade" id="kurangiStokAdminModal" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title"><i class="fas fa-minus-circle me-2"></i>Kurangi Stok Admin</h5>
+            <h5 class="modal-title">
+              <i class="fas fa-minus-circle me-2"></i>
+              Kurangi Stok Admin
+            </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -623,11 +837,11 @@
               </div>
               <div class="mb-3">
                 <label for="jumlah-admin-kurang" class="form-label">Jumlah</label>
-                <input type="number" class="form-control" id="jumlah-admin-kurang" min="1" required>
+                <input type="number" class="form-control" id="jumlah-admin-kurang" min="1" required />
               </div>
               <div class="mb-3">
                 <label for="pengurang-admin" class="form-label">Pengurang Stok</label>
-                <input type="text" class="form-control" id="pengurang-admin" required>
+                <input type="text" class="form-control" id="pengurang-admin" required />
               </div>
               <div class="mb-3">
                 <label for="keterangan-admin" class="form-label">Keterangan</label>
@@ -637,22 +851,27 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-              <i class="fas fa-times me-2"></i>Batal
+              <i class="fas fa-times me-2"></i>
+              Batal
             </button>
             <button type="button" class="btn btn-primary" id="simpan-kurang-admin">
-              <i class="fas fa-save me-2"></i>Simpan
+              <i class="fas fa-save me-2"></i>
+              Simpan
             </button>
           </div>
         </div>
       </div>
     </div>
-    
+
     <!-- Modals for BARANG RUSAK -->
     <div class="modal fade" id="tambahStokBarangRusakModal" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Tambah Stok Barang Rusak</h5>
+            <h5 class="modal-title">
+              <i class="fas fa-plus-circle me-2"></i>
+              Tambah Stok Barang Rusak
+            </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -672,35 +891,40 @@
               </div>
               <div class="mb-3">
                 <label for="jumlah-rusak-tambah" class="form-label">Jumlah</label>
-                <input type="number" class="form-control" id="jumlah-rusak-tambah" min="1" required>
+                <input type="number" class="form-control" id="jumlah-rusak-tambah" min="1" required />
               </div>
               <div class="mb-3">
                 <label for="penambah-rusak" class="form-label">Penambah Stok</label>
-                <input type="text" class="form-control" id="penambah-rusak" required>
+                <input type="text" class="form-control" id="penambah-rusak" required />
               </div>
               <div class="mb-3">
                 <label for="penerima-rusak" class="form-label">Penerima Stok</label>
-                <input type="text" class="form-control" id="penerima-rusak" required>
+                <input type="text" class="form-control" id="penerima-rusak" required />
               </div>
             </form>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-              <i class="fas fa-times me-2"></i>Batal
+              <i class="fas fa-times me-2"></i>
+              Batal
             </button>
             <button type="button" class="btn btn-primary" id="simpan-tambah-rusak">
-              <i class="fas fa-save me-2"></i>Simpan
+              <i class="fas fa-save me-2"></i>
+              Simpan
             </button>
           </div>
         </div>
       </div>
     </div>
-    
+
     <div class="modal fade" id="kurangiStokBarangRusakModal" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title"><i class="fas fa-minus-circle me-2"></i>Kurangi Stok Barang Rusak</h5>
+            <h5 class="modal-title">
+              <i class="fas fa-minus-circle me-2"></i>
+              Kurangi Stok Barang Rusak
+            </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -720,11 +944,11 @@
               </div>
               <div class="mb-3">
                 <label for="jumlah-rusak-kurang" class="form-label">Jumlah</label>
-                <input type="number" class="form-control" id="jumlah-rusak-kurang" min="1" required>
+                <input type="number" class="form-control" id="jumlah-rusak-kurang" min="1" required />
               </div>
               <div class="mb-3">
                 <label for="pengurang-rusak" class="form-label">Pengurang Stok</label>
-                <input type="text" class="form-control" id="pengurang-rusak" required>
+                <input type="text" class="form-control" id="pengurang-rusak" required />
               </div>
               <div class="mb-3">
                 <label for="keterangan-rusak" class="form-label">Keterangan</label>
@@ -734,22 +958,27 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-              <i class="fas fa-times me-2"></i>Batal
+              <i class="fas fa-times me-2"></i>
+              Batal
             </button>
             <button type="button" class="btn btn-primary" id="simpan-kurang-rusak">
-              <i class="fas fa-save me-2"></i>Simpan
+              <i class="fas fa-save me-2"></i>
+              Simpan
             </button>
           </div>
         </div>
       </div>
     </div>
-    
+
     <!-- Modals for POSTING -->
     <div class="modal fade" id="tambahStokPostingModal" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Tambah Stok Posting</h5>
+            <h5 class="modal-title">
+              <i class="fas fa-plus-circle me-2"></i>
+              Tambah Stok Posting
+            </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -769,35 +998,40 @@
               </div>
               <div class="mb-3">
                 <label for="jumlah-posting-tambah" class="form-label">Jumlah</label>
-                <input type="number" class="form-control" id="jumlah-posting-tambah" min="1" required>
+                <input type="number" class="form-control" id="jumlah-posting-tambah" min="1" required />
               </div>
               <div class="mb-3">
                 <label for="penambah-posting" class="form-label">Penambah Stok</label>
-                <input type="text" class="form-control" id="penambah-posting" required>
+                <input type="text" class="form-control" id="penambah-posting" required />
               </div>
               <div class="mb-3">
                 <label for="penerima-posting" class="form-label">Penerima Stok</label>
-                <input type="text" class="form-control" id="penerima-posting" required>
+                <input type="text" class="form-control" id="penerima-posting" required />
               </div>
             </form>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-              <i class="fas fa-times me-2"></i>Batal
+              <i class="fas fa-times me-2"></i>
+              Batal
             </button>
             <button type="button" class="btn btn-primary" id="simpan-tambah-posting">
-              <i class="fas fa-save me-2"></i>Simpan
+              <i class="fas fa-save me-2"></i>
+              Simpan
             </button>
           </div>
         </div>
       </div>
     </div>
-    
+
     <div class="modal fade" id="kurangiStokPostingModal" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title"><i class="fas fa-minus-circle me-2"></i>Kurangi Stok Posting</h5>
+            <h5 class="modal-title">
+              <i class="fas fa-minus-circle me-2"></i>
+              Kurangi Stok Posting
+            </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -817,11 +1051,11 @@
               </div>
               <div class="mb-3">
                 <label for="jumlah-posting-kurang" class="form-label">Jumlah</label>
-                <input type="number" class="form-control" id="jumlah-posting-kurang" min="1" required>
+                <input type="number" class="form-control" id="jumlah-posting-kurang" min="1" required />
               </div>
               <div class="mb-3">
                 <label for="pengurang-posting" class="form-label">Pengurang Stok</label>
-                <input type="text" class="form-control" id="pengurang-posting" required>
+                <input type="text" class="form-control" id="pengurang-posting" required />
               </div>
               <div class="mb-3">
                 <label for="keterangan-posting" class="form-label">Keterangan</label>
@@ -831,10 +1065,12 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-              <i class="fas fa-times me-2"></i>Batal
+              <i class="fas fa-times me-2"></i>
+              Batal
             </button>
             <button type="button" class="btn btn-primary" id="simpan-kurang-posting">
-              <i class="fas fa-save me-2"></i>Simpan
+              <i class="fas fa-save me-2"></i>
+              Simpan
             </button>
           </div>
         </div>
@@ -846,77 +1082,87 @@
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Tambah Stok Batu Lepas</h5>
+            <h5 class="modal-title">
+              <i class="fas fa-plus-circle me-2"></i>
+              Tambah Stok Batu Lepas
+            </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <form id="tambahStokBatuLepasForm">
               <div class="mb-3">
-                <label for="jenis-batu-tambah" class="form-label">Jenis Batu</label>
-                <select class="form-select" id="jenis-batu-tambah" required>
-                  <option value="">Pilih Jenis Batu</option>
-                  <option value="BERLIAN">BERLIAN</option>
-                  <option value="RUBY">RUBY</option>
-                  <option value="SAFIR">SAFIR</option>
-                  <option value="ZAMRUD">ZAMRUD</option>
-                  <option value="MUTIARA">MUTIARA</option>
-                  <option value="ZIRCON">ZIRCON</option>
-                  <option value="LAINNYA">LAINNYA</option>
+                <label for="jenis-barang-batu-tambah" class="form-label">Jenis Barang</label>
+                <select class="form-select" id="jenis-barang-batu-tambah" required>
+                  <option value="">Pilih Jenis Barang</option>
+                  <option value="KALUNG">KALUNG</option>
+                  <option value="LIONTIN">LIONTIN</option>
+                  <option value="ANTING">ANTING</option>
+                  <option value="CINCIN">CINCIN</option>
+                  <option value="HALA">HALA</option>
+                  <option value="GELANG">GELANG</option>
+                  <option value="GIWANG">GIWANG</option>
                 </select>
-              </div>
-              <div class="mb-3" id="jenis-batu-lainnya-container" style="display: none;">
-                <label for="jenis-batu-lainnya" class="form-label">Jenis Batu Lainnya</label>
-                <input type="text" class="form-control" id="jenis-batu-lainnya">
               </div>
               <div class="mb-3">
                 <label for="jumlah-batu-tambah" class="form-label">Jumlah</label>
-                <input type="number" class="form-control" id="jumlah-batu-tambah" min="1" required>
+                <input type="number" class="form-control" id="jumlah-batu-tambah" min="1" required />
               </div>
               <div class="mb-3">
                 <label for="penambah-batu" class="form-label">Penambah Stok</label>
-                <input type="text" class="form-control" id="penambah-batu" required>
+                <input type="text" class="form-control" id="penambah-batu" required />
               </div>
               <div class="mb-3">
                 <label for="penerima-batu" class="form-label">Penerima Stok</label>
-                <input type="text" class="form-control" id="penerima-batu" required>
+                <input type="text" class="form-control" id="penerima-batu" required />
               </div>
             </form>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-              <i class="fas fa-times me-2"></i>Batal
+              <i class="fas fa-times me-2"></i>
+              Batal
             </button>
             <button type="button" class="btn btn-primary" id="simpan-tambah-batu">
-              <i class="fas fa-save me-2"></i>Simpan
+              <i class="fas fa-save me-2"></i>
+              Simpan
             </button>
           </div>
         </div>
       </div>
     </div>
-    
+
     <div class="modal fade" id="kurangiStokBatuLepasModal" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title"><i class="fas fa-minus-circle me-2"></i>Kurangi Stok Batu Lepas</h5>
+            <h5 class="modal-title">
+              <i class="fas fa-minus-circle me-2"></i>
+              Kurangi Stok Batu Lepas
+            </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <form id="kurangiStokBatuLepasForm">
               <div class="mb-3">
-                <label for="jenis-batu-kurang" class="form-label">Jenis Batu</label>
-                <select class="form-select" id="jenis-batu-kurang" required>
-                  <option value="">Pilih Jenis Batu</option>
-                  <!-- Options will be populated by JavaScript -->
+                <label for="jenis-barang-batu-kurang" class="form-label">Jenis Barang</label>
+                <select class="form-select" id="jenis-barang-batu-kurang" required>
+                  <option value="">Pilih Jenis Barang</option>
+                  <option value="KALUNG">KALUNG</option>
+                  <option value="LIONTIN">LIONTIN</option>
+                  <option value="ANTING">ANTING</option>
+                  <option value="CINCIN">CINCIN</option>
+                  <option value="HALA">HALA</option>
+                  <option value="GELANG">GELANG</option>
+                  <option value="GIWANG">GIWANG</option>
                 </select>
               </div>
               <div class="mb-3">
                 <label for="jumlah-batu-kurang" class="form-label">Jumlah</label>
-                <input type="number" class="form-control" id="jumlah-batu-kurang" min="1" required>
+                <input type="number" class="form-control" id="jumlah-batu-kurang" min="1" required />
               </div>
               <div class="mb-3">
                 <label for="pengurang-batu" class="form-label">Pengurang Stok</label>
-                <input type="text" class="form-control" id="pengurang-batu" required>
+                <input type="text" class="form-control" id="pengurang-batu" required />
               </div>
               <div class="mb-3">
                 <label for="keterangan-batu" class="form-label">Keterangan</label>
@@ -926,22 +1172,28 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-              <i class="fas fa-times me-2"></i>Batal
+              <i class="fas fa-times me-2"></i>
+              Batal
             </button>
             <button type="button" class="btn btn-primary" id="simpan-kurang-batu">
-              <i class="fas fa-save me-2"></i>Simpan
+              <i class="fas fa-save me-2"></i>
+              Simpan
             </button>
           </div>
         </div>
       </div>
     </div>
-    
+
     <!-- Modal for History -->
     <div class="modal fade" id="historyModal" tabindex="-1">
       <div class="modal-dialog modal-lg">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title"><i class="fas fa-history me-2"></i>Riwayat Stok <span id="history-title"></span></h5>
+            <h5 class="modal-title">
+              <i class="fas fa-history me-2"></i>
+              Riwayat Stok
+              <span id="history-title"></span>
+            </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -964,7 +1216,8 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-              <i class="fas fa-times me-2"></i>Tutup
+              <i class="fas fa-times me-2"></i>
+              Tutup
             </button>
           </div>
         </div>
@@ -975,10 +1228,6 @@
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/components/sidebar.js"></script>
     <script type="module" src="js/components/header.js"></script>
-    <script src="js/manajemenStok.js"></script>
+    <script type="module" src="js/manajemenStok.js"></script>
   </body>
 </html>
-
-
-
-
