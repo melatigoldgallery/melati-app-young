@@ -14,85 +14,87 @@ import {
 
 // Cache management dengan localStorage dan TTL
 const cacheManager = {
-  prefix: 'melati_sales_',
+  prefix: "melati_sales_",
   defaultTTL: 5 * 60 * 1000, // 5 menit
-  
+
   set(key, data, ttl = this.defaultTTL) {
     const item = {
       data,
       timestamp: Date.now(),
-      ttl
+      ttl,
     };
     localStorage.setItem(this.prefix + key, JSON.stringify(item));
   },
-  
+
   get(key) {
     try {
       const item = JSON.parse(localStorage.getItem(this.prefix + key));
       if (!item) return null;
-      
+
       if (Date.now() - item.timestamp > item.ttl) {
         this.remove(key);
         return null;
       }
-      
+
       return item.data;
     } catch (error) {
-      console.error('Cache get error:', error);
+      console.error("Cache get error:", error);
       return null;
     }
   },
-  
+
   remove(key) {
     localStorage.removeItem(this.prefix + key);
   },
-  
+
   clear() {
     Object.keys(localStorage)
-      .filter(key => key.startsWith(this.prefix))
-      .forEach(key => localStorage.removeItem(key));
+      .filter((key) => key.startsWith(this.prefix))
+      .forEach((key) => localStorage.removeItem(key));
   },
-  
+
   // Cache dengan versioning untuk multi-device sync
   setVersioned(key, data, version = Date.now()) {
     this.set(key, { data, version });
   },
-  
+
   getVersioned(key) {
     const cached = this.get(key);
     return cached ? cached : null;
-  }
+  },
 };
 
 // Utility functions
 const utils = {
-  showAlert: (message, title = "Informasi", type = "info") => 
+  showAlert: (message, title = "Informasi", type = "info") =>
     Swal.fire({ title, text: message, icon: type, confirmButtonText: "OK", confirmButtonColor: "#0d6efd" }),
-  
+
   showLoading: (show) => {
     const loader = document.getElementById("loadingIndicator");
     if (loader) loader.style.display = show ? "flex" : "none";
   },
-  
+
   formatDate: (date) => {
     if (!date) return "-";
     try {
-      const d = date.toDate ? date.toDate() : (date instanceof Date ? date : new Date(date));
+      const d = date.toDate ? date.toDate() : date instanceof Date ? date : new Date(date);
       return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-    } catch { return "-"; }
+    } catch {
+      return "-";
+    }
   },
-  
+
   parseDate: (dateString) => {
     if (!dateString) return null;
     const [day, month, year] = dateString.split("/");
     return new Date(year, month - 1, day);
   },
-  
+
   formatRupiah: (angka) => {
-    const number = typeof angka === "string" ? parseInt(angka.replace(/\./g, "")) : (angka || 0);
+    const number = typeof angka === "string" ? parseInt(angka.replace(/\./g, "")) : angka || 0;
     return new Intl.NumberFormat("id-ID").format(number);
   },
-  
+
   debounce: (func, wait) => {
     let timeout;
     return function executedFunction(...args) {
@@ -104,19 +106,19 @@ const utils = {
       timeout = setTimeout(later, wait);
     };
   },
-  
+
   throttle: (func, limit) => {
     let inThrottle;
-    return function() {
+    return function () {
       const args = arguments;
       const context = this;
       if (!inThrottle) {
         func.apply(context, args);
         inThrottle = true;
-        setTimeout(() => inThrottle = false, limit);
+        setTimeout(() => (inThrottle = false), limit);
       }
     };
-  }
+  },
 };
 
 // Main application class
@@ -127,7 +129,8 @@ class DataPenjualanApp {
     this.dataTable = null;
     this.currentTransaction = null;
     this.isLoading = false;
-    
+    this.isGroupedView = false;
+
     // Bind methods
     this.refreshData = utils.debounce(this.refreshData.bind(this), 1000);
     this.filterData = utils.throttle(this.filterData.bind(this), 500);
@@ -147,25 +150,83 @@ class DataPenjualanApp {
   // Setup all event listeners
   setupEventListeners() {
     const events = {
-      'btnTambahTransaksi': () => window.location.href = "penjualanAksesoris.html",
-      'btnRefreshData': () => this.refreshData(true),
-      'btnFilter': () => this.filterData(),
-      'btnExportData': () => this.exportToExcel(),
-      'btnPrintReceipt': () => this.printDocument('receipt'),
-      'btnPrintInvoice': () => this.printDocument('invoice'),
-      'btnSaveEdit': () => this.saveEditTransaction(),
-      'btnConfirmDelete': () => this.confirmDeleteTransaction()
+      btnTambahTransaksi: () => (window.location.href = "penjualanAksesoris.html"),
+      btnRefreshData: () => this.refreshData(true),
+      btnFilter: () => this.filterData(),
+      btnExportData: () => this.exportToExcel(),
+      btnPrintReceipt: () => this.printDocument("receipt"),
+      btnPrintInvoice: () => this.printDocument("invoice"),
+      btnSaveEdit: () => this.saveEditTransaction(),
+      btnConfirmDelete: () => this.confirmDeleteTransaction(),
+      btnToggleView: () => this.toggleView(),
+      btnExportData: () => (this.isGroupedView ? this.exportGroupedData() : this.exportToExcel()),
     };
 
     Object.entries(events).forEach(([id, handler]) => {
       const element = document.getElementById(id);
-      if (element) element.addEventListener('click', handler);
+      if (element) element.addEventListener("click", handler);
     });
 
     // Table action handlers
-    $(document).on('click', '.btn-reprint', (e) => this.handleReprint(e.target.dataset.id));
-    $(document).on('click', '.btn-edit', (e) => this.handleEdit(e.target.dataset.id));
-    $(document).on('click', '.btn-delete', (e) => this.handleDelete(e.target.dataset.id));
+    $(document).on("click", ".btn-reprint", (e) => this.handleReprint(e.target.dataset.id));
+    $(document).on("click", ".btn-edit", (e) => this.handleEdit(e.target.dataset.id));
+    $(document).on("click", ".btn-delete", (e) => this.handleDelete(e.target.dataset.id));
+    $(document).on("click", ".btn-view-details", (e) => this.showGroupDetails(e.target.closest("button").dataset.ids));
+    $(document).on("click", ".btn-print-group", (e) =>
+      this.printGroupTransactions(e.target.closest("button").dataset.ids)
+    );
+  }
+
+  toggleView() {
+    this.isGroupedView = !this.isGroupedView;
+
+    // Update button
+    const btn = document.getElementById("btnToggleView");
+    btn.innerHTML = this.isGroupedView
+      ? '<i class="fas fa-list me-2"></i>View Detail'
+      : '<i class="fas fa-layer-group me-2"></i>View Grouped';
+    btn.className = this.isGroupedView ? "btn btn-outline-info" : "btn btn-info";
+
+    this.updateDataTable();
+    this.updateSummary();
+  }
+
+  groupData() {
+    const grouped = new Map();
+
+    this.filteredData.forEach((transaction) => {
+      transaction.items?.forEach((item) => {
+        const key = `${transaction.jenisPenjualan}_${item.kodeText || "NO_CODE"}`;
+
+        if (grouped.has(key)) {
+          const g = grouped.get(key);
+          g.totalJumlah += item.jumlah || 1;
+          g.totalHarga += item.totalHarga || 0;
+          g.totalBerat += parseFloat(item.berat || 0);
+          g.transactions.push(transaction);
+          g.salesList.add(transaction.sales || "Admin");
+        } else {
+          grouped.set(key, {
+            jenisPenjualan: transaction.jenisPenjualan,
+            kodeText: item.kodeText || "-",
+            nama: item.nama || "-",
+            kadar: item.kadar || "-",
+            totalJumlah: item.jumlah || 1,
+            totalBerat: parseFloat(item.berat || 0),
+            totalHarga: item.totalHarga || 0,
+            salesList: new Set([transaction.sales || "Admin"]),
+            transactions: [transaction],
+            latestDate: transaction.timestamp || transaction.tanggal,
+          });
+        }
+      });
+    });
+
+    return Array.from(grouped.values()).sort((a, b) => {
+      const dateA = a.latestDate?.toDate ? a.latestDate.toDate() : new Date(a.latestDate);
+      const dateB = b.latestDate?.toDate ? b.latestDate.toDate() : new Date(b.latestDate);
+      return dateB - dateA;
+    });
   }
 
   // Initialize date pickers
@@ -178,40 +239,39 @@ class DataPenjualanApp {
     });
   }
 
-  // Set default date range (last 7 days)
+  // Set default date range (today only)
   setDefaultDates() {
     const today = new Date();
-    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    
-    document.getElementById("filterTanggalMulai").value = utils.formatDate(weekAgo);
+
+    document.getElementById("filterTanggalMulai").value = utils.formatDate(today);
     document.getElementById("filterTanggalAkhir").value = utils.formatDate(today);
   }
 
   // Load sales data with caching
   async loadSalesData(forceRefresh = false) {
     if (this.isLoading) return;
-    
+
     try {
       this.isLoading = true;
       utils.showLoading(true);
 
       // Check cache first
       if (!forceRefresh) {
-        const cachedData = cacheManager.getVersioned('salesData');
+        const cachedData = cacheManager.getVersioned("salesData");
         if (cachedData) {
-          console.log('Using cached sales data');
+          console.log("Using cached sales data");
           this.salesData = cachedData.data;
           this.filterData();
           return;
         }
       }
 
-      console.log('Fetching fresh sales data from Firestore');
+      console.log("Fetching fresh sales data from Firestore");
       const salesSnapshot = await getDocs(
         query(collection(firestore, "penjualanAksesoris"), orderBy("timestamp", "desc"))
       );
-      
-      this.salesData = salesSnapshot.docs.map(doc => {
+
+      this.salesData = salesSnapshot.docs.map((doc) => {
         const data = doc.data();
         // Standardize jenis penjualan
         if (data.jenisPenjualan === "gantiLock") {
@@ -222,9 +282,8 @@ class DataPenjualanApp {
       });
 
       // Cache with version for multi-device sync
-      cacheManager.setVersioned('salesData', this.salesData);
+      cacheManager.setVersioned("salesData", this.salesData);
       this.filterData();
-
     } catch (error) {
       console.error("Error loading sales data:", error);
       utils.showAlert("Gagal memuat data penjualan: " + error.message, "Error", "error");
@@ -254,7 +313,7 @@ class DataPenjualanApp {
         { title: "Harga", width: "120px" },
         { title: "Status", width: "100px" },
         { title: "Keterangan", width: "150px" },
-        { title: "Aksi", width: "120px", orderable: false }
+        { title: "Aksi", width: "120px", orderable: false },
       ],
       order: [[0, "desc"]],
       pageLength: 25,
@@ -265,7 +324,7 @@ class DataPenjualanApp {
       autoWidth: false,
       scrollX: true,
       processing: true,
-      deferRender: true
+      deferRender: true,
     });
   }
 
@@ -275,7 +334,7 @@ class DataPenjualanApp {
       startDate: utils.parseDate(document.getElementById("filterTanggalMulai").value),
       endDate: utils.parseDate(document.getElementById("filterTanggalAkhir").value),
       jenis: document.getElementById("filterJenisPenjualan").value,
-      sales: document.getElementById("filterSales").value
+      sales: document.getElementById("filterSales").value,
     };
 
     // Adjust end date to include full day
@@ -283,10 +342,11 @@ class DataPenjualanApp {
       filters.endDate.setHours(23, 59, 59, 999);
     }
 
-    this.filteredData = this.salesData.filter(transaction => {
-      const transactionDate = transaction.timestamp ? 
-        transaction.timestamp.toDate() : utils.parseDate(transaction.tanggal);
-      
+    this.filteredData = this.salesData.filter((transaction) => {
+      const transactionDate = transaction.timestamp
+        ? transaction.timestamp.toDate()
+        : utils.parseDate(transaction.tanggal);
+
       if (!transactionDate) return false;
 
       // Date filter
@@ -309,7 +369,7 @@ class DataPenjualanApp {
   // Update DataTable with filtered data
   updateDataTable() {
     const tableData = this.prepareTableData();
-    
+
     if (this.dataTable) {
       this.dataTable.clear().rows.add(tableData).draw();
     }
@@ -317,19 +377,36 @@ class DataPenjualanApp {
 
   // Prepare data for DataTable
   prepareTableData() {
+    if (this.isGroupedView) {
+      return this.groupData().map((group) => [
+        utils.formatDate(group.latestDate),
+        Array.from(group.salesList).join(", "),
+        (group.jenisPenjualan || "").charAt(0).toUpperCase() + (group.jenisPenjualan || "").slice(1),
+        group.kodeText,
+        group.nama,
+        `<strong>${group.totalJumlah} pcs</strong>`,
+        group.totalBerat > 0 ? `<strong>${group.totalBerat.toFixed(2)} gr</strong>` : "-",
+        group.kadar,
+        `<strong>Rp ${utils.formatRupiah(group.totalHarga)}</strong>`,
+        this.getGroupStatus(group.transactions),
+        this.getGroupKeterangan(group.transactions),
+        this.getGroupActions(group.transactions),
+      ]);
+    }
+
+    // Original detailed view logic
     const tableData = [];
-    
-    this.filteredData.forEach(transaction => {
+    this.filteredData.forEach((transaction) => {
       const baseData = {
         date: utils.formatDate(transaction.timestamp || transaction.tanggal),
         sales: transaction.sales || "Admin",
         jenis: this.formatJenisPenjualan(transaction),
         status: this.getStatusBadge(transaction),
-        actions: this.getActionButtons(transaction.id)
+        actions: this.getActionButtons(transaction.id),
       };
 
-      if (transaction.items && transaction.items.length > 0) {
-        transaction.items.forEach(item => {
+      if (transaction.items?.length > 0) {
+        transaction.items.forEach((item) => {
           tableData.push([
             baseData.date,
             baseData.sales,
@@ -342,7 +419,7 @@ class DataPenjualanApp {
             `Rp ${utils.formatRupiah(item.totalHarga || 0)}`,
             baseData.status,
             item.keterangan || transaction.keterangan || "-",
-            baseData.actions
+            baseData.actions,
           ]);
         });
       } else {
@@ -350,30 +427,58 @@ class DataPenjualanApp {
           baseData.date,
           baseData.sales,
           baseData.jenis,
-          "-", "-", "-", "-", "-",
+          "-",
+          "-",
+          "-",
+          "-",
+          "-",
           `Rp ${utils.formatRupiah(transaction.totalHarga || 0)}`,
           baseData.status,
           transaction.keterangan || "-",
-          baseData.actions
+          baseData.actions,
         ]);
       }
     });
-
     return tableData;
   }
+
+  getGroupStatus(transactions) {
+  const statusCounts = {};
+  transactions.forEach(t => statusCounts[t.statusPembayaran || "Lunas"] = (statusCounts[t.statusPembayaran || "Lunas"] || 0) + 1);
+  
+  return Object.entries(statusCounts).map(([status, count]) => {
+    const color = status === "Lunas" ? "success" : status === "Free" ? "info" : "warning";
+    return `<span class="badge bg-${color}">${status} (${count})</span>`;
+  }).join(' ');
+}
+
+getGroupKeterangan(transactions) {
+  const keteranganSet = new Set(transactions.map(t => t.keterangan).filter(Boolean));
+  const arr = Array.from(keteranganSet);
+  return arr.length === 0 ? "-" : arr.length === 1 ? arr[0] : `${arr[0]} <small>(+${arr.length-1})</small>`;
+}
+
+getGroupActions(transactions) {
+  const ids = transactions.map(t => t.id).join(',');
+  return `
+    <div class="action-buttons">
+      <button class="btn btn-sm btn-info btn-view-details" data-ids="${ids}" title="Detail"><i class="fas fa-eye"></i></button>
+      <button class="btn btn-sm btn-warning btn-print-group" data-ids="${ids}" title="Cetak"><i class="fas fa-print"></i></button>
+    </div>`;
+}
 
   // Format jenis penjualan
   formatJenisPenjualan(transaction) {
     if (transaction.isGantiLock || transaction.jenisPenjualan === "gantiLock") {
-      const kodeAksesoris = transaction.items?.find(item => item.kodeLock)?.kodeLock || "";
+      const kodeAksesoris = transaction.items?.find((item) => item.kodeLock)?.kodeLock || "";
       return kodeAksesoris ? `Manual<br><small>(${kodeAksesoris})</small>` : "Manual";
     }
-    
+
     if (transaction.jenisPenjualan === "manual") {
-      const kodeAksesoris = transaction.items?.find(item => item.kodeLock)?.kodeLock;
+      const kodeAksesoris = transaction.items?.find((item) => item.kodeLock)?.kodeLock;
       return kodeAksesoris ? `Manual<br><small>(${kodeAksesoris})</small>` : "Manual";
     }
-    
+
     const jenis = transaction.jenisPenjualan || "Tidak diketahui";
     return jenis.charAt(0).toUpperCase() + jenis.slice(1);
   }
@@ -381,14 +486,13 @@ class DataPenjualanApp {
   // Get status badge HTML
   getStatusBadge(transaction) {
     const status = transaction.statusPembayaran || "Lunas";
-    
-    const badges = {
-      "DP": `<span class="badge bg-warning">DP: Rp ${utils.formatRupiah(transaction.nominalDP)}</span>
-             <br><small>Sisa: Rp ${utils.formatRupiah(transaction.sisaPembayaran)}</small>`,
-      "Lunas": `<span class="badge bg-success">Lunas</span>`,
-      "Free": `<span class="badge bg-info">Gratis</span>`
-    };
 
+    const badges = {
+      DP: `<span class="badge bg-warning">DP: Rp ${utils.formatRupiah(transaction.nominalDP)}</span>
+             <br><small>Sisa: Rp ${utils.formatRupiah(transaction.sisaPembayaran)}</small>`,
+      Lunas: `<span class="badge bg-success">Lunas</span>`,
+      Free: `<span class="badge bg-info">Gratis</span>`,
+    };
     return badges[status] || `<span class="badge bg-secondary">${status}</span>`;
   }
 
@@ -409,56 +513,138 @@ class DataPenjualanApp {
     `;
   }
 
-  // Update summary cards
-  updateSummary() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const todayTransactions = this.salesData.filter(t => {
-      const tDate = t.timestamp ? t.timestamp.toDate() : utils.parseDate(t.tanggal);
-      return tDate >= today && tDate < tomorrow;
-    });
-
-    const summary = {
-      totalTransaksi: this.filteredData.length,
-      totalPendapatan: this.calculateTotalRevenue(this.filteredData),
-      transaksiHariIni: todayTransactions.length,
-      pendapatanHariIni: this.calculateTotalRevenue(todayTransactions)
-    };
-
-    // Update DOM
-    document.getElementById("totalTransaksi").textContent = summary.totalTransaksi;
-    document.getElementById("totalPendapatan").textContent = `Rp ${utils.formatRupiah(summary.totalPendapatan)}`;
-    document.getElementById("transaksiHariIni").textContent = summary.transaksiHariIni;
-    document.getElementById("pendapatanHariIni").textContent = `Rp ${utils.formatRupiah(summary.pendapatanHariIni)}`;
+  // Update summary cards (removed daily cards)
+updateSummary() {
+  let totalTransaksi, totalPendapatan;
+  
+  if (this.isGroupedView) {
+    const grouped = this.groupData();
+    totalTransaksi = grouped.length;
+    totalPendapatan = grouped.reduce((sum, g) => sum + g.totalHarga, 0);
+  } else {
+    totalTransaksi = this.filteredData.length;
+    totalPendapatan = this.calculateTotalRevenue(this.filteredData);
   }
+  
+  document.getElementById("totalTransaksi").textContent = totalTransaksi;
+  document.getElementById("totalPendapatan").textContent = `Rp ${utils.formatRupiah(totalPendapatan)}`;
+} 
+
+exportGroupedData() {
+  const grouped = this.groupData();
+  if (!grouped.length) return utils.showAlert("Tidak ada data untuk diekspor", "Info", "info");
+  
+  const exportData = grouped.map(g => ({
+    'Tanggal': utils.formatDate(g.latestDate),
+    'Sales': Array.from(g.salesList).join(', '),
+    'Jenis': g.jenisPenjualan,
+    'Kode': g.kodeText,
+    'Nama': g.nama,
+    'Jumlah': g.totalJumlah,
+    'Berat': g.totalBerat.toFixed(2),
+    'Kadar': g.kadar,
+    'Total Harga': g.totalHarga,
+    'Transaksi': g.transactions.length
+  }));
+  
+  const ws = XLSX.utils.json_to_sheet(exportData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Grouped Data");
+  XLSX.writeFile(wb, `grouped_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
+
+showGroupDetails(ids) {
+  const transactions = this.salesData.filter(t => ids.split(',').includes(t.id));
+  if (!transactions.length) return utils.showAlert("Data tidak ditemukan", "Error", "error");
+  
+  const modalHtml = `
+    <div class="modal fade" id="groupModal" tabindex="-1">
+      <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5>Detail Grup Transaksi</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <table class="table table-sm">
+              <thead><tr><th>Tanggal</th><th>Sales</th><th>Kode</th><th>Nama</th><th>Harga</th></tr></thead>
+              <tbody>
+                ${transactions.map(t => t.items?.map(item => `
+                  <tr>
+                    <td>${utils.formatDate(t.timestamp || t.tanggal)}</td>
+                    <td>${t.sales || "Admin"}</td>
+                    <td>${item.kodeText || "-"}</td>
+                    <td>${item.nama || "-"}</td>
+                    <td>Rp ${utils.formatRupiah(item.totalHarga || 0)}</td>
+                  </tr>
+                `).join('') || '').join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  
+  $('#groupModal').remove();
+  $('body').append(modalHtml);
+  $('#groupModal').modal('show').on('hidden.bs.modal', function() { $(this).remove(); });
+}
+
+printGroupTransactions(ids) {
+  const transactions = this.salesData.filter(t => ids.split(',').includes(t.id));
+  if (!transactions.length) return utils.showAlert("Data tidak ditemukan", "Error", "error");
+  
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return utils.showAlert("Popup diblokir", "Error", "error");
+  
+  const html = `
+    <html><head><title>Grup Transaksi</title>
+    <style>body{font-family:Arial;font-size:12px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px}</style>
+    </head><body>
+    <h2>MELATI GOLD SHOP - Grup Transaksi</h2>
+    <table><thead><tr><th>Tanggal</th><th>Sales</th><th>Kode</th><th>Nama</th><th>Harga</th></tr></thead>
+    <tbody>
+      ${transactions.map(t => t.items?.map(item => `
+        <tr>
+          <td>${utils.formatDate(t.timestamp || t.tanggal)}</td>
+          <td>${t.sales || "Admin"}</td>
+          <td>${item.kodeText || "-"}</td>
+          <td>${item.nama || "-"}</td>
+          <td>Rp ${utils.formatRupiah(item.totalHarga || 0)}</td>
+        </tr>
+      `).join('') || '').join('')}
+    </tbody></table>
+    <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}</script>
+    </body></html>`;
+  
+  printWindow.document.write(html);
+  printWindow.document.close();
+}
 
   // Calculate total revenue
   calculateTotalRevenue(transactions) {
     return transactions.reduce((total, transaction) => {
       if (transaction.metodeBayar === "free") return total;
-      
+
       if (transaction.metodeBayar === "dp" && transaction.statusPembayaran === "DP") {
         return total + (transaction.sisaPembayaran || 0);
       }
-      
+
       return total + (transaction.totalHarga || 0);
     }, 0);
   }
 
   // Populate sales filter dropdown
   populateSalesFilter() {
-    const salesPersons = [...new Set(this.salesData.map(item => item.sales).filter(Boolean))];
+    const salesPersons = [...new Set(this.salesData.map((item) => item.sales).filter(Boolean))];
     const dropdown = document.getElementById("filterSales");
-    
+
     // Clear existing options except first one
     while (dropdown.options.length > 1) {
       dropdown.remove(1);
     }
 
-    salesPersons.forEach(person => {
+    salesPersons.forEach((person) => {
       const option = new Option(person, person);
       dropdown.add(option);
     });
@@ -466,7 +652,7 @@ class DataPenjualanApp {
 
   // Handle reprint action
   handleReprint(transactionId) {
-    this.currentTransaction = this.salesData.find(t => t.id === transactionId);
+    this.currentTransaction = this.salesData.find((t) => t.id === transactionId);
     if (!this.currentTransaction) {
       return utils.showAlert("Transaksi tidak ditemukan", "Error", "error");
     }
@@ -475,7 +661,7 @@ class DataPenjualanApp {
 
   // Handle edit action
   handleEdit(transactionId) {
-    this.currentTransaction = this.salesData.find(t => t.id === transactionId);
+    this.currentTransaction = this.salesData.find((t) => t.id === transactionId);
     if (!this.currentTransaction) {
       return utils.showAlert("Transaksi tidak ditemukan", "Error", "error");
     }
@@ -484,7 +670,7 @@ class DataPenjualanApp {
 
   // Handle delete action
   handleDelete(transactionId) {
-    this.currentTransaction = this.salesData.find(t => t.id === transactionId);
+    this.currentTransaction = this.salesData.find((t) => t.id === transactionId);
     if (!this.currentTransaction) {
       return utils.showAlert("Transaksi tidak ditemukan", "Error", "error");
     }
@@ -495,13 +681,13 @@ class DataPenjualanApp {
   showEditModal() {
     const transaction = this.currentTransaction;
     const jenisPenjualan = transaction.jenisPenjualan;
-    
+
     const formHtml = this.generateEditForm(transaction, jenisPenjualan);
     document.getElementById("editModalBody").innerHTML = formHtml;
-    
+
     // Attach form events
     this.attachEditFormEvents(transaction);
-    
+
     $("#editModal").modal("show");
   }
 
@@ -510,13 +696,13 @@ class DataPenjualanApp {
     let formHtml = `
       <div class="mb-3">
         <label for="editSales" class="form-label">Sales:</label>
-        <input type="text" class="form-control" id="editSales" value="${transaction.sales || ''}">
+        <input type="text" class="form-control" id="editSales" value="${transaction.sales || ""}">
       </div>
     `;
 
     if (transaction.items && transaction.items.length > 0) {
       formHtml += `<div class="mb-3"><label class="form-label">Detail Barang:</label></div>`;
-      
+
       transaction.items.forEach((item, index) => {
         formHtml += `
           <div class="border p-3 mb-3 rounded">
@@ -524,42 +710,60 @@ class DataPenjualanApp {
             <div class="row">
               <div class="col-md-6">
                 <label for="editNama_${index}" class="form-label">Nama Barang:</label>
-                <input type="text" class="form-control" id="editNama_${index}" value="${item.nama || ''}">
+                <input type="text" class="form-control" id="editNama_${index}" value="${item.nama || ""}">
               </div>
-              ${jenisPenjualan !== "kotak" ? `
+              ${
+                jenisPenjualan !== "kotak"
+                  ? `
                 <div class="col-md-6">
                   <label for="editKadar_${index}" class="form-label">Kadar:</label>
-                  <input type="text" class="form-control" id="editKadar_${index}" value="${item.kadar || ''}">
+                  <input type="text" class="form-control" id="editKadar_${index}" value="${item.kadar || ""}">
                 </div>
-              ` : ''}
+              `
+                  : ""
+              }
             </div>
-            ${jenisPenjualan !== "kotak" ? `
+            ${
+              jenisPenjualan !== "kotak"
+                ? `
               <div class="row mt-2">
                 <div class="col-md-6">
                   <label for="editBerat_${index}" class="form-label">Berat (gr):</label>
-                  <input type="text" class="form-control" id="editBerat_${index}" value="${item.berat || ''}">
+                  <input type="text" class="form-control" id="editBerat_${index}" value="${item.berat || ""}">
                 </div>
                 <div class="col-md-6">
                   <label for="editHarga_${index}" class="form-label">Harga:</label>
-                  <input type="text" class="form-control" id="editHarga_${index}" value="${utils.formatRupiah(item.totalHarga || 0)}">
+                  <input type="text" class="form-control" id="editHarga_${index}" value="${utils.formatRupiah(
+                    item.totalHarga || 0
+                  )}">
                 </div>
               </div>
-            ` : `
+            `
+                : `
               <div class="row mt-2">
                 <div class="col-md-12">
                   <label for="editHarga_${index}" class="form-label">Harga:</label>
-                  <input type="text" class="form-control" id="editHarga_${index}" value="${utils.formatRupiah(item.totalHarga || 0)}">
+                  <input type="text" class="form-control" id="editHarga_${index}" value="${utils.formatRupiah(
+                    item.totalHarga || 0
+                  )}">
                 </div>
               </div>
-            `}
-            ${jenisPenjualan === "manual" ? `
+            `
+            }
+            ${
+              jenisPenjualan === "manual"
+                ? `
               <div class="row mt-2">
                 <div class="col-md-12">
                   <label for="editKeterangan_${index}" class="form-label">Keterangan:</label>
-                  <textarea class="form-control" id="editKeterangan_${index}" rows="2">${item.keterangan || ''}</textarea>
+                  <textarea class="form-control" id="editKeterangan_${index}" rows="2">${
+                    item.keterangan || ""
+                  }</textarea>
                 </div>
               </div>
-            ` : ''}
+            `
+                : ""
+            }
           </div>
         `;
       });
@@ -590,27 +794,27 @@ class DataPenjualanApp {
 
       const updateData = {
         sales: document.getElementById("editSales").value.trim(),
-        lastUpdated: serverTimestamp()
+        lastUpdated: serverTimestamp(),
       };
 
       if (this.currentTransaction.items && this.currentTransaction.items.length > 0) {
         updateData.items = this.currentTransaction.items.map((item, index) => {
           const updatedItem = { ...item };
-          
+
           updatedItem.nama = document.getElementById(`editNama_${index}`)?.value || item.nama;
-          
+
           if (this.currentTransaction.jenisPenjualan !== "kotak") {
             updatedItem.kadar = document.getElementById(`editKadar_${index}`)?.value || item.kadar;
             updatedItem.berat = document.getElementById(`editBerat_${index}`)?.value || item.berat;
           }
-          
+
           if (this.currentTransaction.jenisPenjualan === "manual") {
             updatedItem.keterangan = document.getElementById(`editKeterangan_${index}`)?.value || item.keterangan;
           }
-          
+
           const hargaValue = document.getElementById(`editHarga_${index}`)?.value.replace(/\./g, "") || "0";
           updatedItem.totalHarga = parseInt(hargaValue);
-          
+
           return updatedItem;
         });
 
@@ -619,16 +823,15 @@ class DataPenjualanApp {
 
       // Update in Firestore
       await updateDoc(doc(firestore, "penjualanAksesoris", this.currentTransaction.id), updateData);
-      
+
       // Update local data
       this.updateLocalData(this.currentTransaction.id, updateData);
-      
+
       // Clear cache
       cacheManager.clear();
-      
+
       $("#editModal").modal("hide");
       utils.showAlert("Transaksi berhasil diperbarui", "Sukses", "success");
-      
     } catch (error) {
       console.error("Error updating transaction:", error);
       utils.showAlert("Terjadi kesalahan saat memperbarui transaksi: " + error.message, "Error", "error");
@@ -640,19 +843,19 @@ class DataPenjualanApp {
   // Update local data
   updateLocalData(transactionId, updateData) {
     // Update salesData
-    const salesIndex = this.salesData.findIndex(item => item.id === transactionId);
+    const salesIndex = this.salesData.findIndex((item) => item.id === transactionId);
     if (salesIndex !== -1) {
       this.salesData[salesIndex] = { ...this.salesData[salesIndex], ...updateData };
       delete this.salesData[salesIndex].lastUpdated;
     }
-    
+
     // Update filteredData
-    const filteredIndex = this.filteredData.findIndex(item => item.id === transactionId);
+    const filteredIndex = this.filteredData.findIndex((item) => item.id === transactionId);
     if (filteredIndex !== -1) {
       this.filteredData[filteredIndex] = { ...this.filteredData[filteredIndex], ...updateData };
       delete this.filteredData[filteredIndex].lastUpdated;
     }
-    
+
     // Re-render table
     this.updateDataTable();
     this.updateSummary();
@@ -678,22 +881,21 @@ class DataPenjualanApp {
   async confirmDeleteTransaction() {
     try {
       utils.showLoading(true);
-      
+
       await deleteDoc(doc(firestore, "penjualanAksesoris", this.currentTransaction.id));
-      
+
       // Remove from local arrays
-      this.salesData = this.salesData.filter(item => item.id !== this.currentTransaction.id);
-      this.filteredData = this.filteredData.filter(item => item.id !== this.currentTransaction.id);
-      
+      this.salesData = this.salesData.filter((item) => item.id !== this.currentTransaction.id);
+      this.filteredData = this.filteredData.filter((item) => item.id !== this.currentTransaction.id);
+
       // Clear cache
       cacheManager.clear();
-      
+
       this.updateDataTable();
       this.updateSummary();
-      
+
       $("#deleteModal").modal("hide");
       utils.showAlert("Transaksi berhasil dihapus", "Sukses", "success");
-      
     } catch (error) {
       console.error("Error deleting transaction:", error);
       utils.showAlert("Terjadi kesalahan saat menghapus transaksi: " + error.message, "Error", "error");
@@ -715,8 +917,8 @@ class DataPenjualanApp {
       return utils.showAlert("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak.", "Error", "error");
     }
 
-    const html = type === 'receipt' ? this.generateReceiptHTML(transaction) : this.generateInvoiceHTML(transaction);
-    
+    const html = type === "receipt" ? this.generateReceiptHTML(transaction) : this.generateInvoiceHTML(transaction);
+
     printWindow.document.write(html);
     printWindow.document.close();
   }
@@ -766,7 +968,7 @@ class DataPenjualanApp {
     let hasKeterangan = false;
     let keteranganText = "";
 
-    transaction.items?.forEach(item => {
+    transaction.items?.forEach((item) => {
       const itemHarga = parseInt(item.totalHarga || 0);
       receiptHTML += `
         <tr>
@@ -846,7 +1048,7 @@ class DataPenjualanApp {
   // Generate invoice HTML
   generateInvoiceHTML(transaction) {
     const tanggal = utils.formatDate(transaction.timestamp || transaction.tanggal);
-    
+
     let invoiceHTML = `
       <!DOCTYPE html>
       <html>
@@ -877,7 +1079,7 @@ class DataPenjualanApp {
     let keteranganText = "";
     let totalHarga = 0;
 
-    transaction.items?.forEach(item => {
+    transaction.items?.forEach((item) => {
       const itemHarga = parseInt(item.totalHarga || 0);
       totalHarga += itemHarga;
 
@@ -939,40 +1141,40 @@ class DataPenjualanApp {
 
     // Prepare data for export
     const exportData = [];
-    
-    this.filteredData.forEach(transaction => {
+
+    this.filteredData.forEach((transaction) => {
       const baseData = {
         Tanggal: utils.formatDate(transaction.timestamp || transaction.tanggal),
         Sales: transaction.sales || "Admin",
         Jenis: transaction.jenisPenjualan || "-",
-        'Total Harga': transaction.totalHarga || 0,
+        "Total Harga": transaction.totalHarga || 0,
         Status: transaction.statusPembayaran || "Lunas",
-        'Metode Bayar': transaction.metodeBayar || "tunai"
+        "Metode Bayar": transaction.metodeBayar || "tunai",
       };
 
       if (transaction.items && transaction.items.length > 0) {
-        transaction.items.forEach(item => {
+        transaction.items.forEach((item) => {
           exportData.push({
             ...baseData,
-            'Kode Barang': item.kodeText || item.barcode || "-",
-            'Nama Barang': item.nama || "-",
+            "Kode Barang": item.kodeText || item.barcode || "-",
+            "Nama Barang": item.nama || "-",
             Jumlah: item.jumlah || 1,
             Berat: item.berat || "-",
             Kadar: item.kadar || "-",
-            'Harga Item': item.totalHarga || 0,
-            Keterangan: item.keterangan || "-"
+            "Harga Item": item.totalHarga || 0,
+            Keterangan: item.keterangan || "-",
           });
         });
       } else {
         exportData.push({
           ...baseData,
-          'Kode Barang': "-",
-          'Nama Barang': "-",
+          "Kode Barang": "-",
+          "Nama Barang": "-",
           Jumlah: "-",
           Berat: "-",
           Kadar: "-",
-          'Harga Item': transaction.totalHarga || 0,
-          Keterangan: transaction.keterangan || "-"
+          "Harga Item": transaction.totalHarga || 0,
+          Keterangan: transaction.keterangan || "-",
         });
       }
     });
@@ -981,8 +1183,8 @@ class DataPenjualanApp {
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Data Penjualan");
-    
-    const fileName = `data_penjualan_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+    const fileName = `data_penjualan_${new Date().toISOString().split("T")[0]}.xlsx`;
     XLSX.writeFile(wb, fileName);
   }
 
@@ -995,7 +1197,7 @@ class DataPenjualanApp {
 }
 
 // Initialize application when DOM is ready
-$(document).ready(async function() {
+$(document).ready(async function () {
   // Check if required libraries are loaded
   if (typeof XLSX === "undefined") {
     console.warn("SheetJS (XLSX) library is not loaded. Excel export will not work.");
@@ -1011,9 +1213,9 @@ $(document).ready(async function() {
   }, 5 * 60 * 1000);
 
   // Clear cache on page unload to prevent memory leaks
-  window.addEventListener('beforeunload', () => {
+  window.addEventListener("beforeunload", () => {
     // Only clear if cache is older than 1 hour
-    const cacheAge = Date.now() - (localStorage.getItem('melati_sales_salesData_timestamp') || 0);
+    const cacheAge = Date.now() - (localStorage.getItem("melati_sales_salesData_timestamp") || 0);
     if (cacheAge > 60 * 60 * 1000) {
       cacheManager.clear();
     }
@@ -1024,5 +1226,3 @@ $(document).ready(async function() {
 
 // Export for potential use in other modules
 export default DataPenjualanApp;
-
-
