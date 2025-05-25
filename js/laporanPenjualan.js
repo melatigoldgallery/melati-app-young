@@ -18,23 +18,23 @@ let deleteStartDate = null;
 let deleteEndDate = null;
 const VERIFICATION_PASSWORD = "admin123";
 
-// Tambahkan di bagian atas file, setelah import
+// Table configurations
 const tableConfigs = {
   all: {
-    columns: ["Tanggal", "Sales", "Jenis", "Kode Barang", "Nama Barang", "Jumlah", "Berat", "Kadar", "Harga", "Status", "Keterangan", "Aksi"],
-    fields: ["tanggal", "sales", "jenis", "kode", "nama", "jumlah", "berat", "kadar", "harga", "status", "keterangan", "aksi"]
+    columns: ["Tanggal", "Sales", "Jenis", "Kode Barang", "Nama Barang", "Jumlah", "Berat", "Kadar", "Harga", "Status", "Keterangan"],
+    fields: ["tanggal", "sales", "jenis", "kode", "nama", "jumlah", "berat", "kadar", "harga", "status", "keterangan"]
   },
   aksesoris: {
-    columns: ["Tanggal", "Sales", "Jenis", "Kode Barang", "Nama Barang", "Jumlah", "Berat", "Kadar", "Harga", "Status", "Aksi"],
-    fields: ["tanggal", "sales", "jenis", "kode", "nama", "jumlah", "berat", "kadar", "harga", "status", "aksi"]
+    columns: ["Tanggal", "Sales", "Jenis", "Kode Barang", "Nama Barang", "Jumlah", "Berat", "Kadar", "Harga", "Status"],
+    fields: ["tanggal", "sales", "jenis", "kode", "nama", "jumlah", "berat", "kadar", "harga", "status"]
   },
   kotak: {
-    columns: ["Tanggal", "Sales", "Jenis", "Nama Barang", "Jumlah", "Harga", "Status", "Aksi"],
-    fields: ["tanggal", "sales", "jenis", "nama", "jumlah", "harga", "status", "aksi"]
+    columns: ["Tanggal", "Sales", "Jenis", "Nama Barang", "Jumlah", "Harga", "Status"],
+    fields: ["tanggal", "sales", "jenis", "nama", "jumlah", "harga", "status"]
   },
   manual: {
-    columns: ["Tanggal", "Sales", "Jenis", "Kode Barang", "Nama Barang", "Jumlah", "Berat", "Kadar", "Harga", "Status", "Keterangan", "Aksi"],
-    fields: ["tanggal", "sales", "jenis", "kode", "nama", "jumlah", "berat", "kadar", "harga", "status", "keterangan", "aksi"]
+    columns: ["Tanggal", "Sales", "Jenis", "Kode Barang", "Nama Barang", "Jumlah", "Berat", "Kadar", "Harga", "Status", "Keterangan"],
+    fields: ["tanggal", "sales", "jenis", "kode", "nama", "jumlah", "berat", "kadar", "harga", "status", "keterangan"]
   },
   summary: {
     columns: ["Kode Barang", "Nama Barang", "Total Jumlah", "Total Harga"],
@@ -42,12 +42,12 @@ const tableConfigs = {
   }
 };
 
-// Cache management dengan TTL dan cleanup otomatis
+// Cache management
 const cacheManager = {
   salesData: {
     data: null,
     lastFetched: null,
-    ttl: 5 * 60 * 1000, // 5 menit
+    ttl: 5 * 60 * 1000, // 5 minutes
   },
   
   isValid(cacheKey) {
@@ -107,10 +107,9 @@ const laporanPenjualanHandler = {
     }
   },
 
-  // PERBAIKAN 1: Load data dengan cache management yang efisien
+  // Load data with cache management
   async loadSalesData(forceRefresh = false) {
     try {
-      // Cek cache terlebih dahulu
       if (!forceRefresh) {
         const cachedData = cacheManager.get('salesData');
         if (cachedData) {
@@ -130,7 +129,6 @@ const laporanPenjualanHandler = {
       salesSnapshot.forEach((doc) => {
         const data = doc.data();
         
-        // Standarisasi jenis penjualan dan deteksi ganti lock
         if (data.jenisPenjualan === "gantiLock") {
           data.jenisPenjualan = "manual";
           data.isGantiLock = true;
@@ -139,7 +137,6 @@ const laporanPenjualanHandler = {
         salesData.push({ id: doc.id, ...data });
       });
 
-      // Simpan ke cache
       cacheManager.set('salesData', salesData);
       this.salesData = salesData;
       this.populateSalesPersonFilter();
@@ -152,7 +149,7 @@ const laporanPenjualanHandler = {
     }
   },
 
-  // PERBAIKAN 2: DataTable management yang aman
+  // DataTable management
   destroyDataTable() {
     if (this.dataTable) {
       try {
@@ -178,25 +175,28 @@ const laporanPenjualanHandler = {
         dom: "Bfrtip",
         buttons: ["excel", "pdf", "print"],
         order: this.isSummaryMode ? [[2, "desc"]] : [[0, "desc"]],
-        scrollX: true, // PERBAIKAN: Tambahkan scroll horizontal
-        responsive: false, // Disable responsive untuk mempertahankan scroll
         autoWidth: false,
-        drawCallback: () => {
-          this.attachActionButtons();
-        },
+        scrollX: true,
         columnDefs: [
-          { targets: '_all', defaultContent: '-' },
-          { 
-            targets: [2], // Kolom jenis penjualan
-            render: function(data, type, row) {
-              if (type === 'display' && data.includes('<br>')) {
-                return data; // Return HTML as is for display
-              }
-              return data;
-            }
-          }
+          { targets: '_all', defaultContent: '-' }
         ]
       });
+
+      setTimeout(() => {
+        const widths = ['1000px', '80px', '100px', '120px', '200px', '70px', '80px', '80px', '120px', '100px', '150px'];
+        
+        $('#penjualanTable thead th').each(function(index) {
+          $(this).css('width', widths[index]);
+        });
+        
+        $('#penjualanTable tbody td').each(function(index) {
+          const colIndex = index % widths.length;
+          $(this).css('width', widths[colIndex]);
+        });
+        
+        this.dataTable.columns.adjust();
+      }, 100);
+
     } catch (error) {
       console.error("Error initializing DataTable:", error);
     }
@@ -215,10 +215,9 @@ const laporanPenjualanHandler = {
     }
   },
 
-  // PERBAIKAN 3: Format jenis penjualan dengan deteksi ganti lock
+  // Format jenis penjualan
   formatJenisPenjualan(transaction) {
     if (transaction.isGantiLock || transaction.jenisPenjualan === "gantiLock") {
-      // Untuk ganti lock, ambil kode aksesoris dari kodeLock
       let kodeAksesoris = "";
       if (transaction.items && transaction.items.length > 0) {
         const itemWithKode = transaction.items.find(item => item.kodeLock);
@@ -226,12 +225,10 @@ const laporanPenjualanHandler = {
       }
       return kodeAksesoris ? `Manual<br><small>(${kodeAksesoris})</small>` : "Manual";
     } else if (transaction.jenisPenjualan === "manual") {
-      // Untuk manual biasa, cek apakah ada kodeLock (ganti lock)
       let kodeAksesoris = "";
       if (transaction.items && transaction.items.length > 0) {
         const itemWithKode = transaction.items.find(item => item.kodeLock);
         if (itemWithKode && itemWithKode.kodeLock) {
-          // Jika ada kodeLock, berarti ini ganti lock
           kodeAksesoris = itemWithKode.kodeLock;
           return `Manual<br><small>(${kodeAksesoris})</small>`;
         }
@@ -243,7 +240,7 @@ const laporanPenjualanHandler = {
     return jenis.charAt(0).toUpperCase() + jenis.slice(1);
   },
 
-  // Update table header berdasarkan jenis penjualan
+  // Update table header
   updateTableHeader() {
     const salesType = document.getElementById("salesType").value;
     let configKey = salesType === "all" ? "manual" : 
@@ -260,7 +257,7 @@ const laporanPenjualanHandler = {
     }
   },
 
-  // Prepare data untuk DataTable
+  // Prepare data for DataTable
   prepareTableData() {
     const salesType = document.getElementById("salesType").value;
     let configKey = salesType === "all" ? "manual" : 
@@ -276,10 +273,10 @@ const laporanPenjualanHandler = {
         `Rp ${(item.totalHarga || 0).toLocaleString("id-ID")}`
       ]);
     }
-  
+
     const config = tableConfigs[configKey];
     if (!config) return [];
-  
+
     const tableData = [];
     
     this.filteredSalesData.forEach(transaction => {
@@ -290,7 +287,7 @@ const laporanPenjualanHandler = {
         (transaction.tanggal || "-");
       const sales = transaction.sales || "Admin";
       const jenisPenjualan = this.formatJenisPenjualan(transaction);
-  
+
       if (transaction.items && transaction.items.length > 0) {
         transaction.items.forEach(item => {
           if (!item) return;
@@ -302,7 +299,6 @@ const laporanPenjualanHandler = {
               case "jenis": return jenisPenjualan;
               case "kode": 
               case "barcode": 
-                // PERBAIKAN: Untuk manual, prioritaskan kodeLock jika ada (ganti lock)
                 return item.kodeText || item.barcode || "-";
               case "nama": return item.nama || "-";
               case "jumlah": return item.jumlah || 1;
@@ -315,7 +311,6 @@ const laporanPenjualanHandler = {
                 return "-";
               case "harga": return `Rp ${parseInt(item.totalHarga || 0).toLocaleString("id-ID")}`;
               case "status": return this.getStatusBadge(transaction);
-              case "aksi": return this.getActionButtons(transaction.id);
               default: return "-";
             }
           });
@@ -323,7 +318,6 @@ const laporanPenjualanHandler = {
           tableData.push(rowData);
         });
       } else {
-        // Untuk transaksi tanpa items
         const rowData = config.fields.map(field => {
           switch(field) {
             case "tanggal": return date;
@@ -332,7 +326,6 @@ const laporanPenjualanHandler = {
             case "keterangan": return transaction.keterangan || "-";
             case "harga": return `Rp ${parseInt(transaction.totalHarga || 0).toLocaleString("id-ID")}`;
             case "status": return this.getStatusBadge(transaction);
-            case "aksi": return this.getActionButtons(transaction.id);
             default: return "-";
           }
         });
@@ -340,7 +333,7 @@ const laporanPenjualanHandler = {
         tableData.push(rowData);
       }
     });
-  
+
     return tableData;
   },
 
@@ -359,23 +352,7 @@ const laporanPenjualanHandler = {
     return `<span class="badge bg-secondary">${status}</span>`;
   },
 
-  getActionButtons(transactionId) {
-    return `
-      <div class="btn-group">
-        <button class="btn btn-sm btn-warning btn-reprint" data-id="${transactionId}">
-          <i class="fas fa-print"></i>
-        </button>
-        <button class="btn btn-sm btn-primary btn-edit" data-id="${transactionId}">
-          <i class="fas fa-edit"></i>
-        </button>
-        <button class="btn btn-sm btn-danger btn-delete" data-id="${transactionId}">
-          <i class="fas fa-trash-alt"></i>
-        </button>
-      </div>
-    `;
-  },
-
-  // Render table dengan perbaikan
+  // Render table
   renderSalesTable() {
     try {
       this.updateTableHeader();
@@ -388,7 +365,7 @@ const laporanPenjualanHandler = {
     }
   },
 
-  // Filter data penjualan
+  // Filter data
   filterSalesData() {
     if (!this.salesData || !this.salesData.length) return;
 
@@ -481,7 +458,6 @@ const laporanPenjualanHandler = {
     
     if (!dropdown) return;
 
-    // Clear existing options except first one
     while (dropdown.options.length > 1) {
       dropdown.remove(1);
     }
@@ -554,514 +530,6 @@ const laporanPenjualanHandler = {
     this.renderSalesTable();
   },
 
-  // PERBAIKAN 4: Edit transaction dengan form yang disesuaikan
-  editTransaction(transactionId) {
-    const transaction = this.salesData.find(item => item.id === transactionId);
-    if (!transaction) {
-      return this.showAlert("Transaksi tidak ditemukan", "Error", "error");
-    }
-
-    const jenisPenjualan = transaction.jenisPenjualan;
-    let formHtml = this.generateEditForm(transaction, jenisPenjualan);
-
-    Swal.fire({
-      title: `Edit Transaksi ${jenisPenjualan.charAt(0).toUpperCase() + jenisPenjualan.slice(1)}`,
-      html: formHtml,
-      showCancelButton: true,
-      confirmButtonText: "Simpan",
-      cancelButtonText: "Batal",
-      width: "600px",
-      didOpen: () => {
-        this.attachEditFormEvents(transaction);
-      }
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        await this.saveEditedTransaction(transaction);
-      }
-    });
-  },
-
-  generateEditForm(transaction, jenisPenjualan) {
-    let formHtml = `
-      <div class="mb-3">
-        <label for="editSales" class="form-label">Sales:</label>
-        <input type="text" class="form-control" id="editSales" value="${transaction.sales || ''}">
-      </div>
-    `;
-  
-    if (transaction.items && transaction.items.length > 0) {
-      formHtml += `<div class="mb-3"><label class="form-label">Detail Barang:</label></div>`;
-      
-      transaction.items.forEach((item, index) => {
-        formHtml += `<div class="border p-3 mb-3 rounded">`;
-        formHtml += `<h6>Item ${index + 1}</h6>`;
-        
-        if (jenisPenjualan === "manual") {
-          // Form untuk manual: sales, nama barang, kadar, berat, harga, dan keterangan
-          formHtml += `
-            <div class="row">
-              <div class="col-md-6">
-                <label for="editNama_${index}" class="form-label">Nama Barang:</label>
-                <input type="text" class="form-control" id="editNama_${index}" value="${item.nama || ''}">
-              </div>
-              <div class="col-md-6">
-                <label for="editKadar_${index}" class="form-label">Kadar:</label>
-                <input type="text" class="form-control" id="editKadar_${index}" value="${item.kadar || ''}">
-              </div>
-            </div>
-            <div class="row mt-2">
-              <div class="col-md-6">
-                <label for="editBerat_${index}" class="form-label">Berat (gr):</label>
-                <input type="text" class="form-control" id="editBerat_${index}" value="${item.berat || ''}">
-              </div>
-              <div class="col-md-6">
-                <label for="editHarga_${index}" class="form-label">Harga:</label>
-                <input type="text" class="form-control" id="editHarga_${index}" value="${parseInt(item.totalHarga || 0).toLocaleString("id-ID")}">
-              </div>
-            </div>
-            <div class="row mt-2">
-              <div class="col-md-12">
-                <label for="editKeterangan_${index}" class="form-label">Keterangan:</label>
-                <textarea class="form-control" id="editKeterangan_${index}" rows="2">${item.keterangan || ''}</textarea>
-              </div>
-            </div>
-          `;
-        } else if (jenisPenjualan === "kotak") {
-          // Form untuk kotak: sales, nama barang, dan harga
-          formHtml += `
-            <div class="row">
-              <div class="col-md-6">
-                <label for="editNama_${index}" class="form-label">Nama Barang:</label>
-                <input type="text" class="form-control" id="editNama_${index}" value="${item.nama || ''}">
-              </div>
-              <div class="col-md-6">
-                <label for="editHarga_${index}" class="form-label">Harga:</label>
-                <input type="text" class="form-control" id="editHarga_${index}" value="${parseInt(item.totalHarga || 0).toLocaleString("id-ID")}">
-              </div>
-            </div>
-          `;
-        } else {
-          // Form untuk aksesoris: sales, nama barang, kadar, berat, dan harga
-          formHtml += `
-            <div class="row">
-              <div class="col-md-6">
-                <label for="editNama_${index}" class="form-label">Nama Barang:</label>
-                <input type="text" class="form-control" id="editNama_${index}" value="${item.nama || ''}">
-              </div>
-              <div class="col-md-6">
-                <label for="editKadar_${index}" class="form-label">Kadar:</label>
-                <input type="text" class="form-control" id="editKadar_${index}" value="${item.kadar || ''}">
-              </div>
-            </div>
-            <div class="row mt-2">
-              <div class="col-md-6">
-                <label for="editBerat_${index}" class="form-label">Berat (gr):</label>
-                <input type="text" class="form-control" id="editBerat_${index}" value="${item.berat || ''}">
-              </div>
-              <div class="col-md-6">
-                <label for="editHarga_${index}" class="form-label">Harga:</label>
-                <input type="text" class="form-control" id="editHarga_${index}" value="${parseInt(item.totalHarga || 0).toLocaleString("id-ID")}">
-              </div>
-            </div>
-          `;
-        }
-        
-        formHtml += `</div>`;
-      });
-    }
-  
-    return formHtml;
-  },
-
-  attachEditFormEvents(transaction) {
-    // Format input harga dengan thousand separator
-    if (transaction.items) {
-      transaction.items.forEach((item, index) => {
-        const hargaInput = document.getElementById(`editHarga_${index}`);
-        if (hargaInput) {
-          hargaInput.addEventListener("blur", () => {
-            const value = hargaInput.value.replace(/\./g, "");
-            hargaInput.value = parseInt(value || 0).toLocaleString("id-ID");
-          });
-        }
-      });
-    }
-  },
-
-  // PERBAIKAN 5: Save edited transaction dengan update real-time
-  async saveEditedTransaction(transaction) {
-    try {
-      this.showLoading(true);
-  
-      const updateData = {
-        sales: document.getElementById("editSales").value.trim(),
-        lastUpdated: serverTimestamp()
-      };
-  
-      if (transaction.items && transaction.items.length > 0) {
-        updateData.items = transaction.items.map((item, index) => {
-          const updatedItem = { ...item };
-          
-          updatedItem.nama = document.getElementById(`editNama_${index}`)?.value || item.nama;
-          
-          if (transaction.jenisPenjualan !== "kotak") {
-            updatedItem.kadar = document.getElementById(`editKadar_${index}`)?.value || item.kadar;
-            updatedItem.berat = document.getElementById(`editBerat_${index}`)?.value || item.berat;
-          }
-          
-          // PERBAIKAN: Simpan keterangan untuk manual
-          if (transaction.jenisPenjualan === "manual") {
-            updatedItem.keterangan = document.getElementById(`editKeterangan_${index}`)?.value || item.keterangan;
-          }
-          
-          const hargaValue = document.getElementById(`editHarga_${index}`)?.value.replace(/\./g, "") || "0";
-          updatedItem.totalHarga = parseInt(hargaValue);
-          
-          return updatedItem;
-        });
-  
-        updateData.totalHarga = updateData.items.reduce((sum, item) => sum + (item.totalHarga || 0), 0);
-      }
-  
-      // Update di Firestore
-      await updateDoc(doc(firestore, "penjualanAksesoris", transaction.id), updateData);
-      
-      // Update data lokal secara real-time
-      this.updateLocalData(transaction.id, updateData);
-      
-      // Clear cache untuk memastikan data fresh
-      cacheManager.clear('salesData');
-      
-      this.showLoading(false);
-      this.showAlert("Transaksi berhasil diperbarui", "Sukses", "success");
-    } catch (error) {
-      this.showLoading(false);
-      console.error("Error updating transaction:", error);
-      this.showAlert("Terjadi kesalahan saat memperbarui transaksi: " + error.message, "Error", "error");
-    }
-  },
-
-  // Update data lokal secara real-time
-  updateLocalData(transactionId, updateData) {
-    // Update salesData
-    const salesIndex = this.salesData.findIndex(item => item.id === transactionId);
-    if (salesIndex !== -1) {
-      this.salesData[salesIndex] = { ...this.salesData[salesIndex], ...updateData };
-      delete this.salesData[salesIndex].lastUpdated;
-    }
-    
-    // Update filteredSalesData
-    const filteredIndex = this.filteredSalesData.findIndex(item => item.id === transactionId);
-    if (filteredIndex !== -1) {
-      this.filteredSalesData[filteredIndex] = { ...this.filteredSalesData[filteredIndex], ...updateData };
-      delete this.filteredSalesData[filteredIndex].lastUpdated;
-    }
-    
-    // Re-render tabel
-    this.renderSalesTable();
-  },
-
-  // Delete transaction
-  async deleteTransaction(transactionId) {
-    try {
-      this.showLoading(true);
-      
-      await deleteDoc(doc(firestore, "penjualanAksesoris", transactionId));
-      
-      // Remove from local arrays
-      this.salesData = this.salesData.filter(item => item.id !== transactionId);
-      this.filteredSalesData = this.filteredSalesData.filter(item => item.id !== transactionId);
-      
-      // Clear cache
-      cacheManager.clear('salesData');
-      
-      this.renderSalesTable();
-      
-      this.showLoading(false);
-      this.showAlert("Transaksi berhasil dihapus", "Sukses", "success");
-    } catch (error) {
-      this.showLoading(false);
-      console.error("Error deleting transaction:", error);
-      this.showAlert("Terjadi kesalahan saat menghapus transaksi: " + error.message, "Error", "error");
-    }
-  },
-
-  // Confirm delete transaction
-  confirmDeleteTransaction(transactionId) {
-    const transaction = this.salesData.find(item => item.id === transactionId);
-    if (!transaction) {
-      return this.showAlert("Transaksi tidak ditemukan", "Error", "error");
-    }
-
-    const date = transaction.timestamp ? formatDate(transaction.timestamp.toDate()) : transaction.tanggal;
-
-    Swal.fire({
-      title: "Konfirmasi Hapus",
-      html: `
-        <p>Apakah Anda yakin ingin menghapus transaksi ini?</p>
-        <div class="alert alert-warning">
-          <i class="fas fa-exclamation-triangle me-2"></i>
-          <strong>Peringatan!</strong> Tindakan ini tidak dapat dibatalkan.
-        </div>
-        <div class="text-start">
-          <p><strong>Tanggal:</strong> ${date}</p>
-          <p><strong>Sales:</strong> ${transaction.sales || "Admin"}</p>
-          <p><strong>Total Harga:</strong> Rp ${parseInt(transaction.totalHarga || 0).toLocaleString("id-ID")}</p>
-        </div>
-      `,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Ya, Hapus",
-      cancelButtonText: "Batal",
-      confirmButtonColor: "#dc3545",
-    }).then((result) => {
-      if (result.isConfirmed) {
-        this.deleteTransaction(transactionId);
-      }
-    });
-  },
-
-  // Reprint transaction
-  reprintTransaction(transactionId) {
-    const transaction = this.salesData.find(item => item.id === transactionId);
-    if (!transaction) {
-      return this.showAlert("Transaksi tidak ditemukan", "Error", "error");
-    }
-
-    const printData = {
-      id: transactionId,
-      jenisPenjualan: transaction.jenisPenjualan,
-      tanggal: transaction.timestamp ? formatDate(transaction.timestamp.toDate()) : transaction.tanggal,
-      sales: transaction.sales || "Admin",
-      totalHarga: parseInt(transaction.totalHarga || 0).toLocaleString("id-ID"),
-      items: transaction.items || [],
-      metodeBayar: transaction.metodeBayar || "tunai",
-    };
-
-    Swal.fire({
-      title: "Cetak Ulang",
-      html: `
-        <p>Pilih jenis nota yang akan dicetak:</p>
-        <div class="d-grid gap-2">
-          <button type="button" class="btn btn-primary" id="btnPrintReceipt">
-            <i class="fas fa-receipt me-2"></i>
-            Struk Kasir
-          </button>
-          <button type="button" class="btn btn-success" id="btnPrintInvoice">
-            <i class="fas fa-file-invoice me-2"></i>
-            Invoice Customer
-          </button>
-        </div>
-      `,
-      showConfirmButton: false,
-      showCancelButton: true,
-      cancelButtonText: "Tutup",
-      width: "400px",
-      didOpen: () => {
-        document.getElementById("btnPrintReceipt").addEventListener("click", () => {
-          this.printReceipt(printData);
-          Swal.close();
-        });
-        document.getElementById("btnPrintInvoice").addEventListener("click", () => {
-          this.printInvoice(printData);
-          Swal.close();
-        });
-      },
-    });
-  },
-
-  // Print receipt
-  printReceipt(transaction) {
-    try {
-      const printWindow = window.open("", "_blank");
-      if (!printWindow) {
-        throw new Error("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak struk.");
-      }
-
-      const tanggal = transaction.tanggal || this.formatTimestamp(transaction.timestamp);
-      let salesType = transaction.jenisPenjualan || "aksesoris";
-      if (salesType === "manual") {
-        salesType = "layanan";
-      }
-
-      let receiptHTML = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Struk Kasir</title>
-          <style>
-            body { font-family: roboto; font-size: 13px; margin: 0; padding: 0; width: 80mm; }
-            .receipt { margin: 0 auto; padding: 5mm; }
-            .receipt h3, .receipt h4 { text-align: center; margin: 2mm 0; }
-            .receipt hr { border-top: 1px dashed #000; }
-            .receipt table { width: 100%; border-collapse: collapse; }
-            .receipt th, .receipt td { text-align: left; padding: 1mm 2mm; }
-            .text-center { text-align: center; }
-            .text-right { text-align: right; }
-          </style>
-        </head>
-        <body>
-          <div class="receipt">
-            <h3>MELATI GOLD SHOP</h3>
-            <h4>JL. DIPONEGORO NO. 116</h4>
-            <h4>NOTA PENJUALAN ${salesType.toUpperCase()}</h4>
-            <hr>
-            <p>Tanggal: ${tanggal}<br>Sales: ${transaction.sales || "-"}</p>
-            <hr>
-            <table>
-              <tr>
-                <th>Kode</th>
-                <th>Nama</th>
-                <th>Kadar</th>
-                <th>Gr</th>
-                <th>Harga</th>
-              </tr>
-      `;
-
-      transaction.items.forEach((item) => {
-        receiptHTML += `
-          <tr>
-            <td>${item.kodeText || "-"}</td>
-            <td>${item.nama || "-"}</td>
-            <td>${item.kadar || "-"}</td>
-            <td>${item.berat || "-"}</td>
-            <td class="text-right">${parseInt(item.totalHarga || 0).toLocaleString("id-ID")}</td>
-          </tr>
-        `;
-      });
-
-      receiptHTML += `
-              <tr>
-                <td colspan="4" class="text-right"><strong>Total:</strong></td>
-                <td class="text-right"><strong>${parseInt(transaction.totalHarga || 0).toLocaleString("id-ID")}</strong></td>
-              </tr>
-            </table>
-            <hr>
-            <p class="text-center">Terima Kasih<br>Atas Kunjungan Anda</p>
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
-        </body>
-        </html>
-      `;
-
-      printWindow.document.write(receiptHTML);
-      printWindow.document.close();
-    } catch (error) {
-      console.error("Error printing receipt:", error);
-      this.showAlert("Error mencetak struk: " + error.message, "Error", "error");
-    }
-  },
-
-  // Print invoice
-  printInvoice(transaction) {
-    try {
-      const printWindow = window.open("", "_blank");
-      if (!printWindow) {
-        throw new Error("Popup diblokir oleh browser.");
-      }
-
-      let invoiceHTML = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Invoice Customer</title>
-          <style>
-            @page { size: 10cm 20cm; margin: 0; }
-            body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; }
-            .invoice { width: 100%; }
-            .header-info { text-align: right; margin-bottom: 2cm; margin-right: 3cm; margin-top: 1cm; }
-            .total-row { margin-top: 1.9cm; text-align: right; font-weight: bold; margin-right: 3cm; }
-            .sales { text-align: right; margin-top: 0.6cm; margin-right: 2cm; }
-            .item-data { display: grid; grid-template-columns: 2cm 1.8cm 5cm 2cm 2cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 1cm; margin-top: 1.5cm; margin-right: 3cm; }
-          </style>
-        </head>
-        <body>
-          <div class="invoice">
-            <div class="header-info">
-              <p>${transaction.tanggal}</p>
-            </div>
-            <hr>
-      `;
-
-      let totalHarga = 0;
-      transaction.items.forEach((item) => {
-        const itemHarga = parseInt(item.totalHarga) || 0;
-        totalHarga += itemHarga;
-
-        invoiceHTML += `
-          <div class="item-data">
-            <span>${item.kodeText || "-"}</span>
-            <span>${item.jumlah || "1"}pcs</span>
-            <span>${item.nama || "-"}</span>
-            <span>${item.kadar || "-"}</span>
-            <span>${item.berat || "-"}gr</span>
-            <span>${itemHarga.toLocaleString("id-ID")}</span>
-          </div>
-        `;
-      });
-
-      invoiceHTML += `
-            <div class="total-row">
-              Rp ${totalHarga.toLocaleString("id-ID")}
-            </div>
-            <div class="sales">${transaction.sales || "-"}</div>
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
-        </body>
-        </html>
-      `;
-
-      printWindow.document.write(invoiceHTML);
-      printWindow.document.close();
-    } catch (error) {
-      console.error("Error printing invoice:", error);
-      this.showAlert("Error mencetak invoice: " + error.message, "Error", "error");
-    }
-  },
-
-  // Attach action buttons
-  attachActionButtons() {
-    // Remove existing event listeners to prevent duplication
-    document.querySelectorAll(".btn-reprint, .btn-edit, .btn-delete").forEach(btn => {
-      btn.replaceWith(btn.cloneNode(true));
-    });
-
-    // Attach new event listeners
-    document.querySelectorAll(".btn-reprint").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.reprintTransaction(btn.getAttribute("data-id"));
-      });
-    });
-
-    document.querySelectorAll(".btn-edit").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.editTransaction(btn.getAttribute("data-id"));
-      });
-    });
-
-    document.querySelectorAll(".btn-delete").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.confirmDeleteTransaction(btn.getAttribute("data-id"));
-      });
-    });
-  },
-
   // Initialize date pickers
   initDatePickers() {
     $(".datepicker").datepicker({
@@ -1083,26 +551,22 @@ const laporanPenjualanHandler = {
 
   // Attach event listeners
   attachEventListeners() {
-    // Filter button
     document.getElementById("filterSalesBtn")?.addEventListener("click", () => {
       this.loadSalesData().then(() => {
         this.filterSalesData();
       });
     });
 
-    // Toggle summary button
     document.getElementById("toggleSummaryBtn")?.addEventListener("click", () => {
       this.toggleSummaryView();
     });
 
-    // Sales type change
     document.getElementById("salesType")?.addEventListener("change", () => {
       if (this.filteredSalesData && this.filteredSalesData.length > 0) {
         this.renderSalesTable();
       }
     });
 
-    // Delete data button
     document.getElementById("deleteSalesDataBtn")?.addEventListener("click", () => {
       const startDateStr = document.getElementById("startDate").value;
       const endDateStr = document.getElementById("endDate").value;
@@ -1124,7 +588,6 @@ const laporanPenjualanHandler = {
       showVerificationModal("sales", startDate, endDate);
     });
 
-    // Confirm delete button
     document.getElementById("confirmDeleteRangeBtn")?.addEventListener("click", async () => {
       const password = document.getElementById("verificationPassword").value;
 
@@ -1141,33 +604,14 @@ const laporanPenjualanHandler = {
     });
   },
 
-  // Format timestamp
-  formatTimestamp(timestamp) {
-    if (!timestamp) return "-";
-    try {
-      if (timestamp.toDate) {
-        return formatDate(timestamp.toDate());
-      } else if (timestamp instanceof Date) {
-        return formatDate(timestamp);
-      } else {
-        return timestamp;
-      }
-    } catch (error) {
-      console.error("Error formatting timestamp:", error);
-      return "-";
-    }
-  },
-
   // Initialize
   init() {
     this.initDatePickers();
     this.attachEventListeners();
     this.setDefaultDates();
     
-    // Initialize empty table
     this.initDataTable([]);
     
-    // Prepare empty table message
     const tableBody = document.querySelector("#penjualanTable tbody");
     if (tableBody) {
       tableBody.innerHTML = `
@@ -1177,10 +621,9 @@ const laporanPenjualanHandler = {
       `;
     }
 
-    // Setup cache cleanup interval
     setInterval(() => {
       cacheManager.clear();
-    }, 10 * 60 * 1000); // Clean cache every 10 minutes
+    }, 10 * 60 * 1000);
   }
 };
 
@@ -1224,7 +667,6 @@ async function deleteSalesData(startDate, endDate) {
       return laporanPenjualanHandler.showAlert("Tidak ada data penjualan dalam rentang tanggal yang dipilih.", "Info", "info");
     }
 
-    // Delete documents one by one to avoid batch limit
     const deletePromises = [];
     querySnapshot.forEach((docSnapshot) => {
       deletePromises.push(deleteDoc(doc(firestore, "penjualanAksesoris", docSnapshot.id)));
@@ -1232,7 +674,6 @@ async function deleteSalesData(startDate, endDate) {
 
     await Promise.all(deletePromises);
     
-    // Clear cache and refresh data
     cacheManager.clear('salesData');
     await laporanPenjualanHandler.loadSalesData(true);
     laporanPenjualanHandler.filterSalesData();
@@ -1264,41 +705,13 @@ function showVerificationModal(dataType, startDate, endDate) {
   modal.show();
 }
 
-// Helper function to show loading indicator
-function showLoading(show) {
-  const loadingElement = document.getElementById("loadingIndicator");
-  if (loadingElement) {
-    loadingElement.style.display = show ? "flex" : "none";
-  }
-}
-
-// Helper function to show alerts
-function showAlert(message, title = "Informasi", type = "info") {
-  if (typeof Swal !== "undefined") {
-    return Swal.fire({
-      title: title,
-      text: message,
-      icon: type,
-      confirmButtonText: "OK",
-      confirmButtonColor: "#0d6efd",
-    });
-  } else {
-    alert(message);
-    return Promise.resolve();
-  }
-}
-
 // Initialize when document is ready
 document.addEventListener("DOMContentLoaded", function () {
-  // Check if required libraries are loaded
   if (typeof XLSX === "undefined") {
     console.warn("SheetJS (XLSX) library is not loaded. Excel export will not work.");
   }
 
-  // Initialize the handler
   laporanPenjualanHandler.init();
 });
 
-// Export the handler for potential use in other modules
 export default laporanPenjualanHandler;
-

@@ -81,6 +81,20 @@
           transform: rotate(360deg);
         }
       }
+      .app-container {
+        overflow-x: auto !important; /* Allow horizontal scroll */
+        min-width: calc(100% - var(--sidebar-width)) !important;
+      }
+
+      .main-content {
+        overflow-x: auto !important; /* Allow horizontal scroll */
+        min-width: calc(100% - var(--sidebar-width)) !important;
+      }
+
+      .page-content {
+        overflow-x: auto !important; /* Allow horizontal scroll */
+        min-width: calc(100% - var(--sidebar-width)) !important;
+      }
     </style>
   </head>
   <body>
@@ -178,7 +192,7 @@
                     </a>
                   </li>
                   <li class="nav-item">
-                    <a class="nav-link" href="penjualanAksesoris.html">
+                    <a class="nav-link" href="dataPenjualan.html">
                       <i class="fas fa-shopping-cart"></i>
                       <span class="menu-text">Penjualan Aksesoris</span>
                     </a>
@@ -294,13 +308,16 @@
                 </div>
                 <div class="col-12 mt-4">
                   <button type="button" class="btn btn-primary" id="filterSalesBtn">
-                    <i class="fas fa-search me-1"></i> Tampilkan
+                    <i class="fas fa-search me-1"></i>
+                    Tampilkan
                   </button>
                   <button type="button" class="btn btn-success" id="toggleSummaryBtn">
-                    <i class="fas fa-chart-pie me-1"></i> Summary Penjualan
+                    <i class="fas fa-chart-pie me-1"></i>
+                    Summary Penjualan
                   </button>
                   <button type="button" class="btn btn-danger" id="deleteSalesDataBtn">
-                    <i class="fas fa-trash-alt me-1"></i> Hapus Data
+                    <i class="fas fa-trash-alt me-1"></i>
+                    Hapus Data
                   </button>
                 </div>
               </form>
@@ -355,7 +372,6 @@
                       <th>Harga</th>
                       <th>Status</th>
                       <th>Keterangan</th>
-                      <th>Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -370,7 +386,13 @@
     </div>
 
     <!-- Verification Modal -->
-    <div class="modal fade" id="verificationModal" tabindex="-1" aria-labelledby="verificationModalLabel" aria-hidden="true">
+    <div
+      class="modal fade"
+      id="verificationModal"
+      tabindex="-1"
+      aria-labelledby="verificationModalLabel"
+      aria-hidden="true"
+    >
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
@@ -380,11 +402,13 @@
           <div class="modal-body">
             <div class="alert alert-warning">
               <i class="fas fa-exclamation-triangle me-2"></i>
-              <span id="deleteConfirmationText">Anda akan menghapus data penjualan. Tindakan ini tidak dapat dibatalkan.</span>
+              <span id="deleteConfirmationText">
+                Anda akan menghapus data penjualan. Tindakan ini tidak dapat dibatalkan.
+              </span>
             </div>
             <div class="mb-3">
               <label for="verificationPassword" class="form-label">Masukkan kata sandi verifikasi:</label>
-              <input type="password" class="form-control" id="verificationPassword" placeholder="Kata sandi">
+              <input type="password" class="form-control" id="verificationPassword" placeholder="Kata sandi" />
             </div>
           </div>
           <div class="modal-footer">
