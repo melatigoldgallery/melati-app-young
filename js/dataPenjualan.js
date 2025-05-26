@@ -140,11 +140,22 @@ class DataPenjualanApp {
   async init() {
     this.setupEventListeners();
     this.initDatePickers();
-    this.setDefaultDates();
     await this.loadSalesData();
     this.initDataTable();
-    this.updateSummary();
+    this.setDefaultDates();
     this.populateSalesFilter();
+
+    // Load filter from URL or set default
+    this.loadFilterFromURL();
+
+    // If no URL params, set default dates
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get("startDate") && !params.get("endDate")) {
+      this.setDefaultDates();
+    } else {
+      // Apply filter from URL
+      this.filterData();
+    }
   }
 
   // Setup all event listeners
@@ -152,14 +163,12 @@ class DataPenjualanApp {
     const events = {
       btnTambahTransaksi: () => (window.location.href = "penjualanAksesoris.html"),
       btnRefreshData: () => this.refreshData(true),
-      btnFilter: () => this.filterData(),
       btnExportData: () => this.exportToExcel(),
       btnPrintReceipt: () => this.printDocument("receipt"),
       btnPrintInvoice: () => this.printDocument("invoice"),
       btnSaveEdit: () => this.saveEditTransaction(),
       btnConfirmDelete: () => this.confirmDeleteTransaction(),
       btnToggleView: () => this.toggleView(),
-      btnExportData: () => (this.isGroupedView ? this.exportGroupedData() : this.exportToExcel()),
     };
 
     Object.entries(events).forEach(([id, handler]) => {
@@ -167,37 +176,82 @@ class DataPenjualanApp {
       if (element) element.addEventListener("click", handler);
     });
 
+    // Export button handler - terpisah untuk menangani grouped/normal view
+    const exportBtn = document.getElementById("btnExportData");
+    if (exportBtn) {
+      exportBtn.addEventListener("click", () => {
+        if (this.isGroupedView) {
+          this.exportGroupedData();
+        } else {
+          this.exportToExcel();
+        }
+      });
+    }
+
+    // Auto filter when filter inputs change
+    this.setupAutoFilter();
+
     // Table action handlers
-    $(document).off("click", ".btn-reprint").on("click", ".btn-reprint", 
-      utils.debounce((e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const id = e.target.closest('button').dataset.id;
-        if (id) this.handleReprint(id);
-      }, 300)
-    );
-  
-    $(document).off("click", ".btn-edit").on("click", ".btn-edit", 
-      utils.debounce((e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const id = e.target.closest('button').dataset.id;
-        if (id) this.handleEdit(id);
-      }, 300)
-    );
-  
-    $(document).off("click", ".btn-delete").on("click", ".btn-delete", 
-      utils.debounce((e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const id = e.target.closest('button').dataset.id;
-        if (id) this.handleDelete(id);
-      }, 300)
-    );
+    $(document)
+      .off("click", ".btn-reprint")
+      .on(
+        "click",
+        ".btn-reprint",
+        utils.debounce((e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = e.target.closest("button").dataset.id;
+          if (id) this.handleReprint(id);
+        }, 300)
+      );
+
+    $(document)
+      .off("click", ".btn-edit")
+      .on(
+        "click",
+        ".btn-edit",
+        utils.debounce((e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = e.target.closest("button").dataset.id;
+          if (id) this.handleEdit(id);
+        }, 300)
+      );
+
+    $(document)
+      .off("click", ".btn-delete")
+      .on(
+        "click",
+        ".btn-delete",
+        utils.debounce((e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = e.target.closest("button").dataset.id;
+          if (id) this.handleDelete(id);
+        }, 300)
+      );
     $(document).on("click", ".btn-view-details", (e) => this.showGroupDetails(e.target.closest("button").dataset.ids));
     $(document).on("click", ".btn-print-group", (e) =>
       this.printGroupTransactions(e.target.closest("button").dataset.ids)
     );
+  }
+
+  // Setup auto filter functionality
+  setupAutoFilter() {
+    // Auto filter on date change
+    $("#filterTanggalMulai, #filterTanggalAkhir").on("changeDate", () => {
+      this.filterData();
+    });
+
+    // Auto filter on manual date input
+    $("#filterTanggalMulai, #filterTanggalAkhir").on("blur", () => {
+      this.filterData();
+    });
+
+    // Auto filter on dropdown change
+    $("#filterJenisPenjualan, #filterSales").on("change", () => {
+      this.filterData();
+    });
   }
 
   toggleView() {
@@ -221,10 +275,18 @@ class DataPenjualanApp {
       transaction.items?.forEach((item) => {
         const key = `${transaction.jenisPenjualan}_${item.kodeText || "NO_CODE"}`;
 
+        // Calculate actual revenue for this transaction
+        const actualRevenue = this.calculateActualRevenue(transaction);
+
+        // Calculate item's proportional revenue
+        const totalTransactionValue = transaction.totalHarga || 0;
+        const itemProportion = totalTransactionValue > 0 ? (item.totalHarga || 0) / totalTransactionValue : 1;
+        const itemActualRevenue = actualRevenue * itemProportion;
+
         if (grouped.has(key)) {
           const g = grouped.get(key);
           g.totalJumlah += item.jumlah || 1;
-          g.totalHarga += item.totalHarga || 0;
+          g.totalHarga += itemActualRevenue; // Use actual revenue instead of full price
           g.totalBerat += parseFloat(item.berat || 0);
           g.transactions.push(transaction);
           g.salesList.add(transaction.sales || "Admin");
@@ -236,7 +298,7 @@ class DataPenjualanApp {
             kadar: item.kadar || "-",
             totalJumlah: item.jumlah || 1,
             totalBerat: parseFloat(item.berat || 0),
-            totalHarga: item.totalHarga || 0,
+            totalHarga: itemActualRevenue, // Use actual revenue instead of full price
             salesList: new Set([transaction.sales || "Admin"]),
             transactions: [transaction],
             latestDate: transaction.timestamp || transaction.tanggal,
@@ -254,20 +316,61 @@ class DataPenjualanApp {
 
   // Initialize date pickers
   initDatePickers() {
-    $(".datepicker").datepicker({
-      format: "dd/mm/yyyy",
-      autoclose: true,
-      language: "id",
-      todayHighlight: true,
+    const today = new Date();
+
+    // Initialize start date picker
+    $("#filterTanggalMulai")
+      .datepicker({
+        format: "dd/mm/yyyy",
+        autoclose: true,
+        language: "id",
+        todayHighlight: true,
+        endDate: today, // Tidak bisa pilih tanggal masa depan
+      })
+      .on("changeDate", (e) => {
+        // Update end date picker constraint
+        const selectedDate = e.date;
+        $("#filterTanggalAkhir").datepicker("setStartDate", selectedDate);
+
+        // Trigger filter when date changes
+        setTimeout(() => this.filterData(), 100);
+      });
+
+    // Initialize end date picker
+    $("#filterTanggalAkhir")
+      .datepicker({
+        format: "dd/mm/yyyy",
+        autoclose: true,
+        language: "id",
+        todayHighlight: true,
+        endDate: today, // Tidak bisa pilih tanggal masa depan
+      })
+      .on("changeDate", () => {
+        // Trigger filter when date changes
+        setTimeout(() => this.filterData(), 100);
+      });
+
+    // Manual input validation
+    $("#filterTanggalMulai, #filterTanggalAkhir").on("blur", (e) => {
+      const inputDate = utils.parseDate(e.target.value);
+      if (inputDate && inputDate > today) {
+        utils.showAlert("Tanggal tidak boleh melebihi hari ini", "Peringatan", "warning");
+        e.target.value = utils.formatDate(today);
+      }
+      this.filterData();
     });
   }
 
   // Set default date range (today only)
   setDefaultDates() {
     const today = new Date();
+    const todayFormatted = utils.formatDate(today);
 
-    document.getElementById("filterTanggalMulai").value = utils.formatDate(today);
-    document.getElementById("filterTanggalAkhir").value = utils.formatDate(today);
+    document.getElementById("filterTanggalMulai").value = todayFormatted;
+    document.getElementById("filterTanggalAkhir").value = todayFormatted;
+
+    // Trigger initial filter after setting dates
+    setTimeout(() => this.filterData(), 500);
   }
 
   // Load sales data with caching
@@ -316,70 +419,69 @@ class DataPenjualanApp {
     }
   }
 
- // Ganti language config dengan definisi manual
-initDataTable() {
-  if (this.dataTable) {
-    this.dataTable.off();
-    this.dataTable.destroy();
-    this.dataTable = null;
-  }
+  // Ganti language config dengan definisi manual
+  initDataTable() {
+    if (this.dataTable) {
+      this.dataTable.off();
+      this.dataTable.destroy();
+      this.dataTable = null;
+    }
 
-  $("#dataPenjualanTable").empty();
+    $("#dataPenjualanTable").empty();
 
-  this.dataTable = $("#dataPenjualanTable").DataTable({
-    data: [],
-    columns: [
-      { title: "Tanggal", width: "100px" },
-      { title: "Sales", width: "80px" },
-      { title: "Jenis", width: "100px" },
-      { title: "Kode", width: "120px" },
-      { title: "Nama", width: "200px" },
-      { title: "Jumlah", width: "70px" },
-      { title: "Berat", width: "80px" },
-      { title: "Kadar", width: "80px" },
-      { title: "Harga", width: "120px" },
-      { title: "Status", width: "100px" },
-      { title: "Keterangan", width: "150px" },
-      { title: "Aksi", width: "120px", orderable: false },
-    ],
-    order: [[0, "desc"]],
-    pageLength: 25,
-    // Definisi bahasa Indonesia manual
-    language: {
-      "decimal": "",
-      "emptyTable": "Tidak ada data yang tersedia pada tabel ini",
-      "info": "Menampilkan _START_ sampai _END_ dari _TOTAL_ entri",
-      "infoEmpty": "Menampilkan 0 sampai 0 dari 0 entri",
-      "infoFiltered": "(disaring dari _MAX_ entri keseluruhan)",
-      "infoPostFix": "",
-      "thousands": ".",
-      "lengthMenu": "Tampilkan _MENU_ entri",
-      "loadingRecords": "Sedang memuat...",
-      "processing": "Sedang memproses...",
-      "search": "Cari:",
-      "zeroRecords": "Tidak ditemukan data yang sesuai",
-      "paginate": {
-        "first": "Pertama",
-        "last": "Terakhir",
-        "next": "Selanjutnya",
-        "previous": "Sebelumnya"
+    this.dataTable = $("#dataPenjualanTable").DataTable({
+      data: [],
+      columns: [
+        { title: "Tanggal", width: "100px" },
+        { title: "Sales", width: "80px" },
+        { title: "Jenis", width: "100px" },
+        { title: "Kode", width: "120px" },
+        { title: "Nama", width: "200px" },
+        { title: "Jumlah", width: "70px" },
+        { title: "Berat", width: "80px" },
+        { title: "Kadar", width: "80px" },
+        { title: "Harga", width: "120px" },
+        { title: "Status", width: "100px" },
+        { title: "Keterangan", width: "150px" },
+        { title: "Aksi", width: "120px", orderable: false },
+      ],
+      order: [[0, "desc"]],
+      pageLength: 25,
+      // Definisi bahasa Indonesia manual
+      language: {
+        decimal: "",
+        emptyTable: "Tidak ada data yang tersedia pada tabel ini",
+        info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ entri",
+        infoEmpty: "Menampilkan 0 sampai 0 dari 0 entri",
+        infoFiltered: "(disaring dari _MAX_ entri keseluruhan)",
+        infoPostFix: "",
+        thousands: ".",
+        lengthMenu: "Tampilkan _MENU_ entri",
+        loadingRecords: "Sedang memuat...",
+        processing: "Sedang memproses...",
+        search: "Cari:",
+        zeroRecords: "Tidak ditemukan data yang sesuai",
+        paginate: {
+          first: "Pertama",
+          last: "Terakhir",
+          next: "Selanjutnya",
+          previous: "Sebelumnya",
+        },
+        aria: {
+          sortAscending: ": aktifkan untuk mengurutkan kolom naik",
+          sortDescending: ": aktifkan untuk mengurutkan kolom turun",
+        },
       },
-      "aria": {
-        "sortAscending": ": aktifkan untuk mengurutkan kolom naik",
-        "sortDescending": ": aktifkan untuk mengurutkan kolom turun"
-      }
-    },
-    dom: "Bfrtip",
-    buttons: ["excel", "pdf", "print"],
-    responsive: true,
-    autoWidth: false,
-    scrollX: true,
-    processing: true,
-    deferRender: true,
-    destroy: true
-  });
-}
-
+      dom: "Bfrtip",
+      buttons: ["excel", "pdf", "print"],
+      responsive: true,
+      autoWidth: false,
+      scrollX: true,
+      processing: true,
+      deferRender: true,
+      destroy: true,
+    });
+  }
 
   // Filter data based on form inputs
   filterData() {
@@ -395,28 +497,72 @@ initDataTable() {
       filters.endDate.setHours(23, 59, 59, 999);
     }
 
-    this.filteredData = this.salesData.filter((transaction) => {
-      const transactionDate = transaction.timestamp
-        ? transaction.timestamp.toDate()
-        : utils.parseDate(transaction.tanggal);
+    if (!filters.startDate && !filters.endDate) {
+      this.filteredData = [...this.salesData];
+    } else {
+      this.filteredData = this.salesData.filter((transaction) => {
+        const transactionDate = transaction.timestamp
+          ? transaction.timestamp.toDate()
+          : utils.parseDate(transaction.tanggal);
 
-      if (!transactionDate) return false;
+        if (!transactionDate) return false;
 
-      // Date filter
-      if (filters.startDate && transactionDate < filters.startDate) return false;
-      if (filters.endDate && transactionDate > filters.endDate) return false;
+        // Date filter
+        if (filters.startDate && transactionDate < filters.startDate) return false;
+        if (filters.endDate && transactionDate > filters.endDate) return false;
 
-      // Jenis filter
-      if (filters.jenis !== "all" && transaction.jenisPenjualan !== filters.jenis) return false;
+        // Jenis filter
+        if (filters.jenis !== "all" && transaction.jenisPenjualan !== filters.jenis) return false;
 
-      // Sales filter
-      if (filters.sales !== "all" && transaction.sales !== filters.sales) return false;
+        // Sales filter
+        if (filters.sales !== "all" && transaction.sales !== filters.sales) return false;
 
-      return true;
-    });
+        return true;
+      });
+    }
 
     this.updateDataTable();
     this.updateSummary();
+  }
+
+  // Update URL parameters to maintain filter state
+  updateURLParams(filters) {
+    const params = new URLSearchParams();
+
+    if (filters.startDate) {
+      params.set("startDate", document.getElementById("filterTanggalMulai").value);
+    }
+    if (filters.endDate) {
+      params.set("endDate", document.getElementById("filterTanggalAkhir").value);
+    }
+    if (filters.jenis !== "all") {
+      params.set("jenis", filters.jenis);
+    }
+    if (filters.sales !== "all") {
+      params.set("sales", filters.sales);
+    }
+
+    // Update URL without page reload
+    const newURL = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
+    window.history.replaceState({}, "", newURL);
+  }
+
+  // Load filter state from URL parameters
+  loadFilterFromURL() {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("startDate")) {
+      document.getElementById("filterTanggalMulai").value = params.get("startDate");
+    }
+    if (params.get("endDate")) {
+      document.getElementById("filterTanggalAkhir").value = params.get("endDate");
+    }
+    if (params.get("jenis")) {
+      document.getElementById("filterJenisPenjualan").value = params.get("jenis");
+    }
+    if (params.get("sales")) {
+      document.getElementById("filterSales").value = params.get("sales");
+    }
   }
 
   // Update DataTable with filtered data
@@ -496,29 +642,33 @@ initDataTable() {
   }
 
   getGroupStatus(transactions) {
-  const statusCounts = {};
-  transactions.forEach(t => statusCounts[t.statusPembayaran || "Lunas"] = (statusCounts[t.statusPembayaran || "Lunas"] || 0) + 1);
-  
-  return Object.entries(statusCounts).map(([status, count]) => {
-    const color = status === "Lunas" ? "success" : status === "Free" ? "info" : "warning";
-    return `<span class="badge bg-${color}">${status} (${count})</span>`;
-  }).join(' ');
-}
+    const statusCounts = {};
+    transactions.forEach(
+      (t) => (statusCounts[t.statusPembayaran || "Lunas"] = (statusCounts[t.statusPembayaran || "Lunas"] || 0) + 1)
+    );
 
-getGroupKeterangan(transactions) {
-  const keteranganSet = new Set(transactions.map(t => t.keterangan).filter(Boolean));
-  const arr = Array.from(keteranganSet);
-  return arr.length === 0 ? "-" : arr.length === 1 ? arr[0] : `${arr[0]} <small>(+${arr.length-1})</small>`;
-}
+    return Object.entries(statusCounts)
+      .map(([status, count]) => {
+        const color = status === "Lunas" ? "success" : status === "Free" ? "info" : "warning";
+        return `<span class="badge bg-${color}">${status} (${count})</span>`;
+      })
+      .join(" ");
+  }
 
-getGroupActions(transactions) {
-  const ids = transactions.map(t => t.id).join(',');
-  return `
+  getGroupKeterangan(transactions) {
+    const keteranganSet = new Set(transactions.map((t) => t.keterangan).filter(Boolean));
+    const arr = Array.from(keteranganSet);
+    return arr.length === 0 ? "-" : arr.length === 1 ? arr[0] : `${arr[0]} <small>(+${arr.length - 1})</small>`;
+  }
+
+  getGroupActions(transactions) {
+    const ids = transactions.map((t) => t.id).join(",");
+    return `
     <div class="action-buttons">
       <button class="btn btn-sm btn-info btn-view-details" data-ids="${ids}" title="Detail"><i class="fas fa-eye"></i></button>
       <button class="btn btn-sm btn-warning btn-print-group" data-ids="${ids}" title="Cetak"><i class="fas fa-print"></i></button>
     </div>`;
-}
+  }
 
   // Format jenis penjualan
   formatJenisPenjualan(transaction) {
@@ -567,97 +717,157 @@ getGroupActions(transactions) {
   }
 
   // Update summary cards (removed daily cards)
-updateSummary() {
-  let totalTransaksi, totalPendapatan;
-  
-  if (this.isGroupedView) {
-    const grouped = this.groupData();
-    totalTransaksi = grouped.length;
-    totalPendapatan = grouped.reduce((sum, g) => sum + g.totalHarga, 0);
-  } else {
-    totalTransaksi = this.filteredData.length;
-    totalPendapatan = this.calculateTotalRevenue(this.filteredData);
+  updateSummary() {
+    let totalTransaksi, totalPendapatan;
+
+    if (this.isGroupedView) {
+      const grouped = this.groupData();
+      totalTransaksi = grouped.length;
+      totalPendapatan = grouped.reduce((sum, g) => sum + g.totalHarga, 0);
+    } else {
+      totalTransaksi = this.filteredData.length;
+      totalPendapatan = this.calculateTotalRevenue(this.filteredData);
+    }
+
+    document.getElementById("totalTransaksi").textContent = totalTransaksi;
+    document.getElementById("totalPendapatan").textContent = `Rp ${utils.formatRupiah(totalPendapatan)}`;
   }
-  
-  document.getElementById("totalTransaksi").textContent = totalTransaksi;
-  document.getElementById("totalPendapatan").textContent = `Rp ${utils.formatRupiah(totalPendapatan)}`;
-} 
 
-exportGroupedData() {
-  const grouped = this.groupData();
-  if (!grouped.length) return utils.showAlert("Tidak ada data untuk diekspor", "Info", "info");
-  
-  const exportData = grouped.map(g => ({
-    'Tanggal': utils.formatDate(g.latestDate),
-    'Sales': Array.from(g.salesList).join(', '),
-    'Jenis': g.jenisPenjualan,
-    'Kode': g.kodeText,
-    'Nama': g.nama,
-    'Jumlah': g.totalJumlah,
-    'Berat': g.totalBerat.toFixed(2),
-    'Kadar': g.kadar,
-    'Total Harga': g.totalHarga,
-    'Transaksi': g.transactions.length
-  }));
-  
-  const ws = XLSX.utils.json_to_sheet(exportData);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Grouped Data");
-  XLSX.writeFile(wb, `grouped_${new Date().toISOString().split('T')[0]}.xlsx`);
-}
+  exportGroupedData() {
+    // Check if XLSX library is available
+    if (typeof XLSX === "undefined") {
+      utils.showAlert("Library Excel tidak tersedia. Silakan refresh halaman dan coba lagi.", "Error", "error");
+      return;
+    }
 
-showGroupDetails(ids) {
-  const transactions = this.salesData.filter(t => ids.split(',').includes(t.id));
-  if (!transactions.length) return utils.showAlert("Data tidak ditemukan", "Error", "error");
-  
-  const modalHtml = `
-    <div class="modal fade" id="groupModal" tabindex="-1">
-      <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5>Detail Grup Transaksi</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <table class="table table-sm">
-              <thead><tr><th>Tanggal</th><th>Sales</th><th>Kode</th><th>Nama</th><th>Harga</th></tr></thead>
-              <tbody>
-                ${transactions.map(t => t.items?.map(item => `
-                  <tr>
-                    <td>${utils.formatDate(t.timestamp || t.tanggal)}</td>
-                    <td>${t.sales || "Admin"}</td>
-                    <td>${item.kodeText || "-"}</td>
-                    <td>${item.nama || "-"}</td>
-                    <td>Rp ${utils.formatRupiah(item.totalHarga || 0)}</td>
-                  </tr>
-                `).join('') || '').join('')}
-              </tbody>
-            </table>
-          </div>
+    const grouped = this.groupData();
+    if (!grouped.length) {
+      utils.showAlert("Tidak ada data untuk diekspor", "Info", "info");
+      return;
+    }
+
+    try {
+      const exportData = grouped.map((g) => ({
+        Tanggal: utils.formatDate(g.latestDate),
+        Sales: Array.from(g.salesList).join(", "),
+        Jenis: g.jenisPenjualan,
+        Kode: g.kodeText,
+        Nama: g.nama,
+        Jumlah: g.totalJumlah,
+        Berat: g.totalBerat.toFixed(2),
+        Kadar: g.kadar,
+        "Pendapatan Aktual": g.totalHarga, // Changed from 'Total Harga' to 'Pendapatan Aktual'
+        Transaksi: g.transactions.length,
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Grouped Data");
+
+      const fileName = `grouped_penjualan_${new Date().toISOString().split("T")[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+      utils.showAlert("Data berhasil diekspor", "Sukses", "success");
+    } catch (error) {
+      console.error("Export error:", error);
+      utils.showAlert("Gagal mengekspor data: " + error.message, "Error", "error");
+    }
+  }
+
+  showGroupDetails(ids) {
+    const transactions = this.salesData.filter((t) => ids.split(",").includes(t.id));
+    if (!transactions.length) return utils.showAlert("Data tidak ditemukan", "Error", "error");
+
+    const modalHtml = `
+  <div class="modal fade" id="groupModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5>Detail Grup Transaksi</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Sales</th>
+                <th>Kode</th>
+                <th>Nama</th>
+                <th>Status</th>
+                <th>Pendapatan Aktual</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${transactions
+                .map((t) => {
+                  const actualRevenue = this.calculateActualRevenue(t);
+                  const statusInfo =
+                    t.statusPembayaran === "DP"
+                      ? `DP: Rp ${utils.formatRupiah(t.nominalDP || 0)}`
+                      : t.statusPembayaran || "Lunas";
+
+                  return (
+                    t.items
+                      ?.map((item) => {
+                        const totalTransactionValue = t.totalHarga || 0;
+                        const itemProportion =
+                          totalTransactionValue > 0 ? (item.totalHarga || 0) / totalTransactionValue : 1;
+                        const itemActualRevenue = actualRevenue * itemProportion;
+
+                        return `
+                        <tr>
+                          <td>${utils.formatDate(t.timestamp || t.tanggal)}</td>
+                          <td>${t.sales || "Admin"}</td>
+                          <td>${item.kodeText || "-"}</td>
+                          <td>${item.nama || "-"}</td>
+                          <td><span class="badge ${
+                            t.statusPembayaran === "DP" ? "bg-warning" : "bg-success"
+                          }">${statusInfo}</span></td>
+                          <td>Rp ${utils.formatRupiah(itemActualRevenue)}</td>
+                        </tr>
+                      `;
+                      })
+                      .join("") || ""
+                  );
+                })
+                .join("")}
+            </tbody>
+          </table>
         </div>
       </div>
-    </div>`;
-  
-  $('#groupModal').remove();
-  $('body').append(modalHtml);
-  $('#groupModal').modal('show').on('hidden.bs.modal', function() { $(this).remove(); });
-}
+    </div>
+  </div>`;
 
-printGroupTransactions(ids) {
-  const transactions = this.salesData.filter(t => ids.split(',').includes(t.id));
-  if (!transactions.length) return utils.showAlert("Data tidak ditemukan", "Error", "error");
-  
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) return utils.showAlert("Popup diblokir", "Error", "error");
-  
-  const html = `
+    $("#groupModal").remove();
+    $("body").append(modalHtml);
+    $("#groupModal")
+      .modal("show")
+      .on("hidden.bs.modal", function () {
+        $(this).remove();
+      });
+  }
+
+  printGroupTransactions(ids) {
+    const transactions = this.salesData.filter((t) => ids.split(",").includes(t.id));
+    if (!transactions.length) return utils.showAlert("Data tidak ditemukan", "Error", "error");
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return utils.showAlert("Popup diblokir", "Error", "error");
+
+    const html = `
     <html><head><title>Grup Transaksi</title>
     <style>body{font-family:Arial;font-size:12px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px}</style>
     </head><body>
     <h2>MELATI GOLD SHOP - Grup Transaksi</h2>
     <table><thead><tr><th>Tanggal</th><th>Sales</th><th>Kode</th><th>Nama</th><th>Harga</th></tr></thead>
     <tbody>
-      ${transactions.map(t => t.items?.map(item => `
+      ${transactions
+        .map(
+          (t) =>
+            t.items
+              ?.map(
+                (item) => `
         <tr>
           <td>${utils.formatDate(t.timestamp || t.tanggal)}</td>
           <td>${t.sales || "Admin"}</td>
@@ -665,25 +875,38 @@ printGroupTransactions(ids) {
           <td>${item.nama || "-"}</td>
           <td>Rp ${utils.formatRupiah(item.totalHarga || 0)}</td>
         </tr>
-      `).join('') || '').join('')}
+      `
+              )
+              .join("") || ""
+        )
+        .join("")}
     </tbody></table>
     <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}</script>
     </body></html>`;
-  
-  printWindow.document.write(html);
-  printWindow.document.close();
-}
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
+
+  // Helper function to calculate actual revenue (considering DP)
+  calculateActualRevenue(transaction) {
+    if (transaction.metodeBayar === "free" || transaction.statusPembayaran === "Free") {
+      return 0;
+    }
+
+    if (transaction.metodeBayar === "dp" && transaction.statusPembayaran === "DP") {
+      // For DP transactions, return only the DP amount (what was actually received)
+      return transaction.nominalDP || 0;
+    }
+
+    // For completed transactions, return full amount
+    return transaction.totalHarga || 0;
+  }
 
   // Calculate total revenue
   calculateTotalRevenue(transactions) {
     return transactions.reduce((total, transaction) => {
-      if (transaction.metodeBayar === "free") return total;
-
-      if (transaction.metodeBayar === "dp" && transaction.statusPembayaran === "DP") {
-        return total + (transaction.sisaPembayaran || 0);
-      }
-
-      return total + (transaction.totalHarga || 0);
+      return total + this.calculateActualRevenue(transaction);
     }, 0);
   }
 
@@ -1188,6 +1411,12 @@ printGroupTransactions(ids) {
 
   // Export to Excel
   exportToExcel() {
+    // Check if XLSX library is available
+    if (typeof XLSX === "undefined") {
+      utils.showAlert("Library Excel tidak tersedia. Silakan refresh halaman dan coba lagi.", "Error", "error");
+      return;
+    }
+
     if (!this.filteredData.length) {
       return utils.showAlert("Tidak ada data untuk diekspor", "Info", "info");
     }
@@ -1253,7 +1482,10 @@ printGroupTransactions(ids) {
 $(document).ready(async function () {
   // Check if required libraries are loaded
   if (typeof XLSX === "undefined") {
-    console.warn("SheetJS (XLSX) library is not loaded. Excel export will not work.");
+    console.error("SheetJS (XLSX) library is not loaded. Excel export will not work.");
+    utils.showAlert("Library Excel tidak tersedia. Fitur export Excel tidak akan berfungsi.", "Warning", "warning");
+  } else {
+    console.log("SheetJS library loaded successfully");
   }
 
   // Initialize the application
