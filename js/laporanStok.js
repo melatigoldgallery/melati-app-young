@@ -311,7 +311,7 @@ const laporanStokHandler = {
       throw error;
     }
   },
-
+/*  */
   // Calculate stock continuity
   async calculateStockContinuity(startDate, endDate) {
     try {

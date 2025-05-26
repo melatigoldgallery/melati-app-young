@@ -20,76 +20,76 @@ let currentTransactionData = null;
 
 // Enhanced Cache management with localStorage and TTL
 const cacheManager = {
-  prefix: 'melati_penjualan_',
+  prefix: "melati_penjualan_",
   stockTTL: 10 * 60 * 1000, // 10 menit untuk data stok
-  salesTTL: 2 * 60 * 1000,  // 2 menit untuk data penjualan
-  
+  salesTTL: 2 * 60 * 1000, // 2 menit untuk data penjualan
+
   set(key, data, ttl) {
     try {
       const item = {
         data,
         timestamp: Date.now(),
         ttl,
-        version: Date.now() // untuk multi-device sync
+        version: Date.now(), // untuk multi-device sync
       };
       localStorage.setItem(this.prefix + key, JSON.stringify(item));
     } catch (error) {
-      console.warn('Cache set failed:', error);
+      console.warn("Cache set failed:", error);
       // Fallback: clear old cache if storage is full
       this.clearOldCache();
       try {
         localStorage.setItem(this.prefix + key, JSON.stringify(item));
       } catch (retryError) {
-        console.error('Cache retry failed:', retryError);
+        console.error("Cache retry failed:", retryError);
       }
     }
   },
-  
+
   get(key) {
     try {
       const item = JSON.parse(localStorage.getItem(this.prefix + key));
       if (!item) return null;
-      
+
       if (Date.now() - item.timestamp > item.ttl) {
         this.remove(key);
         return null;
       }
-      
+
       return item.data;
     } catch (error) {
-      console.warn('Cache get failed:', error);
+      console.warn("Cache get failed:", error);
       this.remove(key);
       return null;
     }
   },
-  
+
   remove(key) {
     try {
       localStorage.removeItem(this.prefix + key);
     } catch (error) {
-      console.warn('Cache remove failed:', error);
+      console.warn("Cache remove failed:", error);
     }
   },
-  
+
   clear() {
     try {
       Object.keys(localStorage)
-        .filter(key => key.startsWith(this.prefix))
-        .forEach(key => localStorage.removeItem(key));
+        .filter((key) => key.startsWith(this.prefix))
+        .forEach((key) => localStorage.removeItem(key));
     } catch (error) {
-      console.warn('Cache clear failed:', error);
+      console.warn("Cache clear failed:", error);
     }
   },
-  
+
   clearOldCache() {
     const now = Date.now();
     try {
       Object.keys(localStorage)
-        .filter(key => key.startsWith(this.prefix))
-        .forEach(key => {
+        .filter((key) => key.startsWith(this.prefix))
+        .forEach((key) => {
           try {
             const item = JSON.parse(localStorage.getItem(key));
-            if (item && (now - item.timestamp > item.ttl)) {
+            if (item && now - item.timestamp > item.ttl) {
               localStorage.removeItem(key);
             }
           } catch (error) {
@@ -97,24 +97,24 @@ const cacheManager = {
           }
         });
     } catch (error) {
-      console.warn('Clear old cache failed:', error);
+      console.warn("Clear old cache failed:", error);
     }
   },
-  
+
   // Check if cache is valid and not too old
   isValid(key, maxAge = null) {
     const item = this.get(key);
     if (!item) return false;
-    
+
     if (maxAge) {
       try {
         const cacheItem = JSON.parse(localStorage.getItem(this.prefix + key));
-        return cacheItem && (Date.now() - cacheItem.timestamp < maxAge);
+        return cacheItem && Date.now() - cacheItem.timestamp < maxAge;
       } catch (error) {
         return false;
       }
     }
-    
+
     return true;
   },
 
@@ -123,48 +123,56 @@ const cacheManager = {
     const info = {};
     try {
       Object.keys(localStorage)
-        .filter(key => key.startsWith(this.prefix))
-        .forEach(key => {
+        .filter((key) => key.startsWith(this.prefix))
+        .forEach((key) => {
           try {
             const item = JSON.parse(localStorage.getItem(key));
             const age = Date.now() - item.timestamp;
-            info[key.replace(this.prefix, '')] = {
-              age: Math.round(age / 1000) + 's',
+            info[key.replace(this.prefix, "")] = {
+              age: Math.round(age / 1000) + "s",
               valid: age < item.ttl,
-              size: JSON.stringify(item.data).length
+              size: JSON.stringify(item.data).length,
             };
           } catch (error) {
-            info[key.replace(this.prefix, '')] = 'corrupted';
+            info[key.replace(this.prefix, "")] = "corrupted";
           }
         });
     } catch (error) {
-      console.warn('Get cache info failed:', error);
+      console.warn("Get cache info failed:", error);
     }
     return info;
-  }
+  },
 };
 
 // Utility functions
 const utils = {
   showAlert: (message, title = "Informasi", type = "info") => {
     return Swal.fire({
-      title, text: message, icon: type,
-      confirmButtonText: "OK", confirmButtonColor: "#0d6efd"
+      title,
+      text: message,
+      icon: type,
+      confirmButtonText: "OK",
+      confirmButtonColor: "#0d6efd",
     });
   },
 
   showConfirm: (message, title = "Konfirmasi") => {
     return Swal.fire({
-      title, text: message, icon: "question",
-      showCancelButton: true, confirmButtonText: "Ya", cancelButtonText: "Batal",
-      confirmButtonColor: "#0d6efd", cancelButtonColor: "#6c757d"
-    }).then(result => result.isConfirmed);
+      title,
+      text: message,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Ya",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#0d6efd",
+      cancelButtonColor: "#6c757d",
+    }).then((result) => result.isConfirmed);
   },
 
   formatDate: (date) => {
     if (!date) return "";
     try {
-      const d = date.toDate ? date.toDate() : (date instanceof Date ? date : new Date(date));
+      const d = date.toDate ? date.toDate() : date instanceof Date ? date : new Date(date);
       const day = String(d.getDate()).padStart(2, "0");
       const month = String(d.getMonth() + 1).padStart(2, "0");
       const year = d.getFullYear();
@@ -211,16 +219,16 @@ const utils = {
 
   throttle: (func, limit) => {
     let inThrottle;
-    return function() {
+    return function () {
       const args = arguments;
       const context = this;
       if (!inThrottle) {
         func.apply(context, args);
         inThrottle = true;
-        setTimeout(() => inThrottle = false, limit);
+        setTimeout(() => (inThrottle = false), limit);
       }
     };
-  }
+  },
 };
 
 // Main application handler
@@ -237,21 +245,18 @@ const penjualanHandler = {
     this.setupEventListeners();
     this.initDatePicker();
     this.setDefaultDate();
-    
+
     // Load data with cache
-    await Promise.all([
-      this.loadStockData(),
-      this.loadTodaySales()
-    ]);
-    
+    await Promise.all([this.loadStockData(), this.loadTodaySales()]);
+
     this.updateUIForSalesType("aksesoris");
     $("#sales").focus();
-    
+
     // Auto refresh every 3 minutes for stock, 1 minute for sales
     this.startAutoRefresh();
-    
+
     // Log cache info for debugging
-    console.log('Cache info:', cacheManager.getCacheInfo());
+    console.log("Cache info:", cacheManager.getCacheInfo());
   },
 
   // Setup all event listeners
@@ -271,27 +276,43 @@ const penjualanHandler = {
     $("#btnTambahBaris").on("click", () => this.addNewRow("manual"));
     $("#btnSimpanPenjualan").on("click", () => this.saveTransaction());
     $("#btnBatal").on("click", () => this.resetForm());
-    $("#btnPrintReceipt").on("click", () => this.printReceipt());
-    $("#btnPrintInvoice").on("click", () => this.printInvoice());
+    $("#btnPrintReceipt").on("click", (e) => {
+      e.preventDefault();
+      this.printDocument("receipt");
+    });
+
+    $("#btnPrintInvoice").on("click", (e) => {
+      e.preventDefault();
+      this.printDocument("invoice");
+    });
     $("#refreshStok").on("click", () => this.refreshStock());
 
     // Input events with debouncing
-    $("#jumlahBayar").on("input", utils.debounce(() => this.calculateKembalian(), 300));
-    $("#nominalDP").on("input", utils.debounce(() => this.calculateSisaPembayaran(), 300));
-    
-    $("#jumlahBayar, #nominalDP").on("blur", function() {
+    $("#jumlahBayar").on(
+      "input",
+      utils.debounce(() => this.calculateKembalian(), 300)
+    );
+    $("#nominalDP").on(
+      "input",
+      utils.debounce(() => this.calculateSisaPembayaran(), 300)
+    );
+
+    $("#jumlahBayar, #nominalDP").on("blur", function () {
       const value = $(this).val().replace(/\./g, "");
       $(this).val(utils.formatRupiah(parseInt(value || 0)));
     });
 
     // Search events with throttling
-    $("#searchAksesoris, #searchKotak, #searchLock").on("input", utils.throttle((e) => {
-      this.searchTable(e.target);
-    }, 300));
+    $("#searchAksesoris, #searchKotak, #searchLock").on(
+      "input",
+      utils.throttle((e) => {
+        this.searchTable(e.target);
+      }, 300)
+    );
 
     // Sales validation
     $("#sales").on("blur", () => this.validateSales());
-    $("#sales").on("focus", function() {
+    $("#sales").on("focus", function () {
       $(this).removeClass("is-invalid is-valid");
       $(this).next(".invalid-feedback").remove();
     });
@@ -308,9 +329,9 @@ const penjualanHandler = {
     this.refreshInterval = setInterval(async () => {
       try {
         await this.loadTodaySales(true);
-        console.log('Auto-refreshed sales data');
+        console.log("Auto-refreshed sales data");
       } catch (error) {
-        console.error('Auto-refresh failed:', error);
+        console.error("Auto-refresh failed:", error);
       }
     }, 60 * 1000);
 
@@ -318,9 +339,9 @@ const penjualanHandler = {
     setInterval(async () => {
       try {
         await this.loadStockData(true);
-        console.log('Auto-refreshed stock data');
+        console.log("Auto-refreshed stock data");
       } catch (error) {
-        console.error('Stock auto-refresh failed:', error);
+        console.error("Stock auto-refresh failed:", error);
       }
     }, 5 * 60 * 1000);
   },
@@ -346,15 +367,15 @@ const penjualanHandler = {
   // Load stock data with enhanced caching
   async loadStockData(forceRefresh = false) {
     if (this.isLoadingStock) return;
-    
+
     try {
       this.isLoadingStock = true;
-      
+
       // Check cache first
       if (!forceRefresh) {
-        const cachedData = cacheManager.get('stockData');
+        const cachedData = cacheManager.get("stockData");
         if (cachedData) {
-          console.log('Using cached stock data');
+          console.log("Using cached stock data");
           this.stockData = cachedData;
           this.populateStockTables();
           return;
@@ -362,12 +383,12 @@ const penjualanHandler = {
       }
 
       utils.showLoading(true);
-      console.log('Fetching fresh stock data from Firestore');
-      
+      console.log("Fetching fresh stock data from Firestore");
+
       const snapshot = await getDocs(collection(firestore, "stokAksesoris"));
       const stockData = [];
-      
-      snapshot.forEach(doc => {
+
+      snapshot.forEach((doc) => {
         const data = doc.data();
         if (data.stokAkhir > 0) {
           stockData.push({ id: doc.id, ...data });
@@ -375,10 +396,9 @@ const penjualanHandler = {
       });
 
       // Cache with longer TTL for stock data
-      cacheManager.set('stockData', stockData, cacheManager.stockTTL);
+      cacheManager.set("stockData", stockData, cacheManager.stockTTL);
       this.stockData = stockData;
       this.populateStockTables();
-      
     } catch (error) {
       console.error("Error loading stock:", error);
       utils.showAlert("Gagal memuat data stok: " + error.message, "Error", "error");
@@ -391,15 +411,15 @@ const penjualanHandler = {
   // Load today's sales data with caching
   async loadTodaySales(forceRefresh = false) {
     if (this.isLoadingSales) return;
-    
+
     try {
       this.isLoadingSales = true;
-      
+
       // Check cache first
       if (!forceRefresh) {
-        const cachedData = cacheManager.get('todaySales');
+        const cachedData = cacheManager.get("todaySales");
         if (cachedData) {
-          console.log('Using cached sales data');
+          console.log("Using cached sales data");
           this.salesData = cachedData;
           return;
         }
@@ -419,15 +439,14 @@ const penjualanHandler = {
 
       const snapshot = await getDocs(q);
       const salesData = [];
-      
-      snapshot.forEach(doc => {
+
+      snapshot.forEach((doc) => {
         salesData.push({ id: doc.id, ...doc.data() });
       });
 
       // Cache with shorter TTL for sales data
-      cacheManager.set('todaySales', salesData, cacheManager.salesTTL);
+      cacheManager.set("todaySales", salesData, cacheManager.salesTTL);
       this.salesData = salesData;
-      
     } catch (error) {
       console.error("Error loading sales:", error);
       utils.showAlert("Gagal memuat data penjualan: " + error.message, "Error", "error");
@@ -440,21 +459,23 @@ const penjualanHandler = {
   populateStockTables() {
     const categories = {
       aksesoris: "#tableAksesoris",
-      kotak: "#tableKotak"
+      kotak: "#tableKotak",
     };
 
     Object.entries(categories).forEach(([category, selector]) => {
       const tbody = $(`${selector} tbody`);
       tbody.empty();
 
-      const items = this.stockData.filter(item => item.kategori === category);
-      
+      const items = this.stockData.filter((item) => item.kategori === category);
+
       if (items.length === 0) {
         tbody.append(`<tr><td colspan="3" class="text-center">Tidak ada data ${category}</td></tr>`);
       } else {
-        items.forEach(item => {
+        items.forEach((item) => {
           const row = `
-            <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${item.hargaJual || 0}">
+            <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${
+            item.hargaJual || 0
+          }">
               <td>${item.kode || "-"}</td>
               <td>${item.nama || "-"}</td>
               <td>${item.stokAkhir || 0}</td>
@@ -469,14 +490,16 @@ const penjualanHandler = {
     const lockTable = $("#tableLock tbody");
     lockTable.empty();
 
-    const lockItems = this.stockData.filter(item => item.kategori === "aksesoris");
-    
+    const lockItems = this.stockData.filter((item) => item.kategori === "aksesoris");
+
     if (lockItems.length === 0) {
       lockTable.append('<tr><td colspan="3" class="text-center">Tidak ada data lock</td></tr>');
     } else {
-      lockItems.forEach(item => {
+      lockItems.forEach((item) => {
         const row = `
-          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${item.hargaJual || 0}">
+          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${
+          item.hargaJual || 0
+        }">
             <td>${item.kode || "-"}</td>
             <td>${item.nama || "-"}</td>
             <td>${item.stokAkhir || 0}</td>
@@ -496,13 +519,13 @@ const penjualanHandler = {
     $("#tableAksesoris tbody tr, #tableKotak tbody tr, #tableLock tbody tr").off("click");
 
     // Aksesoris table
-    $("#tableAksesoris tbody tr").on("click", function() {
+    $("#tableAksesoris tbody tr").on("click", function () {
       if ($(this).data("kode")) {
         const data = {
           kode: $(this).data("kode"),
           nama: $(this).data("nama"),
           stok: $(this).data("stok"),
-          harga: $(this).data("harga")
+          harga: $(this).data("harga"),
         };
         penjualanHandler.addAksesorisToTable(data);
         $("#modalPilihAksesoris").modal("hide");
@@ -510,13 +533,13 @@ const penjualanHandler = {
     });
 
     // Kotak table
-    $("#tableKotak tbody tr").on("click", function() {
+    $("#tableKotak tbody tr").on("click", function () {
       if ($(this).data("kode")) {
         const data = {
           kode: $(this).data("kode"),
           nama: $(this).data("nama"),
           stok: $(this).data("stok"),
-          harga: $(this).data("harga")
+          harga: $(this).data("harga"),
         };
         penjualanHandler.addKotakToTable(data);
         $("#modalPilihKotak").modal("hide");
@@ -524,16 +547,16 @@ const penjualanHandler = {
     });
 
     // Lock table
-    $("#tableLock tbody tr").on("click", function() {
+    $("#tableLock tbody tr").on("click", function () {
       if ($(this).data("kode") && activeLockRow) {
         const kode = $(this).data("kode");
-        
+
         if (activeLockRow.hasClass("input-row")) {
           $("#manualInputKodeLock").val(kode);
         } else {
           activeLockRow.find(".kode-lock-input").val(kode);
         }
-        
+
         activeLockRow = null;
         $("#modalPilihLock").modal("hide");
       }
@@ -543,7 +566,7 @@ const penjualanHandler = {
   // Show stock modal based on sales type
   showStockModal() {
     const salesType = $("#jenisPenjualan").val();
-    
+
     if (salesType === "aksesoris") {
       $("#modalPilihAksesoris").modal("show");
     } else if (salesType === "kotak") {
@@ -602,7 +625,9 @@ const penjualanHandler = {
           <input type="number" class="form-control form-control-sm jumlah-input" value="${jumlah}" min="1" max="${stok}">
         </td>
         <td>
-          <input type="text" class="form-control form-control-sm harga-input" value="${utils.formatRupiah(harga)}" required>
+          <input type="text" class="form-control form-control-sm harga-input" value="${utils.formatRupiah(
+            harga
+          )}" required>
         </td>
         <td class="total-harga">${utils.formatRupiah(totalHarga)}</td>
         <td>
@@ -634,8 +659,8 @@ const penjualanHandler = {
     // Delete button handler
     $row.find(".btn-delete").on("click", () => {
       const tableId = $row.closest("table").attr("id");
-      const salesType = tableId === "tableAksesorisDetail" ? "aksesoris" : 
-                       tableId === "tableKotakDetail" ? "kotak" : "manual";
+      const salesType =
+        tableId === "tableAksesorisDetail" ? "aksesoris" : tableId === "tableKotakDetail" ? "kotak" : "manual";
       $row.remove();
       this.updateGrandTotal(salesType);
     });
@@ -668,7 +693,7 @@ const penjualanHandler = {
     $jumlahInput.on("input", () => this.updateGrandTotal("aksesoris"));
 
     // Format total harga
-    $totalHargaInput.on("blur", function() {
+    $totalHargaInput.on("blur", function () {
       const value = $(this).val().replace(/\./g, "");
       $(this).val(utils.formatRupiah(parseInt(value || 0)));
     });
@@ -715,7 +740,7 @@ const penjualanHandler = {
 
     $jumlahInput.add($hargaInput).on("input", calculateTotal);
 
-    $hargaInput.on("blur", function() {
+    $hargaInput.on("blur", function () {
       const value = $(this).val().replace(/\./g, "");
       $(this).val(utils.formatRupiah(parseInt(value || 0)));
     });
@@ -846,7 +871,7 @@ const penjualanHandler = {
     $("#manualInputBerat, #manualInputTotalHarga").off("input");
 
     // Pilih kode lock button
-    $("#manualBtnPilihKodeLock").on("click", function() {
+    $("#manualBtnPilihKodeLock").on("click", function () {
       activeLockRow = $(this).closest("tr");
       $("#modalPilihLock").modal("show");
     });
@@ -859,24 +884,26 @@ const penjualanHandler = {
     // Enter key navigation
     const inputs = [
       "#manualInputKode",
-      "#manualInputNamaBarang", 
+      "#manualInputNamaBarang",
       "#manualInputKadar",
       "#manualInputBerat",
       "#manualInputTotalHarga",
-      "#manualInputKeterangan"
+      "#manualInputKeterangan",
     ];
 
     inputs.forEach((selector, index) => {
-      $(selector).off("keypress").on("keypress", (e) => {
-        if (e.which === 13) {
-          e.preventDefault();
-          if (index < inputs.length - 1) {
-            $(inputs[index + 1]).focus();
-          } else {
-            this.addNewRow("manual");
+      $(selector)
+        .off("keypress")
+        .on("keypress", (e) => {
+          if (e.which === 13) {
+            e.preventDefault();
+            if (index < inputs.length - 1) {
+              $(inputs[index + 1]).focus();
+            } else {
+              this.addNewRow("manual");
+            }
           }
-        }
-      });
+        });
     });
   },
 
@@ -948,7 +975,9 @@ const penjualanHandler = {
     $(`#table${type.charAt(0).toUpperCase() + type.slice(1)}Detail tbody`).append(newRow);
 
     // Clear input row
-    $(`#${type}InputKode, #${type}InputNamaBarang, #${type}InputKodeLock, #${type}InputKadar, #${type}InputBerat, #${type}InputHargaPerGram, #${type}InputTotalHarga, #${type}InputKeterangan`).val("");
+    $(
+      `#${type}InputKode, #${type}InputNamaBarang, #${type}InputKodeLock, #${type}InputKadar, #${type}InputBerat, #${type}InputHargaPerGram, #${type}InputTotalHarga, #${type}InputKeterangan`
+    ).val("");
 
     $(`#${type}InputKode`).focus();
     this.updateGrandTotal(type);
@@ -976,17 +1005,17 @@ const penjualanHandler = {
     let total = 0;
 
     if (salesType === "aksesoris") {
-      $(tableSelector + " tbody tr:not(.input-row) .total-harga-input").each(function() {
+      $(tableSelector + " tbody tr:not(.input-row) .total-harga-input").each(function () {
         const value = $(this).val().replace(/\./g, "");
         total += parseFloat(value) || 0;
       });
     } else if (salesType === "kotak") {
-      $(tableSelector + " tbody tr:not(.input-row) .total-harga").each(function() {
+      $(tableSelector + " tbody tr:not(.input-row) .total-harga").each(function () {
         const value = $(this).text().replace(/\./g, "");
         total += parseFloat(value) || 0;
       });
     } else {
-      $(tableSelector + " tbody tr:not(.input-row) .total-harga").each(function() {
+      $(tableSelector + " tbody tr:not(.input-row) .total-harga").each(function () {
         const value = $(this).text().replace(/\./g, "");
         total += parseFloat(value) || 0;
       });
@@ -1011,9 +1040,13 @@ const penjualanHandler = {
     }
 
     let total = 0;
-    const grandTotalSelector = salesType === "aksesoris" ? "#grand-total-aksesoris" :
-                              salesType === "kotak" ? "#grand-total-kotak" : "#grand-total-manual";
-    
+    const grandTotalSelector =
+      salesType === "aksesoris"
+        ? "#grand-total-aksesoris"
+        : salesType === "kotak"
+        ? "#grand-total-kotak"
+        : "#grand-total-manual";
+
     total = parseFloat($(grandTotalSelector).text().replace(/\./g, "")) || 0;
     $("#totalOngkos").val(utils.formatRupiah(total));
 
@@ -1054,11 +1087,11 @@ const penjualanHandler = {
   searchTable(input) {
     const searchText = $(input).val().toLowerCase();
     const tableId = $(input).attr("id").replace("search", "table");
-    
-    $(`#${tableId} tbody tr`).each(function() {
+
+    $(`#${tableId} tbody tr`).each(function () {
       const kode = $(this).find("td:nth-child(1)").text().toLowerCase();
       const nama = $(this).find("td:nth-child(2)").text().toLowerCase();
-      
+
       if (kode.includes(searchText) || nama.includes(searchText)) {
         $(this).show();
       } else {
@@ -1085,7 +1118,7 @@ const penjualanHandler = {
   async refreshStock() {
     try {
       utils.showLoading(true);
-      cacheManager.remove('stockData');
+      cacheManager.remove("stockData");
       await this.loadStockData(true);
       utils.showAlert("Data stok berhasil diperbarui", "Sukses", "success");
     } catch (error) {
@@ -1108,8 +1141,12 @@ const penjualanHandler = {
       }
 
       const salesType = $("#jenisPenjualan").val();
-      const tableSelector = salesType === "aksesoris" ? "#tableAksesorisDetail" :
-                           salesType === "kotak" ? "#tableKotakDetail" : "#tableManualDetail";
+      const tableSelector =
+        salesType === "aksesoris"
+          ? "#tableAksesorisDetail"
+          : salesType === "kotak"
+          ? "#tableKotakDetail"
+          : "#tableManualDetail";
 
       // Check if table has rows
       if ($(tableSelector + " tbody tr:not(.input-row)").length === 0) {
@@ -1124,7 +1161,9 @@ const penjualanHandler = {
         const total = parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0;
 
         if (nominalDP <= 0 || nominalDP >= total) {
-          utils.showAlert(nominalDP <= 0 ? "Nominal DP harus diisi!" : "Nominal DP tidak boleh sama dengan atau melebihi total harga!");
+          utils.showAlert(
+            nominalDP <= 0 ? "Nominal DP harus diisi!" : "Nominal DP tidak boleh sama dengan atau melebihi total harga!"
+          );
           $("#nominalDP").focus();
           return;
         }
@@ -1156,7 +1195,7 @@ const penjualanHandler = {
       };
 
       // Mark as ganti lock if applicable
-      if (salesType === "manual" && items.some(item => item.kodeLock)) {
+      if (salesType === "manual" && items.some((item) => item.kodeLock)) {
         transactionData.isGantiLock = true;
       }
 
@@ -1182,8 +1221,8 @@ const penjualanHandler = {
       }
 
       // Clear cache to ensure fresh data
-      cacheManager.remove('todaySales');
-      cacheManager.remove('stockData');
+      cacheManager.remove("todaySales");
+      cacheManager.remove("stockData");
 
       utils.showAlert("Transaksi berhasil disimpan!", "Sukses", "success");
 
@@ -1213,7 +1252,6 @@ const penjualanHandler = {
         $("#sales").focus();
         $("#printModal").off("hidden.bs.modal");
       });
-
     } catch (error) {
       console.error("Error saving transaction:", error);
       utils.showAlert("Terjadi kesalahan saat menyimpan transaksi: " + error.message, "Error", "error");
@@ -1227,7 +1265,7 @@ const penjualanHandler = {
     const items = [];
 
     if (salesType === "aksesoris") {
-      $(tableSelector + " tbody tr:not(.input-row)").each(function() {
+      $(tableSelector + " tbody tr:not(.input-row)").each(function () {
         const kode = $(this).find("td:nth-child(1)").text();
         const nama = $(this).find("td:nth-child(2)").text();
         const jumlah = parseInt($(this).find(".jumlah-input").val()) || 1;
@@ -1247,7 +1285,7 @@ const penjualanHandler = {
         });
       });
     } else if (salesType === "kotak") {
-      $(tableSelector + " tbody tr:not(.input-row)").each(function() {
+      $(tableSelector + " tbody tr:not(.input-row)").each(function () {
         const kode = $(this).find("td:nth-child(1)").text();
         const nama = $(this).find("td:nth-child(2)").text();
         const jumlah = parseInt($(this).find(".jumlah-input").val()) || 1;
@@ -1264,7 +1302,7 @@ const penjualanHandler = {
       });
     } else {
       // Manual
-      $(tableSelector + " tbody tr:not(.input-row)").each(function() {
+      $(tableSelector + " tbody tr:not(.input-row)").each(function () {
         const kode = $(this).find("td:nth-child(1)").text();
         const nama = $(this).find("td:nth-child(2)").text();
         const kodeLock = $(this).find("td:nth-child(3)").text();
@@ -1293,44 +1331,32 @@ const penjualanHandler = {
   // Update stock after sales
   async updateStock(salesType, items) {
     try {
+      const metodeBayar = $("#metodeBayar").val();
+      const isGantiLock = salesType === "manual" && items.some((item) => item.kodeLock);
+
       for (const item of items) {
         const kode = item.kodeText;
-        if (!kode || salesType === "manual") continue;
+        if (!kode || kode === "-") continue;
 
-        const stockQuery = query(collection(firestore, "stokAksesoris"), where("kode", "==", kode));
-        const stockSnapshot = await getDocs(stockQuery);
-
-        if (!stockSnapshot.empty) {
-          const stockDoc = stockSnapshot.docs[0];
-          const currentStock = stockDoc.data().stokAkhir || 0;
-          const jumlah = parseInt(item.jumlah) || 1;
-          const newStock = Math.max(0, currentStock - jumlah);
-
-          // Update stock in Firestore
-          await updateDoc(doc(firestore, "stokAksesoris", stockDoc.id), {
-            stokAkhir: newStock,
-            lastUpdate: serverTimestamp(),
-          });
-
-          // Add transaction log
-          await addDoc(collection(firestore, "stokAksesorisTransaksi"), {
-            kode,
-            nama: item.nama || "",
-            kategori: salesType === "kotak" ? "kotak" : "aksesoris",
-            jenis: "laku",
-            jumlah,
-            stokSebelum: currentStock,
-            stokSesudah: newStock,
-            stokAkhir: newStock,
-            timestamp: serverTimestamp(),
-            keterangan: `Penjualan ${salesType} oleh ${$("#sales").val() || "Admin"}`,
-          });
+        // Tentukan jenis transaksi berdasarkan kondisi
+        let jenisTransaksi, keterangan;
+        if (metodeBayar === "free") {
+          jenisTransaksi = "free";
+          keterangan = `Penjualan ${salesType} gratis oleh ${$("#sales").val()}`;
+        } else if (isGantiLock && item.kodeLock) {
+          jenisTransaksi = "gantiLock";
+          keterangan = `Ganti lock ${item.kodeLock} oleh ${$("#sales").val()}`;
+        } else if (salesType !== "manual") {
+          jenisTransaksi = "laku";
+          keterangan = `Penjualan ${salesType} oleh ${$("#sales").val()}`;
+        } else {
+          continue; // Skip manual tanpa kode lock
         }
+
+        await this.processStockUpdate(kode, item, jenisTransaksi, keterangan);
       }
 
-      // Clear stock cache to force refresh
-      cacheManager.remove('stockData');
-      
+      cacheManager.remove("stockData");
       return true;
     } catch (error) {
       console.error("Error updating stock:", error);
@@ -1338,6 +1364,62 @@ const penjualanHandler = {
     }
   },
 
+  // Method helper untuk proses update stok
+  async processStockUpdate(kode, item, jenisTransaksi, keterangan) {
+    // Cari stok berdasarkan kode
+    const stockQuery = query(collection(firestore, "stokAksesoris"), where("kode", "==", kode));
+    const stockSnapshot = await getDocs(stockQuery);
+
+    let stockDoc,
+      currentStock = 0;
+
+    if (!stockSnapshot.empty) {
+      stockDoc = stockSnapshot.docs[0];
+      currentStock = stockDoc.data().stokAkhir || 0;
+    } else {
+      // Buat entry stok baru jika tidak ada
+      const newStockData = {
+        kode,
+        nama: item.nama || "",
+        kategori: this.determineCategory(kode),
+        stokAwal: 0,
+        stokAkhir: 0,
+        lastUpdate: serverTimestamp(),
+      };
+      const newStockRef = await addDoc(collection(firestore, "stokAksesoris"), newStockData);
+      stockDoc = { id: newStockRef.id };
+    }
+
+    // Update stok hanya untuk transaksi yang mengurangi stok
+    const jumlah = parseInt(item.jumlah) || 1;
+    const newStock = Math.max(0, currentStock - jumlah);
+
+    await updateDoc(doc(firestore, "stokAksesoris", stockDoc.id), {
+      stokAkhir: newStock,
+      lastUpdate: serverTimestamp(),
+    });
+
+    // Catat transaksi stok
+    await addDoc(collection(firestore, "stokAksesorisTransaksi"), {
+      kode,
+      nama: item.nama || "",
+      kategori: this.determineCategory(kode),
+      jenis: jenisTransaksi,
+      jumlah,
+      stokSebelum: currentStock,
+      stokSesudah: newStock,
+      stokAkhir: newStock,
+      timestamp: serverTimestamp(),
+      keterangan,
+    });
+  },
+
+  // Helper untuk menentukan kategori berdasarkan kode
+  determineCategory(kode) {
+    // Logic sederhana berdasarkan pattern kode atau bisa disesuaikan
+    if (kode.startsWith("K") || kode.includes("KOTAK")) return "kotak";
+    return "aksesoris";
+  },
   // Print receipt
   printReceipt() {
     if (!currentTransactionData) {
@@ -1426,7 +1508,7 @@ const penjualanHandler = {
     let hasKeterangan = false;
     let keteranganText = "";
 
-    transaction.items.forEach(item => {
+    transaction.items.forEach((item) => {
       const itemHarga = parseInt(item.totalHarga) || 0;
       receiptHTML += `
         <tr>
@@ -1599,7 +1681,7 @@ const penjualanHandler = {
     let keteranganText = "";
     let totalHarga = 0;
 
-    transaction.items.forEach(item => {
+    transaction.items.forEach((item) => {
       const itemHarga = parseInt(item.totalHarga) || 0;
       totalHarga += itemHarga;
 
@@ -1693,18 +1775,22 @@ const penjualanHandler = {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
     }
-    
+
     // Clear old cache entries
     cacheManager.clearOldCache();
-  }
+  },
 };
 
 // Initialize when document is ready
-$(document).ready(async function() {
+$(document).ready(async function () {
   try {
     // Initialize print event handlers
-    $("#btnPrintReceipt").off("click").on("click", () => penjualanHandler.printReceipt());
-    $("#btnPrintInvoice").off("click").on("click", () => penjualanHandler.printInvoice());
+    $("#btnPrintReceipt")
+      .off("click")
+      .on("click", () => penjualanHandler.printReceipt());
+    $("#btnPrintInvoice")
+      .off("click")
+      .on("click", () => penjualanHandler.printInvoice());
 
     // Add refresh stock button if not exists
     if ($("#refreshStok").length === 0) {
@@ -1720,7 +1806,6 @@ $(document).ready(async function() {
 
     console.log("Penjualan Aksesoris initialized successfully");
     console.log("Cache info:", cacheManager.getCacheInfo());
-
   } catch (error) {
     console.error("Error initializing penjualan aksesoris:", error);
     utils.showAlert("Terjadi kesalahan saat memuat halaman: " + error.message, "Error", "error");
@@ -1738,13 +1823,13 @@ document.addEventListener("visibilitychange", async () => {
     // Page became visible, check if cache is stale
     const stockCacheAge = 3 * 60 * 1000; // 3 minutes
     const salesCacheAge = 1 * 60 * 1000; // 1 minute
-    
-    if (!cacheManager.isValid('stockData', stockCacheAge)) {
+
+    if (!cacheManager.isValid("stockData", stockCacheAge)) {
       console.log("Refreshing stale stock cache");
       await penjualanHandler.loadStockData(true);
     }
-    
-    if (!cacheManager.isValid('todaySales', salesCacheAge)) {
+
+    if (!cacheManager.isValid("todaySales", salesCacheAge)) {
       console.log("Refreshing stale sales cache");
       await penjualanHandler.loadTodaySales(true);
     }
@@ -1779,8 +1864,9 @@ setInterval(() => {
   try {
     const usage = JSON.stringify(localStorage).length;
     const maxSize = 5 * 1024 * 1024; // 5MB typical limit
-    
-    if (usage > maxSize * 0.8) { // 80% of limit
+
+    if (usage > maxSize * 0.8) {
+      // 80% of limit
       console.warn("localStorage usage high:", usage, "bytes");
       cacheManager.clearOldCache();
     }
@@ -1788,6 +1874,3 @@ setInterval(() => {
     console.warn("Could not check localStorage usage:", error);
   }
 }, 5 * 60 * 1000); // Check every 5 minutes
-
-
-

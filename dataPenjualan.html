@@ -29,7 +29,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/locales/bootstrap-datepicker.id.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/pages/absensi-modern.css" />
     <!-- Favicon -->
@@ -89,16 +88,17 @@
           padding: 5px;
         }
       }
-
-      .action-buttons {
-        display: flex;
-        gap: 5px;
-        flex-wrap: wrap;
+      .app-container {
+        min-width: calc(100% - var(--sidebar-width)) !important;
       }
 
-      .action-buttons .btn {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.875rem;
+      .main-content {
+        min-width: calc(100% - var(--sidebar-width)) !important;
+      }
+
+      .page-content {
+        overflow-x: none; /* Allow horizontal scroll */
+        min-width: calc(100% - var(--sidebar-width)) !important;
       }
 
       .status-badge {
@@ -110,11 +110,11 @@
         background-color: #f8f9fa;
         border-radius: 0.375rem;
         padding: 1rem;
-        margin-bottom: 1rem;
+        margin-bottom: 0.2rem;
       }
 
       .summary-cards {
-        margin-bottom: 1rem;
+        margin-bottom: 0.2rem;
       }
 
       .summary-card {
@@ -162,6 +162,68 @@
         padding: 2rem;
         border-radius: 0.5rem;
         text-align: center;
+      }
+      .action-buttons {
+        display: flex;
+        gap: 2px;
+        flex-wrap: nowrap;
+        justify-content: center;
+        align-items: center;
+        flex-direction: row; /* Pastikan horizontal */
+        width: 100%;
+      }
+
+      .action-buttons .btn {
+        padding: 0.25rem 0.4rem;
+        font-size: 0.75rem;
+        line-height: 1;
+        border-radius: 3px;
+        min-width: 30px;
+        height: 26px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto; /* Tidak flex grow/shrink */
+        margin: 0;
+      }
+
+      .action-buttons .btn i {
+        font-size: 0.7rem;
+        margin: 0;
+      }
+
+      /* Pastikan tidak ada break atau wrap */
+      .action-buttons .btn-reprint {
+        order: 1;
+      }
+
+      .action-buttons .btn-edit {
+        order: 2;
+      }
+
+      .action-buttons .btn-delete {
+        order: 3;
+      }
+
+      /* Perbaikan untuk badge status */
+      .badge {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.4rem;
+        white-space: nowrap;
+      }
+
+      /* Perbaikan untuk text overflow di tabel */
+      .table td {
+        text-overflow: ellipsis;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+
+      /* Khusus untuk kolom keterangan agar bisa wrap jika diperlukan */
+      .table td:nth-child(11) {
+        white-space: normal;
+        word-wrap: break-word;
+        max-width: 150px;
       }
     </style>
     <title>Data Penjualan - Melati Gold Shop</title>
@@ -329,7 +391,7 @@
 
           <div class="content-wrapper">
             <!-- Action Buttons -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-1">
               <div>
                 <button type="button" class="btn btn-primary" id="btnTambahTransaksi">
                   <i class="fas fa-plus me-2"></i>
@@ -339,15 +401,11 @@
                   <i class="fas fa-sync-alt me-2"></i>
                   Refresh Data
                 </button>
-                <button type="button" class="btn btn-info" id="btnToggleView">
-                  <i class="fas fa-layer-group me-2"></i>
-                  View Grouped
-                </button>
               </div>
               <div>
-                <button type="button" class="btn btn-outline-primary" id="btnExportData">
-                  <i class="fas fa-download me-2"></i>
-                  Export Excel
+                <button type="button" class="btn btn-danger" id="btnDeleteRangeData">
+                  <i class="fas fa-trash-alt me-2"></i>
+                  Hapus Data
                 </button>
               </div>
             </div>
@@ -404,7 +462,7 @@
                 </h5>
               </div>
               <div class="card-body">
-                <div class="table-responsive">
+                <div class="table-wrapper">
                   <table id="dataPenjualanTable" class="table table-striped table-hover">
                     <thead class="table-dark">
                       <tr>
@@ -413,8 +471,8 @@
                         <th>Jenis</th>
                         <th>Kode Barang</th>
                         <th>Nama Barang</th>
-                        <th>Jumlah</th>
-                        <th>Berat</th>
+                        <th>Pcs</th>
+                        <th>Gr</th>
                         <th>Kadar</th>
                         <th>Harga</th>
                         <th>Status</th>
@@ -518,6 +576,43 @@
       </div>
     </div>
 
+    <div
+      class="modal fade"
+      id="verificationModal"
+      tabindex="-1"
+      aria-labelledby="verificationModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="verificationModalLabel">Verifikasi Penghapusan Data</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-danger">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              <strong>PERINGATAN!</strong>
+              Tindakan ini akan menghapus data secara permanen dan tidak dapat dibatalkan.
+            </div>
+            <p id="deleteConfirmationText">
+              <!-- Text akan diisi oleh JavaScript -->
+            </p>
+            <div class="mb-3">
+              <label for="verificationPassword" class="form-label">Masukkan kata sandi verifikasi:</label>
+              <input type="password" class="form-control" id="verificationPassword" placeholder="Kata sandi admin" />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="button" class="btn btn-danger" id="btnConfirmDeleteRange">
+              <i class="fas fa-trash-alt me-2"></i>
+              Hapus Data
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
     <!-- Scripts -->
     <script type="module" src="js/dataPenjualan.js"></script>
     <script type="module" src="js/main.js"></script>

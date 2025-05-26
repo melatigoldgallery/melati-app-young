@@ -12,6 +12,11 @@ import {
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
+let deleteDataType = null;
+let deleteStartDate = null;
+let deleteEndDate = null;
+const VERIFICATION_PASSWORD = "smlt116";
+
 // Cache management dengan localStorage dan TTL
 const cacheManager = {
   prefix: "melati_sales_",
@@ -129,7 +134,6 @@ class DataPenjualanApp {
     this.dataTable = null;
     this.currentTransaction = null;
     this.isLoading = false;
-    this.isGroupedView = false;
 
     // Bind methods
     this.refreshData = utils.debounce(this.refreshData.bind(this), 1000);
@@ -163,30 +167,18 @@ class DataPenjualanApp {
     const events = {
       btnTambahTransaksi: () => (window.location.href = "penjualanAksesoris.html"),
       btnRefreshData: () => this.refreshData(true),
-      btnExportData: () => this.exportToExcel(),
       btnPrintReceipt: () => this.printDocument("receipt"),
       btnPrintInvoice: () => this.printDocument("invoice"),
       btnSaveEdit: () => this.saveEditTransaction(),
       btnConfirmDelete: () => this.confirmDeleteTransaction(),
-      btnToggleView: () => this.toggleView(),
+      btnDeleteRangeData: () => this.handleDeleteRange(), 
+      btnConfirmDeleteRange: () => this.confirmDeleteRange()
     };
 
     Object.entries(events).forEach(([id, handler]) => {
       const element = document.getElementById(id);
       if (element) element.addEventListener("click", handler);
     });
-
-    // Export button handler - terpisah untuk menangani grouped/normal view
-    const exportBtn = document.getElementById("btnExportData");
-    if (exportBtn) {
-      exportBtn.addEventListener("click", () => {
-        if (this.isGroupedView) {
-          this.exportGroupedData();
-        } else {
-          this.exportToExcel();
-        }
-      });
-    }
 
     // Auto filter when filter inputs change
     this.setupAutoFilter();
@@ -230,10 +222,110 @@ class DataPenjualanApp {
           if (id) this.handleDelete(id);
         }, 300)
       );
-    $(document).on("click", ".btn-view-details", (e) => this.showGroupDetails(e.target.closest("button").dataset.ids));
-    $(document).on("click", ".btn-print-group", (e) =>
-      this.printGroupTransactions(e.target.closest("button").dataset.ids)
-    );
+  }
+
+   handleDeleteRange() {
+    const startDateStr = document.getElementById("filterTanggalMulai").value;
+    const endDateStr = document.getElementById("filterTanggalAkhir").value;
+
+    if (!startDateStr || !endDateStr) {
+      return utils.showAlert("Pilih rentang tanggal terlebih dahulu.", "Peringatan", "warning");
+    }
+
+    const startDate = utils.parseDate(startDateStr);
+    const endDate = utils.parseDate(endDateStr);
+
+    if (!startDate || !endDate) {
+      return utils.showAlert("Format tanggal tidak valid.", "Peringatan", "warning");
+    }
+
+    if (startDate > endDate) {
+      return utils.showAlert("Tanggal mulai tidak boleh lebih besar dari tanggal akhir.", "Peringatan", "warning");
+    }
+
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    this.showVerificationModal("sales", startDate, endDate);
+  }
+
+  // Show verification modal
+  showVerificationModal(dataType, startDate, endDate) {
+    deleteDataType = dataType;
+    deleteStartDate = startDate;
+    deleteEndDate = endDate;
+
+    const startDateStr = utils.formatDate(startDate);
+    const endDateStr = utils.formatDate(endDate);
+
+    const confirmationText = document.getElementById("deleteConfirmationText");
+    if (confirmationText) {
+      confirmationText.textContent = `Anda akan menghapus data penjualan dari ${startDateStr} hingga ${endDateStr}. Tindakan ini tidak dapat dibatalkan.`;
+    }
+
+    const passwordInput = document.getElementById("verificationPassword");
+    if (passwordInput) {
+      passwordInput.value = "";
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById("verificationModal"));
+    modal.show();
+  }
+
+  // Confirm delete range
+  async confirmDeleteRange() {
+    const password = document.getElementById("verificationPassword").value;
+
+    if (password !== VERIFICATION_PASSWORD) {
+      return utils.showAlert("Kata sandi verifikasi salah.", "Error", "error");
+    }
+
+    const modal = bootstrap.Modal.getInstance(document.getElementById("verificationModal"));
+    modal.hide();
+
+    if (deleteDataType === "sales") {
+      await this.deleteSalesData(deleteStartDate, deleteEndDate);
+    }
+  }
+
+  async deleteSalesData(startDate, endDate) {
+    try {
+      utils.showLoading(true);
+      
+      const salesRef = collection(firestore, "penjualanAksesoris");
+      const q = query(
+        salesRef,
+        where("timestamp", ">=", Timestamp.fromDate(startDate)),
+        where("timestamp", "<=", Timestamp.fromDate(endDate))
+      );
+
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        utils.showLoading(false);
+        return utils.showAlert("Tidak ada data penjualan dalam rentang tanggal yang dipilih.", "Info", "info");
+      }
+
+      const deletePromises = [];
+      querySnapshot.forEach((docSnapshot) => {
+        deletePromises.push(deleteDoc(doc(firestore, "penjualanAksesoris", docSnapshot.id)));
+      });
+
+      await Promise.all(deletePromises);
+      
+      // Clear cache and reload data
+      cacheManager.clear();
+      await this.loadSalesData(true);
+      this.populateSalesFilter();
+      this.filterData();
+
+      utils.showLoading(false);
+      return utils.showAlert(`Berhasil menghapus ${querySnapshot.size} data penjualan.`, "Sukses", "success");
+    } catch (error) {
+      console.error("Error deleting sales data:", error);
+      utils.showLoading(false);
+      return utils.showAlert("Gagal menghapus data: " + error.message, "Error", "error");
+    }
   }
 
   // Setup auto filter functionality
@@ -251,66 +343,6 @@ class DataPenjualanApp {
     // Auto filter on dropdown change
     $("#filterJenisPenjualan, #filterSales").on("change", () => {
       this.filterData();
-    });
-  }
-
-  toggleView() {
-    this.isGroupedView = !this.isGroupedView;
-
-    // Update button
-    const btn = document.getElementById("btnToggleView");
-    btn.innerHTML = this.isGroupedView
-      ? '<i class="fas fa-list me-2"></i>View Detail'
-      : '<i class="fas fa-layer-group me-2"></i>View Grouped';
-    btn.className = this.isGroupedView ? "btn btn-outline-info" : "btn btn-info";
-
-    this.updateDataTable();
-    this.updateSummary();
-  }
-
-  groupData() {
-    const grouped = new Map();
-
-    this.filteredData.forEach((transaction) => {
-      transaction.items?.forEach((item) => {
-        const key = `${transaction.jenisPenjualan}_${item.kodeText || "NO_CODE"}`;
-
-        // Calculate actual revenue for this transaction
-        const actualRevenue = this.calculateActualRevenue(transaction);
-
-        // Calculate item's proportional revenue
-        const totalTransactionValue = transaction.totalHarga || 0;
-        const itemProportion = totalTransactionValue > 0 ? (item.totalHarga || 0) / totalTransactionValue : 1;
-        const itemActualRevenue = actualRevenue * itemProportion;
-
-        if (grouped.has(key)) {
-          const g = grouped.get(key);
-          g.totalJumlah += item.jumlah || 1;
-          g.totalHarga += itemActualRevenue; // Use actual revenue instead of full price
-          g.totalBerat += parseFloat(item.berat || 0);
-          g.transactions.push(transaction);
-          g.salesList.add(transaction.sales || "Admin");
-        } else {
-          grouped.set(key, {
-            jenisPenjualan: transaction.jenisPenjualan,
-            kodeText: item.kodeText || "-",
-            nama: item.nama || "-",
-            kadar: item.kadar || "-",
-            totalJumlah: item.jumlah || 1,
-            totalBerat: parseFloat(item.berat || 0),
-            totalHarga: itemActualRevenue, // Use actual revenue instead of full price
-            salesList: new Set([transaction.sales || "Admin"]),
-            transactions: [transaction],
-            latestDate: transaction.timestamp || transaction.tanggal,
-          });
-        }
-      });
-    });
-
-    return Array.from(grouped.values()).sort((a, b) => {
-      const dateA = a.latestDate?.toDate ? a.latestDate.toDate() : new Date(a.latestDate);
-      const dateB = b.latestDate?.toDate ? b.latestDate.toDate() : new Date(b.latestDate);
-      return dateB - dateA;
     });
   }
 
@@ -419,7 +451,7 @@ class DataPenjualanApp {
     }
   }
 
-  // Ganti language config dengan definisi manual
+  // Initialize DataTable
   initDataTable() {
     if (this.dataTable) {
       this.dataTable.off();
@@ -432,22 +464,35 @@ class DataPenjualanApp {
     this.dataTable = $("#dataPenjualanTable").DataTable({
       data: [],
       columns: [
-        { title: "Tanggal", width: "100px" },
-        { title: "Sales", width: "80px" },
-        { title: "Jenis", width: "100px" },
-        { title: "Kode", width: "120px" },
-        { title: "Nama", width: "200px" },
-        { title: "Jumlah", width: "70px" },
-        { title: "Berat", width: "80px" },
-        { title: "Kadar", width: "80px" },
-        { title: "Harga", width: "120px" },
-        { title: "Status", width: "100px" },
+        { title: "Tanggal", width: "90px", className: "text-center" },
+        { title: "Sales", width: "80px", className: "text-center" },
+        { title: "Jenis", width: "85px", className: "text-center" },
+        { title: "Kode", width: "100px", className: "text-center" },
+        { title: "Nama", width: "180px" },
+        { title: "Jumlah", width: "60px", className: "text-center" },
+        { title: "Berat", width: "70px", className: "text-center" },
+        { title: "Kadar", width: "65px", className: "text-center" },
+        { title: "Harga", width: "110px", className: "text-end" },
+        { title: "Status", width: "90px", className: "text-center" },
         { title: "Keterangan", width: "150px" },
-        { title: "Aksi", width: "120px", orderable: false },
+        { title: "Aksi", width: "110px", orderable: false, className: "text-center" },
       ],
       order: [[0, "desc"]],
       pageLength: 25,
-      // Definisi bahasa Indonesia manual
+      scrollX: true,
+      scrollCollapse: true,
+      fixedColumns: false,
+      autoWidth: false,
+      columnDefs: [
+        {
+          targets: "_all",
+          className: "text-nowrap",
+        },
+        {
+          targets: [10], // Kolom keterangan
+          className: "text-wrap",
+        },
+      ],
       language: {
         decimal: "",
         emptyTable: "Tidak ada data yang tersedia pada tabel ini",
@@ -472,11 +517,7 @@ class DataPenjualanApp {
           sortDescending: ": aktifkan untuk mengurutkan kolom turun",
         },
       },
-      dom: "Bfrtip",
-      buttons: ["excel", "pdf", "print"],
-      responsive: true,
-      autoWidth: false,
-      scrollX: true,
+      responsive: false,
       processing: true,
       deferRender: true,
       destroy: true,
@@ -576,24 +617,6 @@ class DataPenjualanApp {
 
   // Prepare data for DataTable
   prepareTableData() {
-    if (this.isGroupedView) {
-      return this.groupData().map((group) => [
-        utils.formatDate(group.latestDate),
-        Array.from(group.salesList).join(", "),
-        (group.jenisPenjualan || "").charAt(0).toUpperCase() + (group.jenisPenjualan || "").slice(1),
-        group.kodeText,
-        group.nama,
-        `<strong>${group.totalJumlah} pcs</strong>`,
-        group.totalBerat > 0 ? `<strong>${group.totalBerat.toFixed(2)} gr</strong>` : "-",
-        group.kadar,
-        `<strong>Rp ${utils.formatRupiah(group.totalHarga)}</strong>`,
-        this.getGroupStatus(group.transactions),
-        this.getGroupKeterangan(group.transactions),
-        this.getGroupActions(group.transactions),
-      ]);
-    }
-
-    // Original detailed view logic
     const tableData = [];
     this.filteredData.forEach((transaction) => {
       const baseData = {
@@ -641,35 +664,6 @@ class DataPenjualanApp {
     return tableData;
   }
 
-  getGroupStatus(transactions) {
-    const statusCounts = {};
-    transactions.forEach(
-      (t) => (statusCounts[t.statusPembayaran || "Lunas"] = (statusCounts[t.statusPembayaran || "Lunas"] || 0) + 1)
-    );
-
-    return Object.entries(statusCounts)
-      .map(([status, count]) => {
-        const color = status === "Lunas" ? "success" : status === "Free" ? "info" : "warning";
-        return `<span class="badge bg-${color}">${status} (${count})</span>`;
-      })
-      .join(" ");
-  }
-
-  getGroupKeterangan(transactions) {
-    const keteranganSet = new Set(transactions.map((t) => t.keterangan).filter(Boolean));
-    const arr = Array.from(keteranganSet);
-    return arr.length === 0 ? "-" : arr.length === 1 ? arr[0] : `${arr[0]} <small>(+${arr.length - 1})</small>`;
-  }
-
-  getGroupActions(transactions) {
-    const ids = transactions.map((t) => t.id).join(",");
-    return `
-    <div class="action-buttons">
-      <button class="btn btn-sm btn-info btn-view-details" data-ids="${ids}" title="Detail"><i class="fas fa-eye"></i></button>
-      <button class="btn btn-sm btn-warning btn-print-group" data-ids="${ids}" title="Cetak"><i class="fas fa-print"></i></button>
-    </div>`;
-  }
-
   // Format jenis penjualan
   formatJenisPenjualan(transaction) {
     if (transaction.isGantiLock || transaction.jenisPenjualan === "gantiLock") {
@@ -702,190 +696,27 @@ class DataPenjualanApp {
   // Get action buttons HTML
   getActionButtons(transactionId) {
     return `
-      <div class="action-buttons">
-        <button class="btn btn-sm btn-warning btn-reprint" data-id="${transactionId}" title="Cetak Ulang">
-          <i class="fas fa-print"></i>
-        </button>
-        <button class="btn btn-sm btn-primary btn-edit" data-id="${transactionId}" title="Edit">
-          <i class="fas fa-edit"></i>
-        </button>
-        <button class="btn btn-sm btn-danger btn-delete" data-id="${transactionId}" title="Hapus">
-          <i class="fas fa-trash-alt"></i>
-        </button>
-      </div>
-    `;
+    <div class="action-buttons">
+      <button class="btn btn-sm btn-warning btn-reprint" data-id="${transactionId}" title="Cetak Ulang">
+        <i class="fas fa-print"></i>
+      </button>
+      <button class="btn btn-sm btn-primary btn-edit" data-id="${transactionId}" title="Edit">
+        <i class="fas fa-edit"></i>
+      </button>
+      <button class="btn btn-sm btn-danger btn-delete" data-id="${transactionId}" title="Hapus">
+        <i class="fas fa-trash-alt"></i>
+      </button>
+    </div>
+  `;
   }
 
-  // Update summary cards (removed daily cards)
+  // Update summary cards
   updateSummary() {
-    let totalTransaksi, totalPendapatan;
-
-    if (this.isGroupedView) {
-      const grouped = this.groupData();
-      totalTransaksi = grouped.length;
-      totalPendapatan = grouped.reduce((sum, g) => sum + g.totalHarga, 0);
-    } else {
-      totalTransaksi = this.filteredData.length;
-      totalPendapatan = this.calculateTotalRevenue(this.filteredData);
-    }
+    const totalTransaksi = this.filteredData.length;
+    const totalPendapatan = this.calculateTotalRevenue(this.filteredData);
 
     document.getElementById("totalTransaksi").textContent = totalTransaksi;
     document.getElementById("totalPendapatan").textContent = `Rp ${utils.formatRupiah(totalPendapatan)}`;
-  }
-
-  exportGroupedData() {
-    // Check if XLSX library is available
-    if (typeof XLSX === "undefined") {
-      utils.showAlert("Library Excel tidak tersedia. Silakan refresh halaman dan coba lagi.", "Error", "error");
-      return;
-    }
-
-    const grouped = this.groupData();
-    if (!grouped.length) {
-      utils.showAlert("Tidak ada data untuk diekspor", "Info", "info");
-      return;
-    }
-
-    try {
-      const exportData = grouped.map((g) => ({
-        Tanggal: utils.formatDate(g.latestDate),
-        Sales: Array.from(g.salesList).join(", "),
-        Jenis: g.jenisPenjualan,
-        Kode: g.kodeText,
-        Nama: g.nama,
-        Jumlah: g.totalJumlah,
-        Berat: g.totalBerat.toFixed(2),
-        Kadar: g.kadar,
-        "Pendapatan Aktual": g.totalHarga, // Changed from 'Total Harga' to 'Pendapatan Aktual'
-        Transaksi: g.transactions.length,
-      }));
-
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Grouped Data");
-
-      const fileName = `grouped_penjualan_${new Date().toISOString().split("T")[0]}.xlsx`;
-      XLSX.writeFile(wb, fileName);
-
-      utils.showAlert("Data berhasil diekspor", "Sukses", "success");
-    } catch (error) {
-      console.error("Export error:", error);
-      utils.showAlert("Gagal mengekspor data: " + error.message, "Error", "error");
-    }
-  }
-
-  showGroupDetails(ids) {
-    const transactions = this.salesData.filter((t) => ids.split(",").includes(t.id));
-    if (!transactions.length) return utils.showAlert("Data tidak ditemukan", "Error", "error");
-
-    const modalHtml = `
-  <div class="modal fade" id="groupModal" tabindex="-1">
-    <div class="modal-dialog modal-xl">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5>Detail Grup Transaksi</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <table class="table table-sm">
-            <thead>
-              <tr>
-                <th>Tanggal</th>
-                <th>Sales</th>
-                <th>Kode</th>
-                <th>Nama</th>
-                <th>Status</th>
-                <th>Pendapatan Aktual</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${transactions
-                .map((t) => {
-                  const actualRevenue = this.calculateActualRevenue(t);
-                  const statusInfo =
-                    t.statusPembayaran === "DP"
-                      ? `DP: Rp ${utils.formatRupiah(t.nominalDP || 0)}`
-                      : t.statusPembayaran || "Lunas";
-
-                  return (
-                    t.items
-                      ?.map((item) => {
-                        const totalTransactionValue = t.totalHarga || 0;
-                        const itemProportion =
-                          totalTransactionValue > 0 ? (item.totalHarga || 0) / totalTransactionValue : 1;
-                        const itemActualRevenue = actualRevenue * itemProportion;
-
-                        return `
-                        <tr>
-                          <td>${utils.formatDate(t.timestamp || t.tanggal)}</td>
-                          <td>${t.sales || "Admin"}</td>
-                          <td>${item.kodeText || "-"}</td>
-                          <td>${item.nama || "-"}</td>
-                          <td><span class="badge ${
-                            t.statusPembayaran === "DP" ? "bg-warning" : "bg-success"
-                          }">${statusInfo}</span></td>
-                          <td>Rp ${utils.formatRupiah(itemActualRevenue)}</td>
-                        </tr>
-                      `;
-                      })
-                      .join("") || ""
-                  );
-                })
-                .join("")}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>`;
-
-    $("#groupModal").remove();
-    $("body").append(modalHtml);
-    $("#groupModal")
-      .modal("show")
-      .on("hidden.bs.modal", function () {
-        $(this).remove();
-      });
-  }
-
-  printGroupTransactions(ids) {
-    const transactions = this.salesData.filter((t) => ids.split(",").includes(t.id));
-    if (!transactions.length) return utils.showAlert("Data tidak ditemukan", "Error", "error");
-
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return utils.showAlert("Popup diblokir", "Error", "error");
-
-    const html = `
-    <html><head><title>Grup Transaksi</title>
-    <style>body{font-family:Arial;font-size:12px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px}</style>
-    </head><body>
-    <h2>MELATI GOLD SHOP - Grup Transaksi</h2>
-    <table><thead><tr><th>Tanggal</th><th>Sales</th><th>Kode</th><th>Nama</th><th>Harga</th></tr></thead>
-    <tbody>
-      ${transactions
-        .map(
-          (t) =>
-            t.items
-              ?.map(
-                (item) => `
-        <tr>
-          <td>${utils.formatDate(t.timestamp || t.tanggal)}</td>
-          <td>${t.sales || "Admin"}</td>
-          <td>${item.kodeText || "-"}</td>
-          <td>${item.nama || "-"}</td>
-          <td>Rp ${utils.formatRupiah(item.totalHarga || 0)}</td>
-        </tr>
-      `
-              )
-              .join("") || ""
-        )
-        .join("")}
-    </tbody></table>
-    <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}</script>
-    </body></html>`;
-
-    printWindow.document.write(html);
-    printWindow.document.close();
   }
 
   // Helper function to calculate actual revenue (considering DP)
@@ -1409,67 +1240,6 @@ class DataPenjualanApp {
     return invoiceHTML;
   }
 
-  // Export to Excel
-  exportToExcel() {
-    // Check if XLSX library is available
-    if (typeof XLSX === "undefined") {
-      utils.showAlert("Library Excel tidak tersedia. Silakan refresh halaman dan coba lagi.", "Error", "error");
-      return;
-    }
-
-    if (!this.filteredData.length) {
-      return utils.showAlert("Tidak ada data untuk diekspor", "Info", "info");
-    }
-
-    // Prepare data for export
-    const exportData = [];
-
-    this.filteredData.forEach((transaction) => {
-      const baseData = {
-        Tanggal: utils.formatDate(transaction.timestamp || transaction.tanggal),
-        Sales: transaction.sales || "Admin",
-        Jenis: transaction.jenisPenjualan || "-",
-        "Total Harga": transaction.totalHarga || 0,
-        Status: transaction.statusPembayaran || "Lunas",
-        "Metode Bayar": transaction.metodeBayar || "tunai",
-      };
-
-      if (transaction.items && transaction.items.length > 0) {
-        transaction.items.forEach((item) => {
-          exportData.push({
-            ...baseData,
-            "Kode Barang": item.kodeText || item.barcode || "-",
-            "Nama Barang": item.nama || "-",
-            Jumlah: item.jumlah || 1,
-            Berat: item.berat || "-",
-            Kadar: item.kadar || "-",
-            "Harga Item": item.totalHarga || 0,
-            Keterangan: item.keterangan || "-",
-          });
-        });
-      } else {
-        exportData.push({
-          ...baseData,
-          "Kode Barang": "-",
-          "Nama Barang": "-",
-          Jumlah: "-",
-          Berat: "-",
-          Kadar: "-",
-          "Harga Item": transaction.totalHarga || 0,
-          Keterangan: transaction.keterangan || "-",
-        });
-      }
-    });
-
-    // Create and download Excel file
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Data Penjualan");
-
-    const fileName = `data_penjualan_${new Date().toISOString().split("T")[0]}.xlsx`;
-    XLSX.writeFile(wb, fileName);
-  }
-
   // Refresh data
   async refreshData(forceRefresh = false) {
     await this.loadSalesData(forceRefresh);
@@ -1480,14 +1250,6 @@ class DataPenjualanApp {
 
 // Initialize application when DOM is ready
 $(document).ready(async function () {
-  // Check if required libraries are loaded
-  if (typeof XLSX === "undefined") {
-    console.error("SheetJS (XLSX) library is not loaded. Excel export will not work.");
-    utils.showAlert("Library Excel tidak tersedia. Fitur export Excel tidak akan berfungsi.", "Warning", "warning");
-  } else {
-    console.log("SheetJS library loaded successfully");
-  }
-
   // Initialize the application
   const app = new DataPenjualanApp();
   await app.init();

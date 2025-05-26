@@ -12,12 +12,6 @@ import {
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
-// Global variables
-let deleteDataType = null;
-let deleteStartDate = null;
-let deleteEndDate = null;
-const VERIFICATION_PASSWORD = "admin123";
-
 // Table configurations
 const tableConfigs = {
   all: {
@@ -566,42 +560,6 @@ const laporanPenjualanHandler = {
         this.renderSalesTable();
       }
     });
-
-    document.getElementById("deleteSalesDataBtn")?.addEventListener("click", () => {
-      const startDateStr = document.getElementById("startDate").value;
-      const endDateStr = document.getElementById("endDate").value;
-
-      if (!startDateStr || !endDateStr) {
-        return this.showAlert("Pilih rentang tanggal terlebih dahulu.", "Peringatan", "warning");
-      }
-
-      const startDate = parseDate(startDateStr);
-      const endDate = parseDate(endDateStr);
-
-      if (!startDate || !endDate) {
-        return this.showAlert("Format tanggal tidak valid.", "Peringatan", "warning");
-      }
-
-      startDate.setHours(0, 0, 0, 0);
-      endDate.setHours(23, 59, 59, 999);
-
-      showVerificationModal("sales", startDate, endDate);
-    });
-
-    document.getElementById("confirmDeleteRangeBtn")?.addEventListener("click", async () => {
-      const password = document.getElementById("verificationPassword").value;
-
-      if (password !== VERIFICATION_PASSWORD) {
-        return this.showAlert("Kata sandi verifikasi salah.", "Error", "error");
-      }
-
-      const modal = bootstrap.Modal.getInstance(document.getElementById("verificationModal"));
-      modal.hide();
-
-      if (deleteDataType === "sales") {
-        await deleteSalesData(deleteStartDate, deleteEndDate);
-      }
-    });
   },
 
   // Initialize
@@ -647,63 +605,6 @@ const formatDate = (date) => {
   const year = date.getFullYear();
   return `${day}/${month}/${year}`;
 };
-
-// Delete sales data function
-async function deleteSalesData(startDate, endDate) {
-  try {
-    laporanPenjualanHandler.showLoading(true);
-    
-    const salesRef = collection(firestore, "penjualanAksesoris");
-    const q = query(
-      salesRef,
-      where("timestamp", ">=", Timestamp.fromDate(startDate)),
-      where("timestamp", "<=", Timestamp.fromDate(endDate))
-    );
-
-    const querySnapshot = await getDocs(q);
-    
-    if (querySnapshot.empty) {
-      laporanPenjualanHandler.showLoading(false);
-      return laporanPenjualanHandler.showAlert("Tidak ada data penjualan dalam rentang tanggal yang dipilih.", "Info", "info");
-    }
-
-    const deletePromises = [];
-    querySnapshot.forEach((docSnapshot) => {
-      deletePromises.push(deleteDoc(doc(firestore, "penjualanAksesoris", docSnapshot.id)));
-    });
-
-    await Promise.all(deletePromises);
-    
-    cacheManager.clear('salesData');
-    await laporanPenjualanHandler.loadSalesData(true);
-    laporanPenjualanHandler.filterSalesData();
-
-    laporanPenjualanHandler.showLoading(false);
-    return laporanPenjualanHandler.showAlert(`Berhasil menghapus ${querySnapshot.size} data penjualan.`, "Sukses", "success");
-  } catch (error) {
-    console.error("Error deleting sales data:", error);
-    laporanPenjualanHandler.showLoading(false);
-    return laporanPenjualanHandler.showAlert("Gagal menghapus data: " + error.message, "Error", "error");
-  }
-}
-
-// Show verification modal
-function showVerificationModal(dataType, startDate, endDate) {
-  deleteDataType = dataType;
-  deleteStartDate = startDate;
-  deleteEndDate = endDate;
-
-  const startDateStr = formatDate(startDate);
-  const endDateStr = formatDate(endDate);
-
-  const confirmationText = document.getElementById("deleteConfirmationText");
-  confirmationText.textContent = `Anda akan menghapus data penjualan dari ${startDateStr} hingga ${endDateStr}. Tindakan ini tidak dapat dibatalkan.`;
-
-  document.getElementById("verificationPassword").value = "";
-
-  const modal = new bootstrap.Modal(document.getElementById("verificationModal"));
-  modal.show();
-}
 
 // Initialize when document is ready
 document.addEventListener("DOMContentLoaded", function () {
