@@ -168,9 +168,32 @@ class DataPenjualanApp {
     });
 
     // Table action handlers
-    $(document).on("click", ".btn-reprint", (e) => this.handleReprint(e.target.dataset.id));
-    $(document).on("click", ".btn-edit", (e) => this.handleEdit(e.target.dataset.id));
-    $(document).on("click", ".btn-delete", (e) => this.handleDelete(e.target.dataset.id));
+    $(document).off("click", ".btn-reprint").on("click", ".btn-reprint", 
+      utils.debounce((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = e.target.closest('button').dataset.id;
+        if (id) this.handleReprint(id);
+      }, 300)
+    );
+  
+    $(document).off("click", ".btn-edit").on("click", ".btn-edit", 
+      utils.debounce((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = e.target.closest('button').dataset.id;
+        if (id) this.handleEdit(id);
+      }, 300)
+    );
+  
+    $(document).off("click", ".btn-delete").on("click", ".btn-delete", 
+      utils.debounce((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = e.target.closest('button').dataset.id;
+        if (id) this.handleDelete(id);
+      }, 300)
+    );
     $(document).on("click", ".btn-view-details", (e) => this.showGroupDetails(e.target.closest("button").dataset.ids));
     $(document).on("click", ".btn-print-group", (e) =>
       this.printGroupTransactions(e.target.closest("button").dataset.ids)
@@ -293,40 +316,70 @@ class DataPenjualanApp {
     }
   }
 
-  // Initialize DataTable
-  initDataTable() {
-    if (this.dataTable) {
-      this.dataTable.destroy();
-    }
-
-    this.dataTable = $("#dataPenjualanTable").DataTable({
-      data: [],
-      columns: [
-        { title: "Tanggal", width: "100px" },
-        { title: "Sales", width: "80px" },
-        { title: "Jenis", width: "100px" },
-        { title: "Kode", width: "120px" },
-        { title: "Nama", width: "200px" },
-        { title: "Jumlah", width: "70px" },
-        { title: "Berat", width: "80px" },
-        { title: "Kadar", width: "80px" },
-        { title: "Harga", width: "120px" },
-        { title: "Status", width: "100px" },
-        { title: "Keterangan", width: "150px" },
-        { title: "Aksi", width: "120px", orderable: false },
-      ],
-      order: [[0, "desc"]],
-      pageLength: 25,
-      language: { url: "//cdn.datatables.net/plug-ins/1.10.25/i18n/Indonesian.json" },
-      dom: "Bfrtip",
-      buttons: ["excel", "pdf", "print"],
-      responsive: true,
-      autoWidth: false,
-      scrollX: true,
-      processing: true,
-      deferRender: true,
-    });
+ // Ganti language config dengan definisi manual
+initDataTable() {
+  if (this.dataTable) {
+    this.dataTable.off();
+    this.dataTable.destroy();
+    this.dataTable = null;
   }
+
+  $("#dataPenjualanTable").empty();
+
+  this.dataTable = $("#dataPenjualanTable").DataTable({
+    data: [],
+    columns: [
+      { title: "Tanggal", width: "100px" },
+      { title: "Sales", width: "80px" },
+      { title: "Jenis", width: "100px" },
+      { title: "Kode", width: "120px" },
+      { title: "Nama", width: "200px" },
+      { title: "Jumlah", width: "70px" },
+      { title: "Berat", width: "80px" },
+      { title: "Kadar", width: "80px" },
+      { title: "Harga", width: "120px" },
+      { title: "Status", width: "100px" },
+      { title: "Keterangan", width: "150px" },
+      { title: "Aksi", width: "120px", orderable: false },
+    ],
+    order: [[0, "desc"]],
+    pageLength: 25,
+    // Definisi bahasa Indonesia manual
+    language: {
+      "decimal": "",
+      "emptyTable": "Tidak ada data yang tersedia pada tabel ini",
+      "info": "Menampilkan _START_ sampai _END_ dari _TOTAL_ entri",
+      "infoEmpty": "Menampilkan 0 sampai 0 dari 0 entri",
+      "infoFiltered": "(disaring dari _MAX_ entri keseluruhan)",
+      "infoPostFix": "",
+      "thousands": ".",
+      "lengthMenu": "Tampilkan _MENU_ entri",
+      "loadingRecords": "Sedang memuat...",
+      "processing": "Sedang memproses...",
+      "search": "Cari:",
+      "zeroRecords": "Tidak ditemukan data yang sesuai",
+      "paginate": {
+        "first": "Pertama",
+        "last": "Terakhir",
+        "next": "Selanjutnya",
+        "previous": "Sebelumnya"
+      },
+      "aria": {
+        "sortAscending": ": aktifkan untuk mengurutkan kolom naik",
+        "sortDescending": ": aktifkan untuk mengurutkan kolom turun"
+      }
+    },
+    dom: "Bfrtip",
+    buttons: ["excel", "pdf", "print"],
+    responsive: true,
+    autoWidth: false,
+    scrollX: true,
+    processing: true,
+    deferRender: true,
+    destroy: true
+  });
+}
+
 
   // Filter data based on form inputs
   filterData() {
