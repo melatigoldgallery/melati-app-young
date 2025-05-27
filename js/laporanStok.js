@@ -38,6 +38,8 @@ const laporanStokHandler = {
   // Data properties
   stockData: [],
   filteredStockData: [],
+  transactionCache: new Map(),
+  lastTransactionUpdate: 0,
 
   // Cache properties
   cache: {},

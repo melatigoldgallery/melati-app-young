@@ -144,9 +144,9 @@ class DataPenjualanApp {
   async init() {
     this.setupEventListeners();
     this.initDatePickers();
+    this.setDefaultDates();
     await this.loadSalesData();
     this.initDataTable();
-    this.setDefaultDates();
     this.populateSalesFilter();
 
     // Load filter from URL or set default
@@ -171,8 +171,8 @@ class DataPenjualanApp {
       btnPrintInvoice: () => this.printDocument("invoice"),
       btnSaveEdit: () => this.saveEditTransaction(),
       btnConfirmDelete: () => this.confirmDeleteTransaction(),
-      btnDeleteRangeData: () => this.handleDeleteRange(), 
-      btnConfirmDeleteRange: () => this.confirmDeleteRange()
+      btnDeleteRangeData: () => this.handleDeleteRange(),
+      btnConfirmDeleteRange: () => this.confirmDeleteRange(),
     };
 
     Object.entries(events).forEach(([id, handler]) => {
@@ -224,7 +224,7 @@ class DataPenjualanApp {
       );
   }
 
-   handleDeleteRange() {
+  handleDeleteRange() {
     const startDateStr = document.getElementById("filterTanggalMulai").value;
     const endDateStr = document.getElementById("filterTanggalAkhir").value;
 
@@ -291,7 +291,7 @@ class DataPenjualanApp {
   async deleteSalesData(startDate, endDate) {
     try {
       utils.showLoading(true);
-      
+
       const salesRef = collection(firestore, "penjualanAksesoris");
       const q = query(
         salesRef,
@@ -300,7 +300,7 @@ class DataPenjualanApp {
       );
 
       const querySnapshot = await getDocs(q);
-      
+
       if (querySnapshot.empty) {
         utils.showLoading(false);
         return utils.showAlert("Tidak ada data penjualan dalam rentang tanggal yang dipilih.", "Info", "info");
@@ -312,7 +312,7 @@ class DataPenjualanApp {
       });
 
       await Promise.all(deletePromises);
-      
+
       // Clear cache and reload data
       cacheManager.clear();
       await this.loadSalesData(true);
@@ -400,9 +400,6 @@ class DataPenjualanApp {
 
     document.getElementById("filterTanggalMulai").value = todayFormatted;
     document.getElementById("filterTanggalAkhir").value = todayFormatted;
-
-    // Trigger initial filter after setting dates
-    setTimeout(() => this.filterData(), 500);
   }
 
   // Load sales data with caching
@@ -441,7 +438,6 @@ class DataPenjualanApp {
 
       // Cache with version for multi-device sync
       cacheManager.setVersioned("salesData", this.salesData);
-      this.filterData();
     } catch (error) {
       console.error("Error loading sales data:", error);
       utils.showAlert("Gagal memuat data penjualan: " + error.message, "Error", "error");
@@ -725,9 +721,12 @@ class DataPenjualanApp {
       return 0;
     }
 
-    if (transaction.metodeBayar === "dp" && transaction.statusPembayaran === "DP") {
-      // For DP transactions, return only the DP amount (what was actually received)
-      return transaction.nominalDP || 0;
+    // Untuk transaksi manual dengan DP, hitung sisa pembayaran
+    if (
+      transaction.jenisPenjualan === "manual" &&
+      (transaction.metodeBayar === "dp" || transaction.statusPembayaran === "DP")
+    ) {
+      return transaction.sisaPembayaran || 0;
     }
 
     // For completed transactions, return full amount
