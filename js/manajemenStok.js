@@ -15,6 +15,7 @@ let lastFetchTime = null;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 const CACHE_KEY = 'stockDataCache';
 const HISTORY_RETENTION_DAYS = 7; // Hanya simpan riwayat 7 hari
+const MAX_HISTORY_RECORDS = 10; // Maksimal 10 riwayat per item
 
 // Initialize cache from localStorage
 function initializeCache() {
@@ -50,8 +51,8 @@ function isCacheValid() {
     return lastFetchTime && (Date.now() - lastFetchTime < CACHE_DURATION);
 }
 
-// Function to clean history older than 7 days
-function cleanOldHistory(data) {
+// Function to clean and limit history
+function cleanAndLimitHistory(data) {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - HISTORY_RETENTION_DAYS);
     const cutoffTime = cutoffDate.getTime();
@@ -60,16 +61,58 @@ function cleanOldHistory(data) {
     Object.keys(data).forEach(category => {
         Object.keys(data[category]).forEach(type => {
             if (data[category][type].history && Array.isArray(data[category][type].history)) {
-                // Filter out history entries older than cutoff date
-                data[category][type].history = data[category][type].history.filter(entry => {
+                // First, filter out history entries older than cutoff date
+                let filteredHistory = data[category][type].history.filter(entry => {
                     const entryDate = new Date(entry.date).getTime();
                     return entryDate >= cutoffTime;
                 });
+                
+                // Sort by date (newest first) to ensure we keep the most recent entries
+                filteredHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+                
+                // Limit to maximum number of records
+                if (filteredHistory.length > MAX_HISTORY_RECORDS) {
+                    filteredHistory = filteredHistory.slice(0, MAX_HISTORY_RECORDS);
+                }
+                
+                // Update the history array
+                data[category][type].history = filteredHistory;
             }
         });
     });
     
     return data;
+}
+
+// Function to add history entry with automatic cleanup
+function addHistoryEntry(item, historyEntry) {
+    // Initialize history array if it doesn't exist
+    if (!item.history) {
+        item.history = [];
+    }
+    
+    // Add new entry at the beginning
+    item.history.unshift(historyEntry);
+    
+    // Sort by date (newest first) to ensure proper ordering
+    item.history.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    // Apply time-based filtering
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - HISTORY_RETENTION_DAYS);
+    const cutoffTime = cutoffDate.getTime();
+    
+    item.history = item.history.filter(entry => {
+        const entryDate = new Date(entry.date).getTime();
+        return entryDate >= cutoffTime;
+    });
+    
+    // Limit to maximum number of records (keep only the most recent)
+    if (item.history.length > MAX_HISTORY_RECORDS) {
+        item.history = item.history.slice(0, MAX_HISTORY_RECORDS);
+    }
+    
+    return item.history;
 }
 
 // Function to fetch data from Firestore
@@ -98,8 +141,8 @@ async function fetchStockData() {
             stockData[doc.id] = categoryData;
         });
         
-        // Clean old history entries
-        stockData = cleanOldHistory(stockData);
+        // Clean and limit history entries
+        stockData = cleanAndLimitHistory(stockData);
         
         // Update Firestore with cleaned data
         await updateFirestoreWithCleanedData();
@@ -128,7 +171,7 @@ async function updateFirestoreWithCleanedData() {
             await updateDoc(categoryRef, stockData[category]);
         }
         
-        console.log('Cleaned old history entries in Firestore');
+        console.log('Cleaned and limited history entries in Firestore');
     } catch (error) {
         console.error('Error updating Firestore with cleaned data:', error);
     }
@@ -286,7 +329,10 @@ function showHistory(category, type) {
         row.innerHTML = '<td colspan="5" class="text-center">Tidak ada riwayat</td>';
         historyTableBody.appendChild(row);
     } else {
-        history.forEach(record => {
+        // Sort history by date (newest first) before displaying
+        const sortedHistory = [...history].sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+        sortedHistory.forEach((record, index) => {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${formatDate(record.date)}</td>
@@ -297,6 +343,18 @@ function showHistory(category, type) {
             `;
             historyTableBody.appendChild(row);
         });
+        
+        // Add info about history limit
+        if (history.length >= MAX_HISTORY_RECORDS) {
+            const infoRow = document.createElement('tr');
+            infoRow.innerHTML = `
+                <td colspan="5" class="text-center text-muted small">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Menampilkan ${MAX_HISTORY_RECORDS} riwayat terbaru
+                </td>
+            `;
+            historyTableBody.appendChild(infoRow);
+        }
     }
     
     const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
@@ -319,26 +377,16 @@ async function addStock(category, type, quantity, adder, receiver) {
     item.quantity += parseInt(quantity);
     item.lastUpdated = new Date().toISOString();
     
-    // Add to history
-    if (!item.history) item.history = [];
-    
-    item.history.unshift({
+    // Add to history using the new function
+    const historyEntry = {
         date: item.lastUpdated,
         action: 'Tambah',
         quantity: quantity,
         adder: adder,
         receiver: receiver
-    });
+    };
     
-    // Clean old history entries
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - HISTORY_RETENTION_DAYS);
-    const cutoffTime = cutoffDate.getTime();
-    
-    item.history = item.history.filter(entry => {
-        const entryDate = new Date(entry.date).getTime();
-        return entryDate >= cutoffTime;
-    });
+    addHistoryEntry(item, historyEntry);
     
     // Save to Firestore
     await saveData(category, type);
@@ -369,26 +417,16 @@ async function reduceStock(category, type, quantity, reducer, notes) {
     item.quantity -= parseInt(quantity);
     item.lastUpdated = new Date().toISOString();
     
-    // Add to history
-    if (!item.history) item.history = [];
-    
-    item.history.unshift({
+    // Add to history using the new function
+    const historyEntry = {
         date: item.lastUpdated,
         action: 'Kurang',
         quantity: quantity,
         reducer: reducer,
         notes: notes
-    });
+    };
     
-    // Clean old history entries
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - HISTORY_RETENTION_DAYS);
-    const cutoffTime = cutoffDate.getTime();
-    
-    item.history = item.history.filter(entry => {
-        const entryDate = new Date(entry.date).getTime();
-        return entryDate >= cutoffTime;
-    });
+    addHistoryEntry(item, historyEntry);
     
     // Save to Firestore
     await saveData(category, type);
@@ -692,7 +730,7 @@ async function populateBatuLepasDropdown() {
     }
 }
 
-// Schedule daily cleanup of old history
+// Schedule daily cleanup of old history with improved logic
 function scheduleHistoryCleanup() {
     // Check if we already ran cleanup today
     const lastCleanup = localStorage.getItem('lastHistoryCleanup');
@@ -701,13 +739,15 @@ function scheduleHistoryCleanup() {
     if (lastCleanup !== today) {
         console.log('Running scheduled history cleanup');
         
-        // Clean history in all data
+        // Clean and limit history in all data
         if (Object.keys(stockData).length > 0) {
-            cleanOldHistory(stockData);
+            cleanAndLimitHistory(stockData);
             updateFirestoreWithCleanedData();
             
             // Mark as completed for today
             localStorage.setItem('lastHistoryCleanup', today);
+            
+            console.log(`History cleanup completed. Limited to ${MAX_HISTORY_RECORDS} records per item.`);
         }
     }
 }
@@ -741,6 +781,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 alert('Data stok berhasil diperbarui.');
             });
         }
+        
+        // Add info about history limits to the UI
+        console.log(`Stock management initialized. History limited to ${MAX_HISTORY_RECORDS} records per item.`);
     } catch (error) {
         console.error('Error initializing stock management:', error);
         alert('Terjadi kesalahan saat memuat data. Silakan refresh halaman.');
@@ -753,6 +796,6 @@ export {
     addStock, 
     reduceStock, 
     populateTables,
-    cleanOldHistory
+    cleanAndLimitHistory,
+    addHistoryEntry
 };
-

@@ -63,13 +63,12 @@ const laporanStokHandler = {
     });
   },
 
-  // Set default dates (current month)
+  // Set default dates (current date)
   setDefaultDates() {
     const today = new Date();
-
     document.getElementById("startDate").value = formatDate(today);
-    document.getElementById("endDate").value = formatDate(today);
   },
+
   // Initialize DataTable
   initDataTable() {
     $("#stockTable").DataTable({
@@ -130,7 +129,7 @@ const laporanStokHandler = {
     if (tableBody) {
       tableBody.innerHTML = `
           <tr>
-            <td colspan="9" class="text-center">Silakan pilih filter dan klik tombol "Tampilkan" untuk melihat data</td>
+            <td colspan="9" class="text-center">Silakan pilih tanggal dan klik tombol "Tampilkan" untuk melihat data</td>
           </tr>
         `;
     }
@@ -158,10 +157,7 @@ const laporanStokHandler = {
   // Reset filters
   resetFilters() {
     const today = new Date();
-
     document.getElementById("startDate").value = formatDate(today);
-    document.getElementById("endDate").value = formatDate(today);
-
     this.loadAndFilterStockData();
   },
 
@@ -172,29 +168,24 @@ const laporanStokHandler = {
 
       // Get filter values
       const startDateStr = document.getElementById("startDate").value;
-      const endDateStr = document.getElementById("endDate").value;
 
-      // Validate dates
-      if (!startDateStr || !endDateStr) {
-        this.showError("Tanggal awal dan akhir harus diisi");
+      // Validate date
+      if (!startDateStr) {
+        this.showError("Tanggal harus diisi");
         this.showLoading(false);
         return;
       }
 
       const startDate = parseDate(startDateStr);
-      const endDate = parseDate(endDateStr);
 
-      if (!startDate || !endDate) {
+      if (!startDate) {
         this.showError("Format tanggal tidak valid");
         this.showLoading(false);
         return;
       }
 
-      // Add time to end date to include the whole day
-      endDate.setHours(23, 59, 59, 999);
-
       // Check cache
-      const cacheKey = `stock_${startDateStr}_${endDateStr}`;
+      const cacheKey = `stock_${startDateStr}`;
       if (this.cache[cacheKey] && this.cache[cacheKey].data) {
         console.log("Using cached stock data");
         this.filteredStockData = [...this.cache[cacheKey].data];
@@ -207,7 +198,7 @@ const laporanStokHandler = {
       await this.loadStockData();
 
       // Calculate stock continuity
-      await this.calculateStockContinuity(startDate, endDate);
+      await this.calculateStockContinuity(startDate);
 
       // Cache the result
       this.cache[cacheKey] = {
@@ -313,20 +304,24 @@ const laporanStokHandler = {
       throw error;
     }
   },
-/*  */
+
   // Calculate stock continuity
-  async calculateStockContinuity(startDate, endDate) {
+  async calculateStockContinuity(selectedDate) {
     try {
-      // Create day before start date
-      const previousDay = new Date(startDate);
+      // Create day before selected date
+      const previousDay = new Date(selectedDate);
       previousDay.setDate(previousDay.getDate() - 1);
       previousDay.setHours(23, 59, 59, 999);
+
+      // Set end of selected date
+      const endOfSelectedDate = new Date(selectedDate);
+      endOfSelectedDate.setHours(23, 59, 59, 999);
 
       // Get stock transactions
       const stockTransactionsRef = collection(firestore, "stokAksesorisTransaksi");
       const transactionsQuery = query(
         stockTransactionsRef,
-        where("timestamp", "<=", Timestamp.fromDate(endDate)),
+        where("timestamp", "<=", Timestamp.fromDate(endOfSelectedDate)),
         orderBy("timestamp", "asc")
       );
 
@@ -363,9 +358,9 @@ const laporanStokHandler = {
           };
         }
 
-        // Determine if transaction is before or during the selected period
+        // Determine if transaction is before or during the selected date
         const isPeriodBefore = timestamp <= previousDay;
-        const isPeriodDuring = timestamp > previousDay && timestamp <= endDate;
+        const isPeriodDuring = timestamp > previousDay && timestamp <= endOfSelectedDate;
 
         // Update data based on transaction type and period
         if (isPeriodBefore) {
@@ -444,7 +439,7 @@ const laporanStokHandler = {
             // Categorize based on date
             if (timestamp <= previousDay) {
               stockByCode[kode].before.tambahStok += quantity;
-            } else if (timestamp <= endDate) {
+            } else if (timestamp <= endOfSelectedDate) {
               stockByCode[kode].during.tambahStok += quantity;
             }
           });
@@ -601,9 +596,9 @@ const laporanStokHandler = {
         tableBody.innerHTML = html;
       }
 
-      // Get current date for title
-      const today = new Date();
-      const formattedDate = formatDate(today);
+      // Get selected date for title
+      const selectedDateStr = document.getElementById("startDate").value;
+      const selectedDate = selectedDateStr || formatDate(new Date());
 
       // Add CSS for text wrapping and equal column widths
       const styleElement = document.createElement("style");
@@ -650,7 +645,7 @@ const laporanStokHandler = {
             exportOptions: {
               columns: ":visible",
             },
-            title: `Laporan Stok (${formattedDate})`,
+            title: `Laporan Stok (${selectedDate})`,
             customize: function (xlsx) {
               var sheet = xlsx.xl.worksheets["sheet1.xml"];
               $('row c[r^="C"]', sheet).attr("s", "55"); // Nama column - wider with wrap text
@@ -664,7 +659,7 @@ const laporanStokHandler = {
             exportOptions: {
               columns: ":visible",
             },
-            title: `Laporan Stok (${formattedDate})`,
+            title: `Laporan Stok (${selectedDate})`,
             customize: function (doc) {
               doc.defaultStyle.fontSize = 8;
               doc.styles.tableHeader.fontSize = 9;
@@ -689,7 +684,7 @@ const laporanStokHandler = {
             exportOptions: {
               columns: ":visible",
             },
-            title: `Laporan Stok (${formattedDate})`,
+            title: `Laporan Stok (${selectedDate})`,
             customize: function (win) {
               $(win.document.head).append(`
                   <style>
@@ -1012,3 +1007,4 @@ document.addEventListener("DOMContentLoaded", function () {
 
 // Export the handler for potential use in other modules
 export default laporanStokHandler;
+

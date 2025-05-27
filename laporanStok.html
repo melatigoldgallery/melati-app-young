@@ -246,7 +246,7 @@
           </div>
 
           <!-- Filter Card -->
-          <div class="card mb-4">
+           <div class="card mb-4">
             <div class="card-header">
               <h2>
                 <i class="fas fa-filter"></i>
@@ -254,9 +254,9 @@
               </h2>
             </div>
             <div class="card-body">
-              <form class="row g-3">
-                <div class="col-md-4">
-                  <label for="filterTanggalMulai" class="form-label">Tanggal Mulai</label>
+              <form class="row g-3 align-items-end">
+                <div class="col-md-3">
+                  <label for="startDate" class="form-label">Tanggal</label>
                   <div class="input-group">
                     <input type="text" class="form-control datepicker" id="startDate" placeholder="dd/mm/yyyy" />
                     <span class="input-group-text bg-primary text-white">
@@ -264,16 +264,7 @@
                     </span>
                   </div>
                 </div>
-                <div class="col-md-4">
-                  <label for="filterTanggalAkhir" class="form-label">Tanggal Akhir</label>
-                  <div class="input-group">
-                    <input type="text" class="form-control datepicker" id="endDate" placeholder="dd/mm/yyyy" />
-                    <span class="input-group-text bg-primary text-white">
-                      <i class="fas fa-calendar-alt"></i>
-                    </span>
-                  </div>
-                </div>
-                <div class="col-12 mt-4">
+                <div class="col-md-3">
                   <button type="button" class="btn btn-primary" id="filterStockBtn">
                     <i class="fas fa-search me-1"></i> Tampilkan
                   </button>
