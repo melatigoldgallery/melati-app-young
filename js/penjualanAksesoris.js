@@ -384,11 +384,12 @@ const penjualanHandler = {
       // Check localStorage cache
       if (!forceRefresh) {
         const cachedData = sharedCacheManager.getVersioned("stockData");
-        if (cachedData && cachedData.age < 10 * 60 * 1000) { // 10 menit max
+        if (cachedData && cachedData.age < 10 * 60 * 1000) {
+          // 10 menit max
           console.log("Using localStorage stock cache");
           this.stockData = cachedData.data;
           this.stockCache.clear();
-          this.stockData.forEach(item => {
+          this.stockData.forEach((item) => {
             this.stockCache.set(item.kode, item.stokAkhir);
           });
           this.lastStockUpdate = Date.now();
@@ -411,12 +412,12 @@ const penjualanHandler = {
       const stockData = [];
       stockSnapshot.forEach((doc) => {
         const data = doc.data();
-        stockData.push({ 
-          id: doc.id, 
+        stockData.push({
+          id: doc.id,
           ...data,
-          lastChecked: Date.now() // Track kapan terakhir dicek
+          lastChecked: Date.now(), // Track kapan terakhir dicek
         });
-        
+
         // Update in-memory cache
         this.stockCache.set(data.kode, data.stokAkhir || 0);
       });
@@ -426,7 +427,6 @@ const penjualanHandler = {
       this.stockData = stockData;
       this.lastStockUpdate = Date.now();
       this.populateStockTables();
-
     } catch (error) {
       console.error("Error loading stock:", error);
       utils.showAlert("Gagal memuat data stok: " + error.message, "Error", "error");
@@ -436,13 +436,13 @@ const penjualanHandler = {
     }
   },
 
-   // Optimized stock checking - gunakan cache dulu
-   async getStockForItem(kode) {
+  // Optimized stock checking - gunakan cache dulu
+  async getStockForItem(kode) {
     // Check in-memory cache first
     if (this.stockCache.has(kode)) {
       const cachedStock = this.stockCache.get(kode);
       const cacheAge = Date.now() - this.lastStockUpdate;
-      
+
       // Jika cache masih fresh (< 5 menit), gunakan cache
       if (cacheAge < 5 * 60 * 1000) {
         return cachedStock;
@@ -450,7 +450,7 @@ const penjualanHandler = {
     }
 
     // Jika tidak ada di cache atau cache expired, ambil dari stockData
-    const stockItem = this.stockData.find(item => item.kode === kode);
+    const stockItem = this.stockData.find((item) => item.kode === kode);
     if (stockItem) {
       this.stockCache.set(kode, stockItem.stokAkhir);
       return stockItem.stokAkhir;
@@ -458,12 +458,9 @@ const penjualanHandler = {
 
     // Last resort: query Firestore (jarang terjadi)
     try {
-      const stockQuery = query(
-        collection(firestore, "stokAksesoris"), 
-        where("kode", "==", kode)
-      );
+      const stockQuery = query(collection(firestore, "stokAksesoris"), where("kode", "==", kode));
       const stockSnapshot = await getDocs(stockQuery);
-      
+
       if (!stockSnapshot.empty) {
         const stock = stockSnapshot.docs[0].data().stokAkhir || 0;
         this.stockCache.set(kode, stock);
@@ -524,6 +521,7 @@ const penjualanHandler = {
   },
 
   // Populate stock tables
+  // Perbaiki method populateStockTables untuk tidak menampilkan kolom stok
   populateStockTables() {
     const categories = {
       aksesoris: "#tableAksesoris",
@@ -537,18 +535,15 @@ const penjualanHandler = {
       const items = this.stockData.filter((item) => item.kategori === category);
 
       if (items.length === 0) {
-        tbody.append(`<tr><td colspan="3" class="text-center">Tidak ada data ${category}</td></tr>`);
+        tbody.append(`<tr><td colspan="2" class="text-center">Tidak ada data ${category}</td></tr>`);
       } else {
         items.forEach((item) => {
           const row = `
-            <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${
-            item.hargaJual || 0
-          }">
-              <td>${item.kode || "-"}</td>
-              <td>${item.nama || "-"}</td>
-              <td>${item.stokAkhir || 0}</td>
-            </tr>
-          `;
+          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-harga="${item.hargaJual || 0}">
+            <td>${item.kode || "-"}</td>
+            <td>${item.nama || "-"}</td>
+          </tr>
+        `;
           tbody.append(row);
         });
       }
@@ -561,18 +556,15 @@ const penjualanHandler = {
     const lockItems = this.stockData.filter((item) => item.kategori === "aksesoris");
 
     if (lockItems.length === 0) {
-      lockTable.append('<tr><td colspan="3" class="text-center">Tidak ada data lock</td></tr>');
+      lockTable.append('<tr><td colspan="2" class="text-center">Tidak ada data lock</td></tr>');
     } else {
       lockItems.forEach((item) => {
         const row = `
-          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${
-          item.hargaJual || 0
-        }">
-            <td>${item.kode || "-"}</td>
-            <td>${item.nama || "-"}</td>
-            <td>${item.stokAkhir || 0}</td>
-          </tr>
-        `;
+        <tr data-kode="${item.kode}" data-nama="${item.nama}" data-harga="${item.hargaJual || 0}">
+          <td>${item.kode || "-"}</td>
+          <td>${item.nama || "-"}</td>
+        </tr>
+      `;
         lockTable.append(row);
       });
     }
@@ -592,7 +584,6 @@ const penjualanHandler = {
         const data = {
           kode: $(this).data("kode"),
           nama: $(this).data("nama"),
-          stok: $(this).data("stok"),
           harga: $(this).data("harga"),
         };
         penjualanHandler.addAksesorisToTable(data);
@@ -606,7 +597,6 @@ const penjualanHandler = {
         const data = {
           kode: $(this).data("kode"),
           nama: $(this).data("nama"),
-          stok: $(this).data("stok"),
           harga: $(this).data("harga"),
         };
         penjualanHandler.addKotakToTable(data);
@@ -644,33 +634,33 @@ const penjualanHandler = {
 
   // Add aksesoris to table
   addAksesorisToTable(data) {
-    const { kode, nama, stok, harga } = data;
+    const { kode, nama, harga } = data;
     const newRow = `
-      <tr>
-        <td>${kode}</td>
-        <td>${nama}</td>
-        <td>
-          <input type="number" class="form-control form-control-sm jumlah-input" value="1" min="1" max="${stok}">
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm kadar-input" value="" placeholder="Kadar" required>
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm berat-input" value="" placeholder="0.00" required>
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm harga-per-gram-input" value="0" readonly>
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm total-harga-input" value="" placeholder="0" required>
-        </td>
-        <td>
-          <button class="btn btn-sm btn-danger btn-delete">
-            <i class="fas fa-trash"></i>
-          </button>
-        </td>
-      </tr>
-    `;
+    <tr>
+      <td>${kode}</td>
+      <td>${nama}</td>
+      <td>
+        <input type="number" class="form-control form-control-sm jumlah-input" value="1" min="1">
+      </td>
+      <td>
+        <input type="text" class="form-control form-control-sm kadar-input" value="" placeholder="Kadar" required>
+      </td>
+      <td>
+        <input type="text" class="form-control form-control-sm berat-input" value="" placeholder="0.00" required>
+      </td>
+      <td>
+        <input type="text" class="form-control form-control-sm harga-per-gram-input" value="0" readonly>
+      </td>
+      <td>
+        <input type="text" class="form-control form-control-sm total-harga-input" value="" placeholder="0" required>
+      </td>
+      <td>
+        <button class="btn btn-sm btn-danger btn-delete">
+          <i class="fas fa-trash"></i>
+        </button>
+      </td>
+    </tr>
+  `;
 
     $("#tableAksesorisDetail tbody").append(newRow);
     const $newRow = $("#tableAksesorisDetail tbody tr:last-child");
@@ -681,30 +671,30 @@ const penjualanHandler = {
 
   // Add kotak to table
   addKotakToTable(data) {
-    const { kode, nama, stok, harga } = data;
+    const { kode, nama, harga } = data;
     const jumlah = 1;
-    const totalHarga = jumlah * harga;
+    const totalHarga = jumlah * (harga || 0);
 
     const newRow = `
-      <tr>
-        <td>${kode}</td>
-        <td>${nama}</td>
-        <td>
-          <input type="number" class="form-control form-control-sm jumlah-input" value="${jumlah}" min="1" max="${stok}">
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm harga-input" value="${utils.formatRupiah(
-            harga
-          )}" required>
-        </td>
-        <td class="total-harga">${utils.formatRupiah(totalHarga)}</td>
-        <td>
-          <button class="btn btn-sm btn-danger btn-delete">
-            <i class="fas fa-trash"></i>
-          </button>
-        </td>
-      </tr>
-    `;
+    <tr>
+      <td>${kode}</td>
+      <td>${nama}</td>
+      <td>
+        <input type="number" class="form-control form-control-sm jumlah-input" value="${jumlah}" min="1">
+      </td>
+      <td>
+        <input type="text" class="form-control form-control-sm harga-input" value="${utils.formatRupiah(
+          harga || 0
+        )}" required>
+      </td>
+      <td class="total-harga">${utils.formatRupiah(totalHarga)}</td>
+      <td>
+        <button class="btn btn-sm btn-danger btn-delete">
+          <i class="fas fa-trash"></i>
+        </button>
+      </td>
+    </tr>
+  `;
 
     $("#tableKotakDetail tbody").append(newRow);
     const $newRow = $("#tableKotakDetail tbody tr:last-child");
@@ -1283,10 +1273,8 @@ const penjualanHandler = {
       // Save transaction
       const docRef = await addDoc(collection(firestore, "penjualanAksesoris"), transactionData);
 
-      // Update stock if not free
-      if (paymentMethod !== "free") {
-        await this.updateStock(salesType, items);
-      }
+      // PERBAIKAN: Update stock untuk SEMUA metode pembayaran (termasuk free)
+      await this.updateStock(salesType, items);
 
       // Smart cache invalidation - hanya clear sales cache
       sharedCacheManager.invalidateRelated("sales");
@@ -1398,7 +1386,7 @@ const penjualanHandler = {
   // Update stock after sales
   async updateStock(salesType, items) {
     try {
-      const batch = [];
+      const updatePromises = [];
       const stockUpdates = new Map();
 
       // Prepare batch updates
@@ -1406,20 +1394,44 @@ const penjualanHandler = {
         const kode = item.kodeText;
         if (!kode || kode === "-") continue;
 
-        const currentStock = await this.getStockForItem(kode);
-        const jumlah = parseInt(item.jumlah) || 1;
-        const newStock = Math.max(0, currentStock - jumlah);
+        if (salesType === "manual") {
+          // Untuk penjualan manual
+          if (item.kodeLock && item.kodeLock !== "-") {
+            // Kode aksesoris yang dipilih - mengurangi stok sebagai ganti lock
+            const lockCurrentStock = await this.getStockForItem(item.kodeLock);
+            const jumlah = parseInt(item.jumlah) || 1;
+            const lockNewStock = Math.max(0, lockCurrentStock - jumlah);
 
-        stockUpdates.set(kode, {
-          item,
-          currentStock,
-          newStock,
-          jumlah
-        });
+            stockUpdates.set(item.kodeLock, {
+              item: {
+                ...item,
+                kodeText: item.kodeLock,
+                nama: `Ganti lock untuk ${item.nama}`,
+              },
+              currentStock: lockCurrentStock,
+              newStock: lockNewStock,
+              jumlah,
+              isGantiLock: true,
+            });
+          }
+          // Kode barcode manual tidak mengurangi stok
+        } else {
+          // Untuk penjualan aksesoris dan kotak (termasuk yang free)
+          const currentStock = await this.getStockForItem(kode);
+          const jumlah = parseInt(item.jumlah) || 1;
+          const newStock = Math.max(0, currentStock - jumlah);
+
+          stockUpdates.set(kode, {
+            item,
+            currentStock,
+            newStock,
+            jumlah,
+            isGantiLock: false,
+          });
+        }
       }
 
       // Execute batch updates
-      const updatePromises = [];
       for (const [kode, updateData] of stockUpdates) {
         updatePromises.push(this.processSingleStockUpdate(kode, updateData));
       }
@@ -1429,15 +1441,15 @@ const penjualanHandler = {
       // Update local caches
       for (const [kode, updateData] of stockUpdates) {
         this.stockCache.set(kode, updateData.newStock);
-        
+
         // Update stockData array
-        const stockIndex = this.stockData.findIndex(item => item.kode === kode);
+        const stockIndex = this.stockData.findIndex((item) => item.kode === kode);
         if (stockIndex !== -1) {
           this.stockData[stockIndex].stokAkhir = updateData.newStock;
         }
       }
 
-      // Smart cache invalidation - hanya invalidate yang berubah
+      // Smart cache invalidation
       sharedCacheManager.setVersioned("stockData", this.stockData, 15 * 60 * 1000);
       this.lastStockUpdate = Date.now();
 
@@ -1447,14 +1459,18 @@ const penjualanHandler = {
       throw error;
     }
   },
-
-   // Helper untuk single stock update
-   async processSingleStockUpdate(kode, { item, currentStock, newStock, jumlah }) {
+  // Perbaiki method processSingleStockUpdate tanpa menggunakan getItemInfo
+  async processSingleStockUpdate(kode, { item, currentStock, newStock, jumlah, isGantiLock }) {
     const metodeBayar = $("#metodeBayar").val();
     const salesType = $("#jenisPenjualan").val();
-    
+
     let jenisTransaksi, keterangan;
-    if (metodeBayar === "free") {
+
+    // Tentukan jenis transaksi
+    if (isGantiLock) {
+      jenisTransaksi = "gantiLock";
+      keterangan = `Ganti lock ${kode} oleh ${$("#sales").val()}`;
+    } else if (metodeBayar === "free") {
       jenisTransaksi = "free";
       keterangan = `Penjualan ${salesType} gratis oleh ${$("#sales").val()}`;
     } else {
@@ -1462,31 +1478,52 @@ const penjualanHandler = {
       keterangan = `Penjualan ${salesType} oleh ${$("#sales").val()}`;
     }
 
-    // Update stok document
-    const stockQuery = query(collection(firestore, "stokAksesoris"), where("kode", "==", kode));
-    const stockSnapshot = await getDocs(stockQuery);
+    try {
+      // Update stok document
+      const stockQuery = query(collection(firestore, "stokAksesoris"), where("kode", "==", kode));
+      const stockSnapshot = await getDocs(stockQuery);
 
-    if (!stockSnapshot.empty) {
-      const stockDoc = stockSnapshot.docs[0];
-      await updateDoc(doc(firestore, "stokAksesoris", stockDoc.id), {
+      if (!stockSnapshot.empty) {
+        const stockDoc = stockSnapshot.docs[0];
+        await updateDoc(doc(firestore, "stokAksesoris", stockDoc.id), {
+          stokAkhir: newStock,
+          lastUpdate: serverTimestamp(),
+        });
+      } else {
+        // Buat document baru jika tidak ada
+        const newStockData = {
+          kode,
+          nama: item.nama || "",
+          kategori: this.determineCategory(kode),
+          stokAwal: currentStock,
+          stokAkhir: newStock,
+          hargaJual: 0,
+          lastUpdate: serverTimestamp(),
+        };
+
+        await addDoc(collection(firestore, "stokAksesoris"), newStockData);
+      }
+
+      // Catat transaksi stok
+      await addDoc(collection(firestore, "stokAksesorisTransaksi"), {
+        kode,
+        nama: item.nama || "",
+        kategori: this.determineCategory(kode),
+        jenis: jenisTransaksi,
+        jumlah,
+        stokSebelum: currentStock,
+        stokSesudah: newStock,
         stokAkhir: newStock,
-        lastUpdate: serverTimestamp(),
+        timestamp: serverTimestamp(),
+        keterangan,
+        isGantiLock: isGantiLock || false,
       });
-    }
 
-    // Add transaction record
-    await addDoc(collection(firestore, "stokAksesorisTransaksi"), {
-      kode,
-      nama: item.nama || "",
-      kategori: this.determineCategory(kode),
-      jenis: jenisTransaksi,
-      jumlah,
-      stokSebelum: currentStock,
-      stokSesudah: newStock,
-      stokAkhir: newStock,
-      timestamp: serverTimestamp(),
-      keterangan,
-    });
+      console.log(`Updated stock for ${kode}: ${currentStock} → ${newStock} (${jenisTransaksi})`);
+    } catch (error) {
+      console.error(`Error updating stock for ${kode}:`, error);
+      throw error;
+    }
   },
 
   // Method helper untuk proses update stok

@@ -30,6 +30,116 @@
     <!-- Favicon sederhana -->
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
     <style>
+      /* Modal Styling */
+      .modal-xl {
+        max-width: 400px;
+      }
+
+      .modal-header {
+        border-bottom: none;
+        padding: 1rem;
+      }
+
+      .modal-body {
+        padding: 1.5rem;
+      }
+
+      .modal-footer {
+        border-top: 1px solid #dee2e6;
+        padding: 1rem 1.5rem;
+      }
+
+      /* Table Styling dalam Modal */
+      .modal .table {
+        margin-bottom: 0;
+        font-size: 0.95rem;
+      }
+
+      .modal .table thead th {
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+        font-size: 0.9rem;
+        padding: 1rem 0.75rem;
+      }
+
+      .modal .table tbody td {
+        padding: 0.875rem 0.75rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #f1f3f4;
+      }
+
+      .modal .table tbody tr {
+        transition: all 0.2s ease;
+        cursor: pointer;
+      }
+
+      .modal .table tbody tr:hover {
+        background-color: #f8f9fa;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .modal .table tbody tr:hover td {
+        color: #0d6efd;
+        font-weight: 500;
+      }
+
+      /* Search Input Styling */
+      .modal .input-group-text {
+        border-right: none;
+        background-color: #f8f9fa;
+      }
+
+      .modal .form-control {
+        border-left: none;
+        padding-left: 0;
+      }
+
+      .modal .form-control:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+      }
+
+      /* Sticky Header */
+      .sticky-top {
+        position: sticky;
+        top: 0;
+        z-index: 1020;
+      }
+
+      /* Scrollbar Styling */
+      .modal .table-responsive::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .modal .table-responsive::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+      }
+
+      .modal .table-responsive::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 4px;
+      }
+
+      .modal .table-responsive::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+      }
+
+      /* Empty State */
+      .modal .table tbody tr td.text-center {
+        padding: 3rem 1rem;
+        color: #6c757d;
+        font-style: italic;
+      }
+
+      /* Loading State */
+      .modal-loading {
+        text-align: center;
+        padding: 2rem;
+        color: #6c757d;
+      }
+
       @media print {
         body * {
           visibility: hidden;
@@ -480,23 +590,44 @@
 
     <!-- Modal Pilih Lock -->
     <div class="modal fade" id="modalPilihLock" tabindex="-1" aria-labelledby="modalPilihLockLabel" aria-hidden="true">
-      <div class="modal-dialog modal-lg">
+      <div class="modal-dialog modal-xl">
         <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="modalPilihLockLabel">Pilih Kode Lock</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title" id="modalPilihLockLabel">
+              <i class="fas fa-lock me-2"></i>
+              Pilih Kode Lock
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <div class="mb-3">
-              <input type="text" class="form-control" id="searchLock" placeholder="Cari kode lock..." />
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <div class="input-group">
+                  <span class="input-group-text bg-light">
+                    <i class="fas fa-search text-muted"></i>
+                  </span>
+                  <input type="text" class="form-control" id="searchLock" placeholder="Cari kode atau nama lock..." />
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="d-flex align-items-center text-muted">
+                  <i class="fas fa-info-circle me-2"></i>
+                  <small>Klik pada baris untuk memilih kode lock</small>
+                </div>
+              </div>
             </div>
-            <div class="table-responsive">
-              <table class="table table-hover" id="tableLock">
-                <thead>
+            <div class="table-responsive" style="max-height: 450px">
+              <table class="table table-hover table-striped" id="tableLock">
+                <thead class="table-dark sticky-top">
                   <tr>
-                    <th>Kode</th>
-                    <th>Nama Barang</th>
-                    <th>Stok</th>
+                    <th style="width: 25%">
+                      <i class="fas fa-barcode me-2"></i>
+                      Kode
+                    </th>
+                    <th style="width: 75%">
+                      <i class="fas fa-tag me-2"></i>
+                      Nama Barang
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -505,8 +636,11 @@
               </table>
             </div>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              <i class="fas fa-times me-2"></i>
+              Tutup
+            </button>
           </div>
         </div>
       </div>
@@ -520,23 +654,49 @@
       aria-labelledby="modalPilihAksesorisLabel"
       aria-hidden="true"
     >
-      <div class="modal-dialog modal-lg">
+      <div class="modal-dialog modal-xl">
         <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="modalPilihAksesorisLabel">Pilih Aksesoris</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          <div class="modal-header bg-success text-white">
+            <h5 class="modal-title" id="modalPilihAksesorisLabel">
+              <i class="fas fa-gem me-2"></i>
+              Pilih Aksesoris
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <div class="mb-3">
-              <input type="text" class="form-control" id="searchAksesoris" placeholder="Cari aksesoris..." />
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <div class="input-group">
+                  <span class="input-group-text bg-light">
+                    <i class="fas fa-search text-muted"></i>
+                  </span>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="searchAksesoris"
+                    placeholder="Cari kode atau nama aksesoris..."
+                  />
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="d-flex align-items-center text-muted">
+                  <i class="fas fa-info-circle me-2"></i>
+                  <small>Klik pada baris untuk memilih aksesoris</small>
+                </div>
+              </div>
             </div>
-            <div class="table-responsive">
-              <table class="table table-hover" id="tableAksesoris">
-                <thead>
+            <div class="table-responsive" style="max-height: 450px">
+              <table class="table table-hover table-striped" id="tableAksesoris">
+                <thead class="table-dark sticky-top">
                   <tr>
-                    <th>Kode</th>
-                    <th>Nama Barang</th>
-                    <th>Stok</th>
+                    <th style="width: 25%">
+                      <i class="fas fa-barcode me-2"></i>
+                      Kode
+                    </th>
+                    <th style="width: 75%">
+                      <i class="fas fa-tag me-2"></i>
+                      Nama Barang
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -545,8 +705,11 @@
               </table>
             </div>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              <i class="fas fa-times me-2"></i>
+              Tutup
+            </button>
           </div>
         </div>
       </div>
@@ -560,23 +723,49 @@
       aria-labelledby="modalPilihKotakLabel"
       aria-hidden="true"
     >
-      <div class="modal-dialog modal-lg">
+      <div class="modal-dialog modal-xl">
         <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="modalPilihKotakLabel">Pilih Kotak</h5>
+          <div class="modal-header bg-warning text-dark">
+            <h5 class="modal-title" id="modalPilihKotakLabel">
+              <i class="fas fa-box me-2"></i>
+              Pilih Kotak
+            </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <div class="mb-3">
-              <input type="text" class="form-control" id="searchKotak" placeholder="Cari kotak..." />
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <div class="input-group">
+                  <span class="input-group-text bg-light">
+                    <i class="fas fa-search text-muted"></i>
+                  </span>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="searchKotak"
+                    placeholder="Cari kode atau jenis kotak..."
+                  />
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="d-flex align-items-center text-muted">
+                  <i class="fas fa-info-circle me-2"></i>
+                  <small>Klik pada baris untuk memilih kotak</small>
+                </div>
+              </div>
             </div>
-            <div class="table-responsive">
-              <table class="table table-hover" id="tableKotak">
-                <thead>
+            <div class="table-responsive" style="max-height: 450px">
+              <table class="table table-hover table-striped" id="tableKotak">
+                <thead class="table-dark sticky-top">
                   <tr>
-                    <th>Kode</th>
-                    <th>Jenis Kotak</th>
-                    <th>Stok</th>
+                    <th style="width: 25%">
+                      <i class="fas fa-barcode me-2"></i>
+                      Kode
+                    </th>
+                    <th style="width: 75%">
+                      <i class="fas fa-tag me-2"></i>
+                      Jenis Kotak
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -585,13 +774,16 @@
               </table>
             </div>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              <i class="fas fa-times me-2"></i>
+              Tutup
+            </button>
           </div>
         </div>
       </div>
     </div>
-    
+
     <!-- Print Modal -->
     <div class="modal fade" id="printModal" tabindex="-1" aria-labelledby="printModalLabel" aria-hidden="true">
       <div class="modal-dialog">
