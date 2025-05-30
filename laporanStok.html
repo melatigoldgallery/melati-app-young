@@ -5,24 +5,86 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- SweetAlert2 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@sweetalert2/theme-bootstrap-4/bootstrap-4.css" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- jQuery first -->
     <script src="js/jquery-3.6.3.min.js"></script>
     <!-- Bootstrap CSS and JS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Your custom CSS -->
+    <!-- Datepicker CSS and JS -->
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/locales/bootstrap-datepicker.id.min.js"></script>
+    <!-- DataTables -->
+    <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet" />
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+    <!-- DataTables Buttons -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.2.3/css/buttons.dataTables.min.css" />
+    <script src="https://cdn.datatables.net/buttons/2.2.3/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.2.3/js/buttons.html5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.2.3/js/buttons.print.min.js"></script>
+    <!-- Animate.css -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+    <!-- Custom CSS -->
     <link rel="stylesheet" href="css/pages/absensi-modern.css" />
-    <!-- Favicon sederhana -->
+    <!-- Favicon -->
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
-    <title>Analisis Antrian - Melati Gold Shop</title>
+    <title>Laporan Stok Aksesoris - Melati Gold Shop</title>
+    <style>
+      /* Loading indicator */
+      #loadingIndicator {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        display: none;
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </head>
   <body>
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator">
+      <div class="spinner"></div>
+    </div>
+
     <div class="app-container">
       <!-- Sidebar -->
       <aside class="sidebar">
@@ -179,130 +241,84 @@
         <!-- Page Content -->
         <div class="page-content">
           <div class="page-header">
-            <h1>Dashboard Analisis Antrian</h1>
+            <h1>Laporan Stok Aksesoris</h1>
             <nav aria-label="breadcrumb">
               <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="dashboard.html">Home</a></li>
-                <li class="breadcrumb-item"><a href="#">Laporan</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Analisis Antrian</li>
+                <li class="breadcrumb-item">Aksesoris</li>
+                <li class="breadcrumb-item active" aria-current="page">Laporan Stok</li>
               </ol>
             </nav>
           </div>
-          
-          <div class="content-wrapper">
-            <!-- Stats Cards -->
-            <div class="stats-cards">
-              <div class="stat-card">
-                <div class="stat-card-icon bg-primary">
-                  <i class="fas fa-users"></i>
-                </div>
-                <div class="stat-card-info">
-                  <h3 id="todayTotal">0</h3>
-                  <p>Total Antrian Hari Ini</p>
-                </div>
-              </div>
 
-              <div class="stat-card">
-                <div class="stat-card-icon bg-success">
-                  <i class="fas fa-calendar-week"></i>
+          <!-- Filter Card -->
+           <div class="card mb-4">
+            <div class="card-header">
+              <h2>
+                <i class="fas fa-filter"></i>
+                Filter Laporan Stok
+              </h2>
+            </div>
+            <div class="card-body">
+              <form class="row g-3 align-items-end">
+                <div class="col-md-3">
+                  <label for="startDate" class="form-label">Tanggal</label>
+                  <div class="input-group">
+                    <input type="text" class="form-control datepicker" id="startDate" placeholder="dd/mm/yyyy" />
+                    <span class="input-group-text bg-primary text-white">
+                      <i class="fas fa-calendar-alt"></i>
+                    </span>
+                  </div>
                 </div>
-                <div class="stat-card-info">
-                  <h3 id="weekTotal">0</h3>
-                  <p>Total Minggu Ini</p>
+                <div class="col-md-3">
+                  <button type="button" class="btn btn-primary" id="filterStockBtn">
+                    <i class="fas fa-search me-1"></i> Tampilkan
+                  </button>
                 </div>
-              </div>
+              </form>
+            </div>
+          </div>
 
-              <div class="stat-card">
-                <div class="stat-card-icon bg-warning">
-                  <i class="fas fa-clock"></i>
-                </div>
-                <div class="stat-card-info">
-                  <h3 id="avgWaitTime">0 min</h3>
-                  <p>Rata-rata Waktu Tunggu</p>
-                </div>
-              </div>
-
-              <div class="stat-card">
-                <div class="stat-card-icon bg-info">
-                  <i class="fas fa-user-clock"></i>
-                </div>
-                <div class="stat-card-info">
-                  <h3 id="peakHour">--:--</h3>
-                  <p>Jam Tersibuk</p>
-                </div>
+          <!-- Stock Data Table -->
+          <div class="card mb-4">
+            <div class="card-header">
+              <h2>
+                <i class="fas fa-boxes"></i>
+                Data Stok Aksesoris
+              </h2>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-striped table-bordered" id="stockTable">
+                  <thead>
+                    <tr>
+                      <th>No</th>
+                      <th>Kode</th>
+                      <th>Nama</th>
+                      <th>Stok Awal</th>
+                      <th>Tambah Stok</th>
+                      <th>Laku</th>
+                      <th>Free</th>
+                      <th>Ganti Lock</th>
+                      <th>Stok Akhir</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Data will be populated by JavaScript -->
+                  </tbody>
+                </table>
               </div>
             </div>
-
-            <!-- Chart Cards -->
-            <div class="row">
-              <div class="col-lg-6">
-                <div class="card">
-                  <div class="card-header">
-                    <h2>
-                      <i class="fas fa-chart-bar"></i>
-                      Jam Tersibuk
-                    </h2>
-                    <div class="card-actions">
-                      <div class="dropdown">
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="hourlyChartPeriod" data-bs-toggle="dropdown" aria-expanded="false">
-                          <i class="fas fa-calendar"></i>
-                          Hari Ini
-                        </button>
-                        <ul class="dropdown-menu" aria-labelledby="hourlyChartPeriod">
-                          <li><a class="dropdown-item" href="#" data-period="today">Hari Ini</a></li>
-                          <li><a class="dropdown-item" href="#" data-period="week">Minggu Ini</a></li>
-                          <li><a class="dropdown-item" href="#" data-period="month">Bulan Ini</a></li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="card-body">
-                    <canvas id="hourlyChart" height="250"></canvas>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="col-lg-6">
-                <div class="card">
-                  <div class="card-header">
-                    <h2>
-                      <i class="fas fa-chart-line"></i>
-                      Tren Harian
-                    </h2>
-                    <div class="card-actions">
-                      <div class="dropdown">
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="dailyChartPeriod" data-bs-toggle="dropdown" aria-expanded="false">
-                          <i class="fas fa-calendar"></i>
-                          Minggu Ini
-                        </button>
-                        <ul class="dropdown-menu" aria-labelledby="dailyChartPeriod">
-                          <li><a class="dropdown-item" href="#" data-period="week">Minggu Ini</a></li>
-                          <li><a class="dropdown-item" href="#" data-period="month">Bulan Ini</a></li>
-                          <li><a class="dropdown-item" href="#" data-period="quarter">3 Bulan Terakhir</a></li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="card-body">
-                    <canvas id="dailyChart" height="250"></canvas>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <button id="resetAnalytics" class="btn btn-sm btn-danger">
-              <i class="fas fa-trash-alt"></i>
-              Reset Data
-            </button>
           </div>
         </div>
       </main>
     </div>
-    <script type="module" src="js/analyticsDisplay.js"></script>
+
+    <!-- Custom JavaScript -->
+    <script src="js/sharedCache.js"></script>
+    <script type="module" src="js/laporanStok.js"></script>
     <script type="module" src="js/main.js"></script>
-    <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
-      import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
-    </script>
+    <script type="module" src="js/components/sidebar.js"></script>
+    <script type="module" src="js/components/header.js"></script>
   </body>
 </html>
-

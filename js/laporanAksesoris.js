@@ -2950,3 +2950,4 @@ document.addEventListener("DOMContentLoaded", function () {
 
 // Export the handler for potential use in other modules
 export default laporanAksesorisHandler;
+

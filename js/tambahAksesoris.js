@@ -40,6 +40,7 @@ export const aksesorisSaleHandler = {
   modalFormKode: null,
   currentKategori: "kotak",
   editingDocId: null,
+  laporanData: [],
 
   // Fungsi inisialisasi
   async init() {
@@ -75,17 +76,18 @@ export const aksesorisSaleHandler = {
     const year = today.getFullYear();
 
     const formattedDate = `${day}/${month}/${year}`;
-    const tanggalInput = document.getElementById("tanggal");
 
+    // Set tanggal input utama
+    const tanggalInput = document.getElementById("tanggal");
     if (tanggalInput) {
       tanggalInput.value = formattedDate;
     }
 
-    // Set tanggal filter riwayat juga
-    const filterDateInput = document.getElementById("filterDate");
-    if (filterDateInput) {
-      filterDateInput.value = formattedDate;
-    }
+    // Set filter tanggal mulai dan akhir ke hari ini
+    const filterDateStart = document.getElementById("filterDateStart");
+    const filterDateEnd = document.getElementById("filterDateEnd");
+    if (filterDateStart) filterDateStart.value = formattedDate;
+    if (filterDateEnd) filterDateEnd.value = formattedDate;
   },
 
   // Fungsi untuk inisialisasi elemen DOM
@@ -221,6 +223,16 @@ export const aksesorisSaleHandler = {
       });
     }
 
+    // Event listener untuk tombol print laporan
+    if (document.getElementById("btnPrintLaporan")) {
+      document.getElementById("btnPrintLaporan").addEventListener("click", () => {
+        this.printLaporanTambahBarang();
+      });
+    }
+
+    // Initialize datepicker untuk filter tanggal
+    this.initFilterDatepickers();
+
     // Initialize datepicker for filter date
     if (this.elements.filterDate) {
       $(this.elements.filterDate).datepicker({
@@ -238,6 +250,30 @@ export const aksesorisSaleHandler = {
         });
       }
     }
+  },
+
+  // Method untuk inisialisasi datepicker filter
+  initFilterDatepickers() {
+    // Datepicker untuk filter start
+    $("#filterDateStart").datepicker({
+      format: "dd/mm/yyyy",
+      autoclose: true,
+      language: "id",
+      todayHighlight: true,
+    });
+
+    // Datepicker untuk filter end
+    $("#filterDateEnd").datepicker({
+      format: "dd/mm/yyyy",
+      autoclose: true,
+      language: "id",
+      todayHighlight: true,
+    });
+
+    // Calendar icon click handlers
+    $(".input-group-text").on("click", function () {
+      $(this).siblings("input").datepicker("show");
+    });
   },
 
   // Fungsi untuk memasang event listener pencarian
@@ -740,118 +776,287 @@ export const aksesorisSaleHandler = {
     }
   },
 
-  // Fungsi untuk memuat riwayat penambahan stok dengan caching
-  async loadStockAdditionHistory() {
-    try {
-      const filterDateInput = document.getElementById("filterDate");
-      if (!filterDateInput) return;
+  printLaporanTambahBarang() {
+  const filterDateStart = document.getElementById("filterDateStart");
+  const filterDateEnd = document.getElementById("filterDateEnd");
 
-      const filterDateStr = filterDateInput.value;
-      if (!filterDateStr) return;
+  if (!filterDateStart?.value || !filterDateEnd?.value) {
+    this.showErrorNotification("Silakan pilih rentang tanggal terlebih dahulu!");
+    return;
+  }
 
-      // Check cache for this date
-      if (this.cache.stockAdditions.data[filterDateStr] && this.cache.stockAdditions.lastFetched[filterDateStr]) {
-        const cacheTime = this.cache.stockAdditions.lastFetched[filterDateStr];
-        const now = new Date().getTime();
-        const cacheExpiry = 5 * 60 * 1000; // 5 minutes
+  if (!this.laporanData || this.laporanData.length === 0) {
+    this.showErrorNotification("Tidak ada data untuk dicetak pada rentang tanggal tersebut!");
+    return;
+  }
 
-        if (now - cacheTime < cacheExpiry) {
-          console.log(`Using cached stock additions for ${filterDateStr}`);
-          this.renderStockAdditionHistory(this.cache.stockAdditions.data[filterDateStr]);
-          return;
-        }
-      }
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    this.showErrorNotification("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak.");
+    return;
+  }
 
-      // Parse tanggal filter
-      const dateParts = filterDateStr.split("/");
-      const filterDate = new Date(dateParts[2], dateParts[1] - 1, dateParts[0]);
+  const html = this.generateLaporanHTML();
+  printWindow.document.write(html);
+  printWindow.document.close();
+},
 
-      // Set waktu ke awal hari
-      filterDate.setHours(0, 0, 0, 0);
+// Method untuk generate HTML laporan
+generateLaporanHTML() {
+  const filterDateStart = document.getElementById("filterDateStart").value;
+  const filterDateEnd = document.getElementById("filterDateEnd").value;
+  
+  // Group data by kategori
+  const groupedData = this.laporanData.reduce((acc, item) => {
+    const kategori = item.jenisText || "Lainnya";
+    if (!acc[kategori]) acc[kategori] = [];
+    acc[kategori].push(item);
+    return acc;
+  }, {});
 
-      // Set waktu ke akhir hari untuk end date
-      const endDate = new Date(filterDate);
-      endDate.setHours(23, 59, 59, 999);
+  // Hitung total
+  const totalItems = this.laporanData.reduce((sum, item) => sum + (item.jumlah || 0), 0);
 
-      // Query penambahan stok berdasarkan tanggal
-      const stockAdditionsRef = collection(firestore, "stockAdditions");
-      const q = query(
-        stockAdditionsRef,
-        where("timestamp", ">=", filterDate),
-        where("timestamp", "<=", endDate),
-        orderBy("timestamp", "desc")
-      );
+  let laporanHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Laporan Tambah Barang</title>
+      <style>
+        @page { size: A4; margin: 1cm; }
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 0; }
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .header h2 { margin: 5px 0; }
+        .header h3 { margin: 5px 0; color: #666; }
+        .period { text-align: center; margin: 15px 0; font-weight: bold; }
+        .category-section { margin: 20px 0; }
+        .category-title { background-color: #f0f0f0; padding: 8px; font-weight: bold; border: 1px solid #ccc; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+        th { background-color: #f8f9fa; font-weight: bold; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .summary { margin-top: 20px; border-top: 2px solid #000; padding-top: 10px; }
+        .summary table { width: 50%; margin-left: auto; }
+        .footer { margin-top: 30px; text-align: right; }
+        .no-data { text-align: center; color: #666; font-style: italic; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h2>MELATI GOLD SHOP</h2>
+        <h3>JL. DIPONEGORO NO. 116</h3>
+        <h2>LAPORAN PENAMBAHAN STOK</h2>
+      </div>
+      
+      <div class="period">
+        Periode: ${filterDateStart} s/d ${filterDateEnd}
+      </div>
+  `;
 
-      const snapshot = await getDocs(q);
+  // Tambahkan data per kategori
+  Object.entries(groupedData).forEach(([kategori, items]) => {
+    const subtotal = items.reduce((sum, item) => sum + (item.jumlah || 0), 0);
+    
+    laporanHTML += `
+      <div class="category-section">
+        <div class="category-title">${kategori.toUpperCase()} (${subtotal} pcs)</div>
+        <table>
+          <thead>
+            <tr>
+              <th width="15%">Tanggal</th>
+              <th width="20%">Kode Barang</th>
+              <th width="45%">Nama Barang</th>
+              <th width="20%" class="text-center">Jumlah</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
 
-      // Process data
-      const historyData = [];
-
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.items && data.items.length) {
-          data.items.forEach((item) => {
-            historyData.push({
-              id: doc.id,
-              timestamp: data.timestamp,
-              kodeText: item.kodeText,
-              nama: item.nama,
-              jumlah: item.jumlah,
-            });
-          });
-        }
-      });
-
-      // Update cache
-      this.cache.stockAdditions.data[filterDateStr] = historyData;
-      this.cache.stockAdditions.lastFetched[filterDateStr] = new Date().getTime();
-
-      // Render data
-      this.renderStockAdditionHistory(historyData);
-    } catch (error) {
-      console.error("Error loading stock addition history:", error);
-      const tableBody = document.querySelector("#tableRiwayatTambahStok tbody");
-      if (tableBody) {
-        tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Error: ${error.message}</td></tr>`;
-      }
-    }
-  },
-
-  // Render riwayat penambahan stok ke tabel
-  renderStockAdditionHistory(historyData) {
-    const tableBody = document.querySelector("#tableRiwayatTambahStok tbody");
-    if (!tableBody) return;
-
-    if (!historyData || historyData.length === 0) {
-      const filterDateStr = document.getElementById("filterDate").value;
-      tableBody.innerHTML = `<tr><td colspan="4" class="text-center">Tidak ada data penambahan stok pada tanggal ${filterDateStr}</td></tr>`;
-      return;
-    }
-
-    let html = "";
-
-    historyData.forEach((item) => {
-      const date = item.timestamp && item.timestamp.toDate ? item.timestamp.toDate() : new Date();
-
-      const formattedDate = `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
-        .toString()
-        .padStart(2, "0")}/${date.getFullYear()} ${date.getHours().toString().padStart(2, "0")}:${date
-        .getMinutes()
-        .toString()
-        .padStart(2, "0")}`;
-
-      html += `
+    items.forEach(item => {
+      laporanHTML += `
         <tr>
-          <td>${formattedDate}</td>
+          <td>${item.tanggal || "-"}</td>
           <td>${item.kodeText || "-"}</td>
           <td>${item.nama || "-"}</td>
-          <td>${item.jumlah || 0}</td>
+          <td class="text-center"><strong>${item.jumlah || 0}</strong></td>
         </tr>
       `;
     });
 
-    tableBody.innerHTML = html;
-  },
+    laporanHTML += `
+          </tbody>
+          <tfoot>
+            <tr style="background-color: #f8f9fa;">
+              <td colspan="3" class="text-right"><strong>Subtotal ${kategori}:</strong></td>
+              <td class="text-center"><strong>${subtotal} pcs</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
+  });
+
+  laporanHTML += `
+      <div class="summary">
+        <table>
+          <tr>
+            <td><strong>TOTAL KESELURUHAN:</strong></td>
+            <td class="text-center"><strong>${totalItems} pcs</strong></td>
+          </tr>
+        </table>
+      </div>
+      
+      <div class="footer">
+        <p>Dicetak pada: ${new Date().toLocaleString('id-ID')}</p>
+        <p>Admin: ${localStorage.getItem('currentUser') || 'Admin'}</p>
+      </div>
+      
+      <script>
+        window.onload = function() {
+          setTimeout(() => {
+            window.print();
+            setTimeout(() => window.close(), 500);
+          }, 500);
+        };
+      </script>
+    </body>
+    </html>
+  `;
+
+  return laporanHTML;
+},
+
+  // Fungsi untuk memuat riwayat penambahan stok dengan caching
+ async loadStockAdditionHistory() {
+  try {
+    const filterDateStart = document.getElementById("filterDateStart");
+    const filterDateEnd = document.getElementById("filterDateEnd");
+    
+    // Validasi elemen ada dan memiliki value
+    if (!filterDateStart || !filterDateEnd || !filterDateStart.value || !filterDateEnd.value) {
+      console.log("Filter tanggal belum diset, menggunakan tanggal hari ini");
+      this.setDefaultFilterDates();
+      return;
+    }
+
+    // Parse tanggal filter dengan validasi
+    const startParts = filterDateStart.value.split("/");
+    const endParts = filterDateEnd.value.split("/");
+    
+    if (startParts.length !== 3 || endParts.length !== 3) {
+      throw new Error("Format tanggal tidak valid");
+    }
+
+    const startDate = new Date(startParts[2], startParts[1] - 1, startParts[0]);
+    const endDate = new Date(endParts[2], endParts[1] - 1, endParts[0]);
+    
+    // Validasi tanggal valid
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      throw new Error("Tanggal tidak valid");
+    }
+    
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    // Query data
+    const stockAdditionsRef = collection(firestore, "stockAdditions");
+    const q = query(
+      stockAdditionsRef,
+      where("timestamp", ">=", startDate),
+      where("timestamp", "<=", endDate),
+      orderBy("timestamp", "desc")
+    );
+
+    const snapshot = await getDocs(q);
+    const historyData = [];
+
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.items && data.items.length) {
+        data.items.forEach((item) => {
+          historyData.push({
+            id: doc.id,
+            timestamp: data.timestamp,
+            tanggal: data.tanggal,
+            jenisText: data.jenisText,
+            kodeText: item.kodeText,
+            nama: item.nama,
+            jumlah: item.jumlah,
+          });
+        });
+      }
+    });
+
+    // Simpan data untuk laporan
+    this.laporanData = historyData;
+
+    // Render data
+    this.renderStockAdditionHistory(historyData);
+    
+  } catch (error) {
+    console.error("Error loading stock addition history:", error);
+    this.renderStockAdditionHistory([]); // Render tabel kosong dengan pesan error
+  }
+},
+
+// Method untuk set default filter dates
+setDefaultFilterDates() {
+  const today = new Date();
+  const day = String(today.getDate()).padStart(2, "0");
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const year = today.getFullYear();
+  const formattedDate = `${day}/${month}/${year}`;
+
+  const filterDateStart = document.getElementById("filterDateStart");
+  const filterDateEnd = document.getElementById("filterDateEnd");
+  
+  if (filterDateStart) filterDateStart.value = formattedDate;
+  if (filterDateEnd) filterDateEnd.value = formattedDate;
+  
+  // Load data setelah set tanggal
+  setTimeout(() => this.loadStockAdditionHistory(), 100);
+},
+
+
+  // Render riwayat penambahan stok ke tabel
+ renderStockAdditionHistory(historyData = []) {
+  const tableBody = document.querySelector("#tableRiwayatTambahStok tbody");
+  
+  if (!tableBody) {
+    console.error("Table body element not found");
+    return;
+  }
+
+  // Clear existing content
+  tableBody.innerHTML = "";
+
+  if (!historyData || historyData.length === 0) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="4" class="text-center text-muted py-4">
+          <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+          <span>Tidak ada data penambahan stok pada periode ini</span>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  // Render data
+  historyData.forEach((item) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${item.tanggal || "-"}</td>
+      <td>${item.kodeText || "-"}</td>
+      <td>${item.nama || "-"}</td>
+      <td class="text-center">
+        <span class="badge bg-primary">${item.jumlah || 0} pcs</span>
+      </td>
+    `;
+    tableBody.appendChild(row);
+  });
+},
 
   // Fungsi untuk menampilkan loading indicator
   showLoading(isLoading) {

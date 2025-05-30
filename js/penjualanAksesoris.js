@@ -14,281 +14,645 @@ import {
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
+// Global variables
 let activeLockRow = null;
 let currentTransactionData = null;
 
-// Fungsi untuk menampilkan alert yang lebih menarik
-function showAlert(message, title = "Informasi", type = "info") {
-  return Swal.fire({
-    title: title,
-    text: message,
-    icon: type, // 'success', 'error', 'warning', 'info', 'question'
-    confirmButtonText: 'OK',
-    confirmButtonColor: '#0d6efd' // Warna primary Bootstrap
-  });
-}
+// Enhanced Cache management with localStorage and TTL
+const cacheManager = {
+  prefix: "melati_penjualan_",
+  stockTTL: 10 * 60 * 1000, // 10 menit untuk data stok
+  salesTTL: 2 * 60 * 1000, // 2 menit untuk data penjualan
 
-// Fungsi untuk konfirmasi
-function showConfirm(message, title = "Konfirmasi") {
-  return Swal.fire({
-    title: title,
-    text: message,
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'Ya',
-    cancelButtonText: 'Batal',
-    confirmButtonColor: '#0d6efd',
-    cancelButtonColor: '#6c757d'
-  }).then((result) => {
-    return result.isConfirmed;
-  });
-}
+  set(key, data, ttl) {
+    try {
+      const item = {
+        data,
+        timestamp: Date.now(),
+        ttl,
+        version: Date.now(), // untuk multi-device sync
+      };
+      localStorage.setItem(this.prefix + key, JSON.stringify(item));
+    } catch (error) {
+      console.warn("Cache set failed:", error);
+      // Fallback: clear old cache if storage is full
+      this.clearOldCache();
+      try {
+        localStorage.setItem(this.prefix + key, JSON.stringify(item));
+      } catch (retryError) {
+        console.error("Cache retry failed:", retryError);
+      }
+    }
+  },
 
-// Wait for document to be ready
-$(document).ready(function () {
-  // Pastikan event listener hanya ditambahkan sekali
-  $("#btnPrintReceipt")
-    .off("click")
-    .on("click", function () {
-      printReceipt();
-    });
+  get(key) {
+    try {
+      const item = JSON.parse(localStorage.getItem(this.prefix + key));
+      if (!item) return null;
 
-  $("#btnPrintInvoice")
-    .off("click")
-    .on("click", function () {
-      printInvoice();
-    });
+      if (Date.now() - item.timestamp > item.ttl) {
+        this.remove(key);
+        return null;
+      }
 
-  // Set tanggal hari ini
-  const today = new Date();
-  const formattedDate = formatDate(today);
-  $("#tanggal").val(formattedDate);
+      return item.data;
+    } catch (error) {
+      console.warn("Cache get failed:", error);
+      this.remove(key);
+      return null;
+    }
+  },
 
-  // Initialize datepicker
-  $("#tanggal").datepicker({
-    format: "dd/mm/yyyy",
-    autoclose: true,
-    language: "id",
-    todayHighlight: true,
-  });
+  remove(key) {
+    try {
+      localStorage.removeItem(this.prefix + key);
+    } catch (error) {
+      console.warn("Cache remove failed:", error);
+    }
+  },
 
-  // Calendar icon click handler
-  $("#calendarIcon").on("click", function () {
-    $("#tanggal").datepicker("show");
-  });
+  clear() {
+    try {
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith(this.prefix))
+        .forEach((key) => localStorage.removeItem(key));
+    } catch (error) {
+      console.warn("Cache clear failed:", error);
+    }
+  },
 
-    // Set focus to sales field when page loads
-    $("#sales").focus();
+  clearOldCache() {
+    const now = Date.now();
+    try {
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith(this.prefix))
+        .forEach((key) => {
+          try {
+            const item = JSON.parse(localStorage.getItem(key));
+            if (item && now - item.timestamp > item.ttl) {
+              localStorage.removeItem(key);
+            }
+          } catch (error) {
+            localStorage.removeItem(key);
+          }
+        });
+    } catch (error) {
+      console.warn("Clear old cache failed:", error);
+    }
+  },
 
-  console.log("Print event handlers initialized");
-});
+  // Check if cache is valid and not too old
+  isValid(key, maxAge = null) {
+    const item = this.get(key);
+    if (!item) return false;
 
-// Stock data cache
-const stockCache = {
-  data: null,
-  lastFetched: null,
+    if (maxAge) {
+      try {
+        const cacheItem = JSON.parse(localStorage.getItem(this.prefix + key));
+        return cacheItem && Date.now() - cacheItem.timestamp < maxAge;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    return true;
+  },
+
+  // Get cache info for debugging
+  getCacheInfo() {
+    const info = {};
+    try {
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith(this.prefix))
+        .forEach((key) => {
+          try {
+            const item = JSON.parse(localStorage.getItem(key));
+            const age = Date.now() - item.timestamp;
+            info[key.replace(this.prefix, "")] = {
+              age: Math.round(age / 1000) + "s",
+              valid: age < item.ttl,
+              size: JSON.stringify(item.data).length,
+            };
+          } catch (error) {
+            info[key.replace(this.prefix, "")] = "corrupted";
+          }
+        });
+    } catch (error) {
+      console.warn("Get cache info failed:", error);
+    }
+    return info;
+  },
 };
 
-// Load stock data on page load
-loadStockData();
+// Utility functions
+const utils = {
+  showAlert: (message, title = "Informasi", type = "info") => {
+    return Swal.fire({
+      title,
+      text: message,
+      icon: type,
+      confirmButtonText: "OK",
+      confirmButtonColor: "#0d6efd",
+    });
+  },
 
-// Function to load stock data from Firestore
-async function loadStockData() {
-  try {
-    // Check cache validity (cache expires after 5 minutes)
-    const now = new Date().getTime();
-    const cacheExpiry = 5 * 60 * 1000; // 5 minutes in milliseconds
+  showConfirm: (message, title = "Konfirmasi") => {
+    return Swal.fire({
+      title,
+      text: message,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Ya",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#0d6efd",
+      cancelButtonColor: "#6c757d",
+    }).then((result) => result.isConfirmed);
+  },
 
-    if (stockCache.lastFetched && now - stockCache.lastFetched < cacheExpiry && stockCache.data) {
-      console.log("Using cached stock data");
-      populateStockTables(stockCache.data);
-      return;
+  formatDate: (date) => {
+    if (!date) return "";
+    try {
+      const d = date.toDate ? date.toDate() : date instanceof Date ? date : new Date(date);
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "";
+    }
+  },
+
+  parseDate: (dateString) => {
+    if (!dateString) return null;
+    try {
+      const parts = dateString.split("/");
+      return new Date(parts[2], parts[1] - 1, parts[0]);
+    } catch (error) {
+      console.error("Error parsing date:", error);
+      return null;
+    }
+  },
+
+  formatRupiah: (angka) => {
+    if (!angka && angka !== 0) return "0";
+    const number = typeof angka === "string" ? parseInt(angka.replace(/\./g, "")) : angka;
+    return new Intl.NumberFormat("id-ID").format(number);
+  },
+
+  showLoading: (show) => {
+    const loader = document.getElementById("loadingIndicator");
+    if (loader) loader.style.display = show ? "flex" : "none";
+  },
+
+  debounce: (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  },
+
+  throttle: (func, limit) => {
+    let inThrottle;
+    return function () {
+      const args = arguments;
+      const context = this;
+      if (!inThrottle) {
+        func.apply(context, args);
+        inThrottle = true;
+        setTimeout(() => (inThrottle = false), limit);
+      }
+    };
+  },
+};
+
+// Main application handler
+const penjualanHandler = {
+  stockData: [],
+  salesData: [],
+  stockCache: new Map(), // In-memory cache untuk session
+  lastStockUpdate: 0,
+  dataTable: null,
+  isLoadingStock: false,
+  isLoadingSales: false,
+  refreshInterval: null,
+
+  // Initialize application
+  async init() {
+    this.setupEventListeners();
+    this.initDatePicker();
+    this.setDefaultDate();
+
+    // Load data with cache
+    await Promise.all([this.loadStockData(), this.loadTodaySales()]);
+
+    this.updateUIForSalesType("aksesoris");
+    $("#sales").focus();
+
+    // Auto refresh every 3 minutes for stock, 1 minute for sales
+    this.startAutoRefresh();
+
+    // Log cache info for debugging
+    console.log("Cache info:", cacheManager.getCacheInfo());
+  },
+
+  // Setup all event listeners
+  setupEventListeners() {
+    // Sales type change
+    $("#jenisPenjualan").on("change", (e) => {
+      this.updateUIForSalesType(e.target.value);
+    });
+
+    // Payment method change
+    $("#metodeBayar").on("change", (e) => {
+      this.handlePaymentMethodChange(e.target.value);
+    });
+
+    // Button events
+    $("#btnTambah").on("click", () => this.showStockModal());
+    $("#btnTambahBaris").on("click", () => this.addNewRow("manual"));
+    $("#btnSimpanPenjualan").on("click", () => this.saveTransaction());
+    $("#btnBatal").on("click", () => this.resetForm());
+    $("#btnPrintReceipt").on("click", (e) => {
+      e.preventDefault();
+      this.printDocument("receipt");
+    });
+
+    $("#btnPrintInvoice").on("click", (e) => {
+      e.preventDefault();
+      this.printDocument("invoice");
+    });
+    $("#refreshStok").on("click", () => this.refreshStock());
+
+    // Input events with debouncing
+    $("#jumlahBayar").on(
+      "input",
+      utils.debounce(() => this.calculateKembalian(), 300)
+    );
+    $("#nominalDP").on(
+      "input",
+      utils.debounce(() => this.calculateSisaPembayaran(), 300)
+    );
+
+    $("#jumlahBayar, #nominalDP").on("blur", function () {
+      const value = $(this).val().replace(/\./g, "");
+      $(this).val(utils.formatRupiah(parseInt(value || 0)));
+    });
+
+    // Search events with throttling
+    $("#searchAksesoris, #searchKotak, #searchLock").on(
+      "input",
+      utils.throttle((e) => {
+        this.searchTable(e.target);
+      }, 300)
+    );
+
+    // Sales validation
+    $("#sales").on("blur", () => this.validateSales());
+    $("#sales").on("focus", function () {
+      $(this).removeClass("is-invalid is-valid");
+      $(this).next(".invalid-feedback").remove();
+    });
+  },
+
+  // Start auto refresh
+  startAutoRefresh() {
+    // Clear existing interval
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
     }
 
-    console.log("Fetching fresh stock data");
-    const stockSnapshot = await getDocs(collection(firestore, "stokAksesoris"));
+    // Refresh sales data every minute
+    this.refreshInterval = setInterval(async () => {
+      try {
+        await this.loadTodaySales(true);
+        console.log("Auto-refreshed sales data");
+      } catch (error) {
+        console.error("Auto-refresh failed:", error);
+      }
+    }, 60 * 1000);
 
-    const stockData = [];
-    stockSnapshot.forEach((doc) => {
-      stockData.push({
-        id: doc.id,
-        ...doc.data(),
+    // Refresh stock data every 5 minutes
+    setInterval(async () => {
+      try {
+        await this.loadStockData(true);
+        console.log("Auto-refreshed stock data");
+      } catch (error) {
+        console.error("Stock auto-refresh failed:", error);
+      }
+    }, 5 * 60 * 1000);
+  },
+
+  // Initialize date picker
+  initDatePicker() {
+    $("#tanggal").datepicker({
+      format: "dd/mm/yyyy",
+      autoclose: true,
+      language: "id",
+      todayHighlight: true,
+    });
+
+    $("#calendarIcon").on("click", () => $("#tanggal").datepicker("show"));
+  },
+
+  // Set default date
+  setDefaultDate() {
+    const today = new Date();
+    $("#tanggal").val(utils.formatDate(today));
+  },
+
+  // Load stock data with enhanced caching
+  async loadStockData(forceRefresh = false) {
+    if (this.isLoadingStock) return;
+
+    try {
+      this.isLoadingStock = true;
+
+      // Check in-memory cache first (fastest)
+      const cacheAge = Date.now() - this.lastStockUpdate;
+      if (!forceRefresh && cacheAge < 5 * 60 * 1000 && this.stockData.length > 0) {
+        console.log("Using in-memory stock cache");
+        this.populateStockTables();
+        return;
+      }
+
+      // Check localStorage cache
+      if (!forceRefresh) {
+        const cachedData = sharedCacheManager.getVersioned("stockData");
+        if (cachedData && cachedData.age < 10 * 60 * 1000) {
+          // 10 menit max
+          console.log("Using localStorage stock cache");
+          this.stockData = cachedData.data;
+          this.stockCache.clear();
+          this.stockData.forEach((item) => {
+            this.stockCache.set(item.kode, item.stokAkhir);
+          });
+          this.lastStockUpdate = Date.now();
+          this.populateStockTables();
+          return;
+        }
+      }
+
+      utils.showLoading(true);
+      console.log("Fetching fresh stock data from Firestore");
+
+      // Optimized: Single query untuk stok dengan filter
+      const stockSnapshot = await getDocs(
+        query(
+          collection(firestore, "stokAksesoris"),
+          where("stokAkhir", ">", 0) // Hanya ambil yang ada stoknya
+        )
+      );
+
+      const stockData = [];
+      stockSnapshot.forEach((doc) => {
+        const data = doc.data();
+        stockData.push({
+          id: doc.id,
+          ...data,
+          lastChecked: Date.now(), // Track kapan terakhir dicek
+        });
+
+        // Update in-memory cache
+        this.stockCache.set(data.kode, data.stokAkhir || 0);
       });
-    });
 
-    // Update cache
-    stockCache.data = stockData;
-    stockCache.lastFetched = now;
+      // Cache dengan TTL yang lebih panjang
+      sharedCacheManager.setVersioned("stockData", stockData, 15 * 60 * 1000);
+      this.stockData = stockData;
+      this.lastStockUpdate = Date.now();
+      this.populateStockTables();
+    } catch (error) {
+      console.error("Error loading stock:", error);
+      utils.showAlert("Gagal memuat data stok: " + error.message, "Error", "error");
+    } finally {
+      this.isLoadingStock = false;
+      utils.showLoading(false);
+    }
+  },
 
-    // Populate stock tables
-    populateStockTables(stockData);
-  } catch (error) {
-    console.error("Error loading stock data:", error);
-    showAlert("Gagal memuat data stok: " + error.message);
-  }
-}
+  // Optimized stock checking - gunakan cache dulu
+  async getStockForItem(kode) {
+    // Check in-memory cache first
+    if (this.stockCache.has(kode)) {
+      const cachedStock = this.stockCache.get(kode);
+      const cacheAge = Date.now() - this.lastStockUpdate;
 
-// Function to populate stock tables
-function populateStockTables(stockData) {
-  // Populate aksesoris table
-  const aksesorisTable = $("#tableAksesoris tbody");
-  aksesorisTable.empty();
+      // Jika cache masih fresh (< 5 menit), gunakan cache
+      if (cacheAge < 5 * 60 * 1000) {
+        return cachedStock;
+      }
+    }
 
-  const aksesorisItems = stockData.filter((item) => 
-    item.kategori === "aksesoris" && (item.stokAkhir > 0) // Only show items with stock > 0
-  );
+    // Jika tidak ada di cache atau cache expired, ambil dari stockData
+    const stockItem = this.stockData.find((item) => item.kode === kode);
+    if (stockItem) {
+      this.stockCache.set(kode, stockItem.stokAkhir);
+      return stockItem.stokAkhir;
+    }
 
-  if (aksesorisItems.length === 0) {
-    aksesorisTable.append('<tr><td colspan="3" class="text-center">Tidak ada data aksesoris</td></tr>');
-  } else {
-    aksesorisItems.forEach((item) => {
-      const row = `
-          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${item.hargaJual || 0}">
+    // Last resort: query Firestore (jarang terjadi)
+    try {
+      const stockQuery = query(collection(firestore, "stokAksesoris"), where("kode", "==", kode));
+      const stockSnapshot = await getDocs(stockQuery);
+
+      if (!stockSnapshot.empty) {
+        const stock = stockSnapshot.docs[0].data().stokAkhir || 0;
+        this.stockCache.set(kode, stock);
+        return stock;
+      }
+    } catch (error) {
+      console.warn("Failed to get stock for", kode, error);
+    }
+
+    return 0;
+  },
+
+  // Load today's sales data with caching
+  async loadTodaySales(forceRefresh = false) {
+    if (this.isLoadingSales) return;
+
+    try {
+      this.isLoadingSales = true;
+
+      // Check cache first
+      if (!forceRefresh) {
+        const cachedData = cacheManager.get("todaySales");
+        if (cachedData) {
+          console.log("Using cached sales data");
+          this.salesData = cachedData;
+          return;
+        }
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const q = query(
+        collection(firestore, "penjualanAksesoris"),
+        where("timestamp", ">=", Timestamp.fromDate(today)),
+        where("timestamp", "<", Timestamp.fromDate(tomorrow)),
+        orderBy("timestamp", "desc")
+      );
+
+      const snapshot = await getDocs(q);
+      const salesData = [];
+
+      snapshot.forEach((doc) => {
+        salesData.push({ id: doc.id, ...doc.data() });
+      });
+
+      // Cache with shorter TTL for sales data
+      cacheManager.set("todaySales", salesData, cacheManager.salesTTL);
+      this.salesData = salesData;
+    } catch (error) {
+      console.error("Error loading sales:", error);
+      utils.showAlert("Gagal memuat data penjualan: " + error.message, "Error", "error");
+    } finally {
+      this.isLoadingSales = false;
+    }
+  },
+
+  // Populate stock tables
+  // Perbaiki method populateStockTables untuk tidak menampilkan kolom stok
+  populateStockTables() {
+    const categories = {
+      aksesoris: "#tableAksesoris",
+      kotak: "#tableKotak",
+    };
+
+    Object.entries(categories).forEach(([category, selector]) => {
+      const tbody = $(`${selector} tbody`);
+      tbody.empty();
+
+      const items = this.stockData.filter((item) => item.kategori === category);
+
+      if (items.length === 0) {
+        tbody.append(`<tr><td colspan="2" class="text-center">Tidak ada data ${category}</td></tr>`);
+      } else {
+        items.forEach((item) => {
+          const row = `
+          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-harga="${item.hargaJual || 0}">
             <td>${item.kode || "-"}</td>
             <td>${item.nama || "-"}</td>
-            <td>${item.stokAkhir || 0}</td>
           </tr>
         `;
-      aksesorisTable.append(row);
+          tbody.append(row);
+        });
+      }
     });
-  }
 
-  // Populate kotak table
-  const kotakTable = $("#tableKotak tbody");
-  kotakTable.empty();
+    // Populate lock table (using aksesoris data)
+    const lockTable = $("#tableLock tbody");
+    lockTable.empty();
 
-  const kotakItems = stockData.filter((item) => 
-    item.kategori === "kotak" && (item.stokAkhir > 0) // Only show items with stock > 0
-  );
+    const lockItems = this.stockData.filter((item) => item.kategori === "aksesoris");
 
-  if (kotakItems.length === 0) {
-    kotakTable.append('<tr><td colspan="3" class="text-center">Tidak ada data kotak</td></tr>');
-  } else {
-    kotakItems.forEach((item) => {
-      const row = `
-          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${item.hargaJual || 0}">
-            <td>${item.kode || "-"}</td>
-            <td>${item.nama || "-"}</td>
-            <td>${item.stokAkhir || 0}</td>
-          </tr>
-        `;
-      kotakTable.append(row);
-    });
-  }
-
-  // Populate lock table (menggunakan data yang sama dengan aksesoris)
-  const lockTable = $("#tableLock tbody");
-  lockTable.empty();
-
-  const lockItems = stockData.filter((item) => 
-    item.kategori === "aksesoris" && (item.stokAkhir > 0) // Only show items with stock > 0
-  );
-
-  if (lockItems.length === 0) {
-    lockTable.append('<tr><td colspan="3" class="text-center">Tidak ada data lock</td></tr>');
-  } else {
-    lockItems.forEach((item) => {
-      const row = `
-        <tr data-kode="${item.kode}" data-nama="${item.nama}" data-stok="${item.stokAkhir || 0}" data-harga="${item.hargaJual || 0}">
+    if (lockItems.length === 0) {
+      lockTable.append('<tr><td colspan="2" class="text-center">Tidak ada data lock</td></tr>');
+    } else {
+      lockItems.forEach((item) => {
+        const row = `
+        <tr data-kode="${item.kode}" data-nama="${item.nama}" data-harga="${item.hargaJual || 0}">
           <td>${item.kode || "-"}</td>
           <td>${item.nama || "-"}</td>
-          <td>${item.stokAkhir || 0}</td>
         </tr>
       `;
-      lockTable.append(row);
+        lockTable.append(row);
+      });
+    }
+
+    // Attach click handlers
+    this.attachTableRowClickHandlers();
+  },
+
+  // Attach table row click handlers
+  attachTableRowClickHandlers() {
+    // Remove existing handlers to prevent duplicates
+    $("#tableAksesoris tbody tr, #tableKotak tbody tr, #tableLock tbody tr").off("click");
+
+    // Aksesoris table
+    $("#tableAksesoris tbody tr").on("click", function () {
+      if ($(this).data("kode")) {
+        const data = {
+          kode: $(this).data("kode"),
+          nama: $(this).data("nama"),
+          harga: $(this).data("harga"),
+        };
+        penjualanHandler.addAksesorisToTable(data);
+        $("#modalPilihAksesoris").modal("hide");
+      }
     });
-  }
 
-  // Attach event handlers for table row clicks
-  attachTableRowClickHandlers();
-}
+    // Kotak table
+    $("#tableKotak tbody tr").on("click", function () {
+      if ($(this).data("kode")) {
+        const data = {
+          kode: $(this).data("kode"),
+          nama: $(this).data("nama"),
+          harga: $(this).data("harga"),
+        };
+        penjualanHandler.addKotakToTable(data);
+        $("#modalPilihKotak").modal("hide");
+      }
+    });
 
-// Function to attach click handlers to table rows
-function attachTableRowClickHandlers() {
-  // Aksesoris table row click
-  $("#tableAksesoris tbody tr").on("click", function() {
-    if ($(this).data('kode')) {
-      const kode = $(this).data("kode");
-      const nama = $(this).data("nama");
-      const stok = $(this).data("stok");
-      const harga = $(this).data("harga");
+    // Lock table
+    $("#tableLock tbody tr").on("click", function () {
+      if ($(this).data("kode") && activeLockRow) {
+        const kode = $(this).data("kode");
 
-      // Add to table
-      addAksesorisToTable(kode, nama, stok, harga);
-
-      // Close modal
-      $("#modalPilihAksesoris").modal("hide");
-    }
-  });
-
-  // Kotak table row click
-  $("#tableKotak tbody tr").on("click", function() {
-    if ($(this).data('kode')) {
-      const kode = $(this).data("kode");
-      const nama = $(this).data("nama");
-      const stok = $(this).data("stok");
-      const harga = $(this).data("harga");
-
-      // Add to table
-      addKotakToTable(kode, nama, stok, harga);
-
-      // Close modal
-      $("#modalPilihKotak").modal("hide");
-    }
-  });
-
-  // Lock table row click
-  $("#tableLock tbody tr").on("click", function() {
-    if ($(this).data('kode')) {
-      const kode = $(this).data("kode");
-      const nama = $(this).data("nama");
-
-      if (activeLockRow) {
-        // Jika ini adalah baris input
         if (activeLockRow.hasClass("input-row")) {
-          $("#lockInputKodeLock").val(kode);
+          $("#manualInputKodeLock").val(kode);
         } else {
-          // Jika ini adalah baris normal
           activeLockRow.find(".kode-lock-input").val(kode);
         }
 
-        // Reset referensi
         activeLockRow = null;
+        $("#modalPilihLock").modal("hide");
       }
+    });
+  },
 
-      // Tutup modal
-      $("#modalPilihLock").modal("hide");
+  // Show stock modal based on sales type
+  showStockModal() {
+    const salesType = $("#jenisPenjualan").val();
+
+    if (salesType === "aksesoris") {
+      $("#modalPilihAksesoris").modal("show");
+    } else if (salesType === "kotak") {
+      $("#modalPilihKotak").modal("show");
     }
-  });
-}
+  },
 
-// Function to add aksesoris to table
-function addAksesorisToTable(kode, nama, stok, harga) {
-  // Default values
-  const jumlah = 1;
-  const berat = "";
-  const totalHarga = "";
-  const kadar = ""; // Default empty kadar
-
-  // Create new row
-  const newRow = `
+  // Add aksesoris to table
+  addAksesorisToTable(data) {
+    const { kode, nama, harga } = data;
+    const newRow = `
     <tr>
       <td>${kode}</td>
       <td>${nama}</td>
       <td>
-        <input type="number" class="form-control form-control-sm jumlah-input" value="${jumlah}" min="1" max="${stok}">
+        <input type="number" class="form-control form-control-sm jumlah-input" value="1" min="1">
       </td>
       <td>
-        <input type="text" class="form-control form-control-sm kadar-input" value="${kadar}" placeholder="Kadar" required>
+        <input type="text" class="form-control form-control-sm kadar-input" value="" placeholder="Kadar" required>
       </td>
       <td>
-        <input type="text" class="form-control form-control-sm berat-input" value="${berat}" min="0.01" step="0.01" placeholder="0.00" required>
+        <input type="text" class="form-control form-control-sm berat-input" value="" placeholder="0.00" required>
       </td>
       <td>
         <input type="text" class="form-control form-control-sm harga-per-gram-input" value="0" readonly>
       </td>
       <td>
-        <input type="text" class="form-control form-control-sm total-harga-input" value="${totalHarga}" placeholder="0" required>
+        <input type="text" class="form-control form-control-sm total-harga-input" value="" placeholder="0" required>
       </td>
       <td>
         <button class="btn btn-sm btn-danger btn-delete">
@@ -298,41 +662,32 @@ function addAksesorisToTable(kode, nama, stok, harga) {
     </tr>
   `;
 
-  // Add row to table
-  $("#tableAksesorisDetail tbody").append(newRow);
+    $("#tableAksesorisDetail tbody").append(newRow);
+    const $newRow = $("#tableAksesorisDetail tbody tr:last-child");
+    $newRow.find(".kadar-input").focus();
+    this.attachRowEventHandlers($newRow);
+    this.updateGrandTotal("aksesoris");
+  },
 
-  // Focus on the kadar input of the new row
-  const $newRow = $("#tableAksesorisDetail tbody tr:last-child");
-  $newRow.find(".kadar-input").focus();
+  // Add kotak to table
+  addKotakToTable(data) {
+    const { kode, nama, harga } = data;
+    const jumlah = 1;
+    const totalHarga = jumlah * (harga || 0);
 
-  // Attach event handlers to the new row
-  attachRowEventHandlers($newRow);
-
-  // Update grand total
-  updateGrandTotal("aksesoris");
-}
-
-
-// Function to add kotak to table
-function addKotakToTable(kode, nama, stok, harga) {
-  // Default values
-  const jumlah = 1;
-  const totalHarga = jumlah * harga;
-
-  // Create new row
-  const newRow = `
+    const newRow = `
     <tr>
       <td>${kode}</td>
       <td>${nama}</td>
       <td>
-        <input type="number" class="form-control form-control-sm jumlah-input" value="${jumlah}" min="1" max="${stok}">
+        <input type="number" class="form-control form-control-sm jumlah-input" value="${jumlah}" min="1">
       </td>
       <td>
-        <input type="text" class="form-control form-control-sm harga-input" value="${parseInt(harga).toLocaleString(
-          "id-ID"
+        <input type="text" class="form-control form-control-sm harga-input" value="${utils.formatRupiah(
+          harga || 0
         )}" required>
       </td>
-      <td class="total-harga">${parseInt(totalHarga).toLocaleString("id-ID")}</td>
+      <td class="total-harga">${utils.formatRupiah(totalHarga)}</td>
       <td>
         <button class="btn btn-sm btn-danger btn-delete">
           <i class="fas fa-trash"></i>
@@ -341,325 +696,332 @@ function addKotakToTable(kode, nama, stok, harga) {
     </tr>
   `;
 
-  // Add row to table
-  $("#tableKotakDetail tbody").append(newRow);
+    $("#tableKotakDetail tbody").append(newRow);
+    const $newRow = $("#tableKotakDetail tbody tr:last-child");
+    $newRow.find(".jumlah-input").focus();
+    this.attachRowEventHandlers($newRow);
+    this.updateGrandTotal("kotak");
+  },
 
-  // Focus on the jumlah input of the new row
-  const $newRow = $("#tableKotakDetail tbody tr:last-child");
-  $newRow.find(".jumlah-input").focus();
+  // Attach row event handlers
+  attachRowEventHandlers($row) {
+    // Remove existing handlers
+    $row.find("input, button").off();
 
-  // Attach event handlers to the new row
-  attachRowEventHandlers($newRow);
+    if ($row.closest("table").attr("id") === "tableAksesorisDetail") {
+      this.attachAksesorisRowHandlers($row);
+    } else if ($row.closest("table").attr("id") === "tableKotakDetail") {
+      this.attachKotakRowHandlers($row);
+    }
 
-  // Update grand total
-  updateGrandTotal("kotak");
-}
+    // Delete button handler
+    $row.find(".btn-delete").on("click", () => {
+      const tableId = $row.closest("table").attr("id");
+      const salesType =
+        tableId === "tableAksesorisDetail" ? "aksesoris" : tableId === "tableKotakDetail" ? "kotak" : "manual";
+      $row.remove();
+      this.updateGrandTotal(salesType);
+    });
+  },
 
-// Function to attach event handlers to row inputs
-function attachRowEventHandlers($row) {
-  // For aksesoris rows
-  if ($row.closest("table").attr("id") === "tableAksesorisDetail") {
-    const $jumlahInput = $row.find(".jumlah-input");
+  // Attach aksesoris row handlers
+  attachAksesorisRowHandlers($row) {
     const $beratInput = $row.find(".berat-input");
-    const $hargaPerGramInput = $row.find(".harga-per-gram-input");
     const $totalHargaInput = $row.find(".total-harga-input");
+    const $hargaPerGramInput = $row.find(".harga-per-gram-input");
     const $kadarInput = $row.find(".kadar-input");
+    const $jumlahInput = $row.find(".jumlah-input");
 
-    // Calculate harga per gram when total harga or berat changes
-    $totalHargaInput.add($beratInput).on("input", function () {
+    // Calculate harga per gram
+    const calculateHargaPerGram = () => {
       const berat = parseFloat($beratInput.val()) || 0;
       let totalHarga = $totalHargaInput.val().replace(/\./g, "");
       totalHarga = parseFloat(totalHarga) || 0;
 
-      // Calculate harga per gram
       let hargaPerGram = 0;
       if (berat > 0) {
         hargaPerGram = totalHarga / berat;
       }
 
-      // Update harga per gram field
-      $hargaPerGramInput.val(Math.round(hargaPerGram).toLocaleString("id-ID"));
+      $hargaPerGramInput.val(utils.formatRupiah(Math.round(hargaPerGram)));
+      this.updateGrandTotal("aksesoris");
+    };
 
-      // Update grand total
-      updateGrandTotal("aksesoris");
-    });
+    $totalHargaInput.add($beratInput).on("input", calculateHargaPerGram);
+    $jumlahInput.on("input", () => this.updateGrandTotal("aksesoris"));
 
-    // Format total harga with thousand separator
+    // Format total harga
     $totalHargaInput.on("blur", function () {
       const value = $(this).val().replace(/\./g, "");
-      $(this).val(parseInt(value || 0).toLocaleString("id-ID"));
+      $(this).val(utils.formatRupiah(parseInt(value || 0)));
     });
 
-    // Update total when jumlah changes
-    $jumlahInput.on("input", function () {
-      // Update grand total
-      updateGrandTotal("aksesoris");
-    });
-
-    // Add keypress event listener to handle Enter key on total harga input
-    $totalHargaInput.on("keypress", function (e) {
+    // Enter key navigation
+    $kadarInput.on("keypress", (e) => {
       if (e.which === 13) {
         e.preventDefault();
-
-        // Format the current value
-        const value = $(this).val().replace(/\./g, "");
-        $(this).val(parseInt(value || 0).toLocaleString("id-ID"));
-
-        // Calculate total from all rows
-        calculateAksesorisTotal();
-
-        // Focus on payment field
-        $("#jumlahBayar").focus();
-      }
-    });
-
-    // Function to calculate total from all aksesoris rows
-    function calculateAksesorisTotal() {
-      let total = 0;
-
-      // Sum up all total prices from each row
-      $("#tableAksesorisDetail tbody tr").each(function () {
-        const totalHarga = $(this).find(".total-harga-input").val().replace(/\./g, "");
-        total += parseInt(totalHarga) || 0;
-      });
-
-      // Update grand total display
-      $("#grand-total-aksesoris").text(total.toLocaleString("id-ID"));
-
-      // Update total in payment section
-      $("#totalOngkos").val(total.toLocaleString("id-ID"));
-    }
-
-    // Add keypress event listener to handle Enter key on kadar input
-    $kadarInput.on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        // Move focus to berat input
         $beratInput.focus();
       }
     });
 
-    // Add keypress event listener to handle Enter key on berat input
-    $beratInput.on("keypress", function (e) {
+    $beratInput.on("keypress", (e) => {
       if (e.which === 13) {
         e.preventDefault();
-        // Move focus to total harga input
         $totalHargaInput.focus();
       }
     });
-  }
 
-  // For kotak rows (keep existing code)
-  if ($row.closest("table").attr("id") === "tableKotakDetail") {
-    const $namaInput = $row.find(".nama-input");
+    $totalHargaInput.on("keypress", (e) => {
+      if (e.which === 13) {
+        e.preventDefault();
+        const value = $(this).val().replace(/\./g, "");
+        $(this).val(utils.formatRupiah(parseInt(value || 0)));
+        calculateHargaPerGram();
+        $("#jumlahBayar").focus();
+      }
+    });
+  },
+
+  // Attach kotak row handlers
+  attachKotakRowHandlers($row) {
     const $jumlahInput = $row.find(".jumlah-input");
     const $hargaInput = $row.find(".harga-input");
     const $totalCell = $row.find(".total-harga");
 
-    // Calculate total on input change
-    $namaInput
-      .add($jumlahInput)
-      .add($hargaInput)
-      .on("input", function () {
-        const jumlah = parseInt($jumlahInput.val()) || 0;
-        const harga = parseInt($hargaInput.val().replace(/\./g, "")) || 0;
-        const total = jumlah * harga;
-        $totalCell.text(total.toLocaleString("id-ID"));
+    const calculateTotal = () => {
+      const jumlah = parseInt($jumlahInput.val()) || 0;
+      const harga = parseInt($hargaInput.val().replace(/\./g, "")) || 0;
+      const total = jumlah * harga;
+      $totalCell.text(utils.formatRupiah(total));
+      this.updateGrandTotal("kotak");
+    };
 
-        // Update grand total
-        updateGrandTotal("kotak");
-      });
+    $jumlahInput.add($hargaInput).on("input", calculateTotal);
 
-    // Format harga with thousand separator
     $hargaInput.on("blur", function () {
       const value = $(this).val().replace(/\./g, "");
-      $(this).val(parseInt(value || 0).toLocaleString("id-ID"));
+      $(this).val(utils.formatRupiah(parseInt(value || 0)));
     });
 
-    // Add keypress event listener to handle Enter key
-    $hargaInput.on("keypress", function (e) {
+    $hargaInput.on("keypress", (e) => {
       if (e.which === 13) {
         e.preventDefault();
-
-        // Format the current value
         const value = $(this).val().replace(/\./g, "");
-        $(this).val(parseInt(value || 0).toLocaleString("id-ID"));
-
-        // Calculate total for this row
-        const $row = $(this).closest("tr");
-        const jumlah = parseInt($row.find(".jumlah-input").val()) || 0;
-        const harga = parseInt(value) || 0;
-        const total = jumlah * harga;
-        $row.find(".total-harga").text(total.toLocaleString("id-ID"));
-
-        // Update grand total
-        updateGrandTotal("kotak");
-
-        // Focus on payment field
+        $(this).val(utils.formatRupiah(parseInt(value || 0)));
+        calculateTotal();
         $("#jumlahBayar").focus();
       }
     });
-  }
+  },
 
-  // Delete button handler
-  $row.find(".btn-delete").on("click", function () {
-    const tableId = $row.closest("table").attr("id");
-    const salesType = tableId === "tableAksesorisDetail" ? "aksesoris" : "kotak";
+  // Update UI for sales type
+  updateUIForSalesType(type) {
+    // Hide all containers
+    $("#aksesorisTableContainer, #kotakTableContainer, #manualTableContainer").hide();
+    $("#btnTambah, #btnTambahBaris").hide();
 
-    $row.remove();
-    updateGrandTotal(salesType);
-  });
-}
+    let detailTitle = "Detail Barang";
 
-// Calculate total price based on input values
-function calculateTotalPrice() {
-  const jumlah = parseFloat($("#inputJumlah").val()) || 0;
-  const berat = parseFloat($("#inputBerat").val()) || 0;
-  const hargaPerGram = parseFloat($("#inputHargaPerGram").val()) || 0;
+    switch (type) {
+      case "aksesoris":
+        $("#aksesorisTableContainer").show();
+        $("#btnTambah").show();
+        detailTitle = "Detail Aksesoris";
+        break;
+      case "kotak":
+        $("#kotakTableContainer").show();
+        $("#btnTambah").show();
+        detailTitle = "Detail Kotak";
+        break;
+      case "manual":
+        $("#manualTableContainer").show();
+        $("#btnTambahBaris").show();
+        detailTitle = "Detail Penjualan Manual";
+        this.resetTableAndAddInputRow("manual");
+        break;
+    }
 
-  const totalHarga = jumlah * berat * hargaPerGram;
-  $("#inputTotalHarga").val(totalHarga.toLocaleString("id-ID"));
-
-  return totalHarga;
-}
-
-// Add event listeners to calculate total price
-$("#inputJumlah, #inputBerat, #inputHargaPerGram").on("input", calculateTotalPrice);
-
-// Handle sales type change
-$("#jenisPenjualan").on("change", function () {
-  const selectedType = $(this).val();
-
-  // Update UI based on selected type
-  updateUIForSalesType(selectedType);
-
-  // Update payment method options based on sales type
-  updatePaymentMethodOptions(selectedType);
-});
-
-// Function to update payment method options based on sales type
-function updatePaymentMethodOptions(salesType) {
-  // Get the current selected payment method
-  const currentMethod = $("#metodeBayar").val();
-
-  // Clear existing options
-  $("#metodeBayar").empty();
-
-  // Add default options
-  $("#metodeBayar").append('<option value="tunai">Tunai</option>');
-
-  // Add DP option only for manual sales type
-  if (salesType === "manual") {
-    $("#metodeBayar").append('<option value="dp">DP</option>');
-  }
-
-  // Add free option for kotak and aksesoris sales type
-  if (salesType === "kotak" || salesType === "aksesoris") {
-    $("#metodeBayar").append('<option value="free">Free</option>');
-  }
-
-  // Try to set the previously selected method if it's still valid
-  if ($("#metodeBayar option[value='" + currentMethod + "']").length > 0) {
-    $("#metodeBayar").val(currentMethod);
-  } else {
-    // Default to tunai if the previous method is no longer available
-    $("#metodeBayar").val("tunai");
-  }
-
-  // Trigger change event to update UI
-  $("#metodeBayar").trigger("change");
-}
-
-// Function to update UI based on sales type
-function updateUIForSalesType(type) {
-  // Hide all table containers first
-  $("#aksesorisTableContainer, #kotakTableContainer, #lockTableContainer, #manualTableContainer").hide();
-
-  // Hide/show appropriate buttons
-  $("#btnTambah, #btnTambahBaris").hide();
-
-  // Update detail title
-  let detailTitle = "Detail Barang";
-
-  // Show appropriate table based on type
-  switch (type) {
-    case "aksesoris":
-      $("#aksesorisTableContainer").show();
-      $("#btnTambah").show(); // Tampilkan tombol "Pilih Kode"
-      detailTitle = "Detail Aksesoris";
-      $(".payment-field").show();
-      break;
-    case "kotak":
-      $("#kotakTableContainer").show();
-      $("#btnTambah").show(); // Tampilkan tombol "Pilih Kode"
-      detailTitle = "Detail Kotak";
-      $(".kotak-only").show();
-      $(".payment-field").show();
-      break;
-    case "gantiLock":
-      $("#lockTableContainer").show();
-      $("#btnTambahBaris").show(); // Tampilkan tombol "Tambah Baris"
-      detailTitle = "Detail Penggantian Lock";
-      $(".kotak-only").hide();
-      $(".payment-field").show();
-      // Reset tabel dan tambahkan baris input
-      resetTableAndAddInputRow("lock");
-      break;
-    case "manual":
-      $("#manualTableContainer").show();
-      $("#btnTambahBaris").show(); // Tampilkan tombol "Tambah Baris"
-      detailTitle = "Detail Penjualan Manual";
-      $(".kotak-only").hide();
-      $(".payment-field").show();
-      // Reset tabel dan tambahkan baris input
-      resetTableAndAddInputRow("manual");
-      break;
-    case "gantiLock":
-      $("#lockTableContainer").show();
-      $("#btnTambah").show(); // Tampilkan tombol "Pilih Kode"
-      $("#btnTambahBaris").show(); // Tetap tampilkan tombol "Tambah Baris"
-      detailTitle = "Detail Penggantian Lock";
-      $(".kotak-only").hide();
-      $(".payment-field").show();
-      // Reset tabel dan tambahkan baris input
-      resetTableAndAddInputRow("lock");
-      break;
-  }
-
-  $("#detailTitle").text(detailTitle);
+    $("#detailTitle").text(detailTitle);
+    this.updatePaymentMethodOptions(type);
+  },
 
   // Update payment method options
-  updatePaymentMethodOptions(type);
-}
+  updatePaymentMethodOptions(salesType) {
+    const currentMethod = $("#metodeBayar").val();
+    $("#metodeBayar").empty();
 
-// Modifikasi fungsi addLockToTable
-function addLockToTable(kode, nama, stok, harga) {
-  // Default values
-  const berat = 0;
-  const totalHarga = 0;
+    $("#metodeBayar").append('<option value="tunai">Tunai</option>');
 
-  // Create new row
-  const newRow = `
-      <tr>
-        <td>${kode}</td>
-        <td>${nama}</td>
+    if (salesType === "manual") {
+      $("#metodeBayar").append('<option value="dp">DP</option>');
+    }
+
+    if (salesType === "kotak" || salesType === "aksesoris") {
+      $("#metodeBayar").append('<option value="free">Free</option>');
+    }
+
+    if ($("#metodeBayar option[value='" + currentMethod + "']").length > 0) {
+      $("#metodeBayar").val(currentMethod);
+    } else {
+      $("#metodeBayar").val("tunai");
+    }
+
+    $("#metodeBayar").trigger("change");
+  },
+
+  // Handle payment method change
+  handlePaymentMethodChange(method) {
+    const salesType = $("#jenisPenjualan").val();
+
+    if (method === "free") {
+      $(".payment-field, .dp-field").hide();
+      $("#totalOngkos").val("0");
+    } else if (method === "dp") {
+      if (salesType === "manual") {
+        $(".payment-field, .dp-field").show();
+      } else {
+        $("#metodeBayar").val("tunai");
+        $(".payment-field").show();
+        $(".dp-field").hide();
+      }
+      this.updateTotal();
+    } else {
+      $(".payment-field").show();
+      $(".dp-field").hide();
+      this.updateTotal();
+    }
+  },
+
+  // Reset table and add input row for manual
+  resetTableAndAddInputRow(type) {
+    $("#tableManualDetail tbody").empty();
+
+    const inputRow = `
+      <tr class="input-row">
+        <td><input type="text" class="form-control form-control-sm" id="manualInputKode" placeholder="Kode"></td>
+        <td><input type="text" class="form-control form-control-sm" id="manualInputNamaBarang" placeholder="Nama barang"></td>
         <td>
           <div class="input-group input-group-sm">
-            <input type="text" class="form-control kode-lock-input" placeholder="Pilih kode" readonly>
-            <button class="btn btn-outline-secondary btn-pilih-kode-lock" type="button">
+            <input type="text" class="form-control" id="manualInputKodeLock" placeholder="Pilih kode" readonly>
+            <button class="btn btn-outline-secondary" id="manualBtnPilihKodeLock" type="button">
               <i class="fas fa-search"></i>
             </button>
           </div>
         </td>
-        <td>
-          <input type="text" class="form-control form-control-sm berat-input" value="${berat}" min="0.01" step="0.01">
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm harga-per-gram-input" value="0" readonly>
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm total-harga-input" value="0">
-        </td>
+        <td><input type="text" class="form-control form-control-sm" id="manualInputKadar" placeholder="Kadar" required></td>
+        <td><input type="text" class="form-control form-control-sm" id="manualInputBerat" placeholder="0.00" required></td>
+        <td><input type="text" class="form-control form-control-sm" id="manualInputHargaPerGram" placeholder="0" readonly></td>
+        <td><input type="text" class="form-control form-control-sm" id="manualInputTotalHarga" placeholder="0" required></td>
+        <td><input type="text" class="form-control form-control-sm" id="manualInputKeterangan" placeholder="Keterangan"></td>
+        <td></td>
+      </tr>
+    `;
+
+    $("#tableManualDetail tbody").append(inputRow);
+    this.attachManualInputHandlers();
+    $("#manualInputKode").focus();
+  },
+
+  // Attach manual input handlers
+  attachManualInputHandlers() {
+    // Remove existing handlers
+    $("#manualBtnPilihKodeLock").off("click");
+    $("#manualInputBerat, #manualInputTotalHarga").off("input");
+
+    // Pilih kode lock button
+    $("#manualBtnPilihKodeLock").on("click", function () {
+      activeLockRow = $(this).closest("tr");
+      $("#modalPilihLock").modal("show");
+    });
+
+    // Calculate harga per gram
+    $("#manualInputBerat, #manualInputTotalHarga").on("input", () => {
+      this.calculateHargaPerGram("manual");
+    });
+
+    // Enter key navigation
+    const inputs = [
+      "#manualInputKode",
+      "#manualInputNamaBarang",
+      "#manualInputKadar",
+      "#manualInputBerat",
+      "#manualInputTotalHarga",
+      "#manualInputKeterangan",
+    ];
+
+    inputs.forEach((selector, index) => {
+      $(selector)
+        .off("keypress")
+        .on("keypress", (e) => {
+          if (e.which === 13) {
+            e.preventDefault();
+            if (index < inputs.length - 1) {
+              $(inputs[index + 1]).focus();
+            } else {
+              this.addNewRow("manual");
+            }
+          }
+        });
+    });
+  },
+
+  // Calculate harga per gram for manual
+  calculateHargaPerGram(type) {
+    const berat = parseFloat($(`#${type}InputBerat`).val()) || 0;
+    const totalHarga = parseFloat($(`#${type}InputTotalHarga`).val().replace(/\./g, "")) || 0;
+
+    let hargaPerGram = 0;
+    if (berat > 0) {
+      hargaPerGram = totalHarga / berat;
+    }
+
+    $(`#${type}InputHargaPerGram`).val(utils.formatRupiah(Math.round(hargaPerGram)));
+  },
+
+  // Add new row for manual
+  addNewRow(type) {
+    const kode = $(`#${type}InputKode`).val() || "-";
+    const namaBarang = $(`#${type}InputNamaBarang`).val();
+    const kodeLock = $(`#${type}InputKodeLock`).val() || "-";
+    const kadar = $(`#${type}InputKadar`).val() || "-";
+    const berat = $(`#${type}InputBerat`).val() || 0;
+    const totalHargaValue = $(`#${type}InputTotalHarga`).val() || "0";
+    const totalHarga = parseFloat(totalHargaValue.replace(/\./g, "")) || 0;
+    const hargaPerGram = $(`#${type}InputHargaPerGram`).val() || "0";
+    const keterangan = $(`#${type}InputKeterangan`).val() || "";
+
+    // Validation
+    if (!namaBarang) {
+      utils.showAlert("Nama barang harus diisi!");
+      $(`#${type}InputNamaBarang`).focus();
+      return;
+    }
+    if (!kadar) {
+      utils.showAlert("Kadar harus diisi!");
+      $(`#${type}InputKadar`).focus();
+      return;
+    }
+    if (berat <= 0) {
+      utils.showAlert("Berat harus lebih dari 0!");
+      $(`#${type}InputBerat`).focus();
+      return;
+    }
+    if (totalHarga <= 0) {
+      utils.showAlert("Total harga harus lebih dari 0!");
+      $(`#${type}InputTotalHarga`).focus();
+      return;
+    }
+
+    const newRow = `
+      <tr>
+        <td>${kode}</td>
+        <td>${namaBarang}</td>
+        <td>${kodeLock}</td>
+        <td>${kadar}</td>
+        <td>${berat}</td>
+        <td>${hargaPerGram}</td>
+        <td class="total-harga">${utils.formatRupiah(totalHarga)}</td>
+        <td class="keterangan">${keterangan}</td>
         <td>
           <button class="btn btn-sm btn-danger btn-delete">
             <i class="fas fa-trash"></i>
@@ -668,725 +1030,294 @@ function addLockToTable(kode, nama, stok, harga) {
       </tr>
     `;
 
-  // Add row to table
-  $("#tableLockDetail tbody").append(newRow);
+    $(`#table${type.charAt(0).toUpperCase() + type.slice(1)}Detail tbody`).append(newRow);
 
-  // Get the new row
-  const $newRow = $("#tableLockDetail tbody tr:last-child");
+    // Clear input row
+    $(
+      `#${type}InputKode, #${type}InputNamaBarang, #${type}InputKodeLock, #${type}InputKadar, #${type}InputBerat, #${type}InputHargaPerGram, #${type}InputTotalHarga, #${type}InputKeterangan`
+    ).val("");
 
-  // Attach event handler for pilih kode lock button
-  $newRow.find(".btn-pilih-kode-lock").on("click", function () {
-    // Set this row as the active row
-    activeLockRow = $newRow;
-
-    // Show modal to select lock code
-    $("#modalPilihLock").modal("show");
-  });
-
-  // Attach other event handlers
-  attachLockRowEventHandlers($newRow);
-
-  // Focus on the berat input
-  $newRow.find(".berat-input").focus();
+    $(`#${type}InputKode`).focus();
+    this.updateGrandTotal(type);
+  },
 
   // Update grand total
-  updateGrandTotal("gantiLock");
-}
+  updateGrandTotal(salesType) {
+    let tableSelector, grandTotalId;
 
-// Fungsi untuk menangani event pada baris lock
-function attachLockRowEventHandlers($row) {
-  const $beratInput = $row.find(".berat-input");
-  const $hargaPerGramInput = $row.find(".harga-per-gram-input");
-  const $totalHargaInput = $row.find(".total-harga-input");
-
-  // Calculate harga per gram when total harga or berat changes
-  $totalHargaInput.add($beratInput).on("input", function () {
-    const berat = parseFloat($beratInput.val()) || 0;
-    let totalHarga = $totalHargaInput.val().replace(/\./g, "");
-    totalHarga = parseFloat(totalHarga) || 0;
-
-    // Calculate harga per gram
-    let hargaPerGram = 0;
-    if (berat > 0) {
-      hargaPerGram = totalHarga / berat;
+    switch (salesType) {
+      case "aksesoris":
+        tableSelector = "#tableAksesorisDetail";
+        grandTotalId = "#grand-total-aksesoris";
+        break;
+      case "kotak":
+        tableSelector = "#tableKotakDetail";
+        grandTotalId = "#grand-total-kotak";
+        break;
+      case "manual":
+        tableSelector = "#tableManualDetail";
+        grandTotalId = "#grand-total-manual";
+        break;
     }
 
-    // Update harga per gram field
-    $hargaPerGramInput.val(Math.round(hargaPerGram).toLocaleString("id-ID"));
+    let total = 0;
 
-    // Update grand total
-    updateGrandTotal("gantiLock");
-  });
-
-  // Format total harga with thousand separator
-  $totalHargaInput.on("blur", function () {
-    const value = $(this).val().replace(/\./g, "");
-    $(this).val(parseInt(value || 0).toLocaleString("id-ID"));
-  });
-
-  // Delete button handler
-  $row.find(".btn-delete").on("click", function () {
-    $row.remove();
-    updateGrandTotal("gantiLock");
-  });
-}
-
-// Function to calculate harga per gram based on total harga and berat
-function calculateHargaPerGram(type) {
-  const berat = parseFloat($(`#${type}InputBerat`).val()) || 0;
-  const totalHarga = parseFloat($(`#${type}InputTotalHarga`).val().replace(/\./g, "").replace(",", ".")) || 0;
-
-  let hargaPerGram = 0;
-  if (berat > 0) {
-    hargaPerGram = totalHarga / berat;
-  }
-
-  $(`#${type}InputHargaPerGram`).val(Math.round(hargaPerGram).toLocaleString("id-ID"));
-}
-
-// Function to add input row if needed
-function addInputRowIfNeeded(type) {
-  let tableSelector, inputRowId;
-
-  if (type === "lock") {
-    tableSelector = "#tableLockDetail";
-    inputRowId = "lockInputRow";
-  } else {
-    // manual
-    tableSelector = "#tableManualDetail";
-    inputRowId = "manualInputRow";
-  }
-
-  // Check if input row already exists
-  if ($(tableSelector + " tbody tr#" + inputRowId).length === 0) {
-    // Create input row
-    const inputRow = `
-      <tr id="${inputRowId}" class="input-row">
-        <td><input type="text" class="form-control form-control-sm" id="${type}InputKode" placeholder="Kode"></td>
-        <td><input type="text" class="form-control form-control-sm" id="${type}InputNamaBarang" placeholder="Nama barang"></td>
-        <td><input type="number" class="form-control form-control-sm" id="${type}InputJumlah" value="1" min="1"></td>
-        <td><input type="text" class="form-control form-control-sm" id="${type}InputBerat" placeholder="0.00"></td>
-        <td><input type="text" class="form-control form-control-sm" id="${type}InputHargaPerGram" placeholder="0" readonly></td>
-        <td><input type="text" class="form-control form-control-sm" id="${type}InputTotalHarga" placeholder="0"></td>
-        <td></td>
-      </tr>
-    `;
-
-    // Add input row to table
-    $(tableSelector + " tbody").prepend(inputRow);
-
-    // Add event listeners to calculate total price
-    $(`#${type}InputJumlah, #${type}InputBerat, #${type}InputHargaPerGram`).on("input", function () {
-      calculateRowTotalPrice(type);
-    });
-  }
-}
-
-// Function to calculate total price for a row
-function calculateRowTotalPrice(type) {
-  const jumlah = parseFloat($(`#${type}InputJumlah`).val()) || 0;
-  const berat = parseFloat($(`#${type}InputBerat`).val()) || 0;
-  const hargaPerGram = parseFloat($(`#${type}InputHargaPerGram`).val()) || 0;
-
-  const totalHarga = jumlah * berat * hargaPerGram;
-  $(`#${type}InputTotalHarga`).val(totalHarga.toLocaleString("id-ID"));
-
-  return totalHarga;
-}
-
-// Add new row from input row
-$("#btnTambahBaris").on("click", function () {
-  const salesType = $("#jenisPenjualan").val();
-
-  if (salesType === "gantiLock" || salesType === "manual") {
-    const type = salesType === "gantiLock" ? "lock" : "manual";
-    addNewRow(type);
-  }
-});
-
-// Handle "Pilih Kode" button click
-$("#btnTambah").on("click", function () {
-  const salesType = $("#jenisPenjualan").val();
-
-  // Show the appropriate modal based on sales type
-  if (salesType === "aksesoris") {
-    $("#modalPilihAksesoris").modal("show");
-  } else if (salesType === "kotak") {
-    $("#modalPilihKotak").modal("show");
-  } else if (salesType === "gantiLock") {
-    // Untuk gantiLock, kita perlu memilih barang yang akan diganti locknya
-    $("#modalPilihAksesoris").modal("show");
-  }
-});
-
-// Handle delete button click for all tables
-$(document).on("click", ".btn-delete", function () {
-  const salesType = $("#jenisPenjualan").val();
-  $(this).closest("tr").remove();
-  updateGrandTotal(salesType);
-});
-
-// Handle payment method change
-$("#metodeBayar").on("change", function () {
-  const method = $(this).val();
-  const salesType = $("#jenisPenjualan").val();
-
-  if (method === "free") {
-    // If free, hide payment fields and set total to 0
-    $(".payment-field, .dp-field").hide();
-    $("#totalOngkos").val("0");
-  } else if (method === "dp") {
-    // If DP, show DP fields (only available for manual sales)
-    if (salesType === "manual") {
-      $(".payment-field, .dp-field").show();
+    if (salesType === "aksesoris") {
+      $(tableSelector + " tbody tr:not(.input-row) .total-harga-input").each(function () {
+        const value = $(this).val().replace(/\./g, "");
+        total += parseFloat(value) || 0;
+      });
+    } else if (salesType === "kotak") {
+      $(tableSelector + " tbody tr:not(.input-row) .total-harga").each(function () {
+        const value = $(this).text().replace(/\./g, "");
+        total += parseFloat(value) || 0;
+      });
     } else {
-      // If somehow DP is selected for non-manual sales, switch back to tunai
-      $("#metodeBayar").val("tunai");
-      $(".payment-field").show();
-      $(".dp-field").hide();
+      $(tableSelector + " tbody tr:not(.input-row) .total-harga").each(function () {
+        const value = $(this).text().replace(/\./g, "");
+        total += parseFloat(value) || 0;
+      });
     }
-    // Recalculate total based on current items
-    updateTotal();
-  } else {
-    // For other methods (tunai)
-    $(".payment-field").show();
-    $(".dp-field").hide();
-    // Recalculate total based on current items
-    updateTotal();
-  }
-});
 
-// Handle nominal DP input
-$("#nominalDP").on("input", function () {
-  calculateSisaPembayaran();
-});
+    $(grandTotalId).text(utils.formatRupiah(total));
+    $("#totalOngkos").val(utils.formatRupiah(total));
 
-// Format nominal DP with thousand separator
-$("#nominalDP").on("blur", function () {
-  const value = $(this).val().replace(/\./g, "");
-  $(this).val(parseInt(value || 0).toLocaleString("id-ID"));
-  calculateSisaPembayaran();
-});
+    if ($("#metodeBayar").val() === "dp") {
+      this.calculateSisaPembayaran();
+    }
+  },
 
-// Calculate sisa pembayaran
-function calculateSisaPembayaran() {
-  const total = parseFloat($("#totalOngkos").val().replace(/\./g, "").replace(",", ".")) || 0;
-  const nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "").replace(",", ".")) || 0;
+  // Update total
+  updateTotal() {
+    const salesType = $("#jenisPenjualan").val();
+    const paymentMethod = $("#metodeBayar").val();
 
-  const sisa = total - nominalDP;
-  $("#sisaPembayaran").val(sisa > 0 ? sisa.toLocaleString("id-ID") : "0");
+    if (paymentMethod === "free") {
+      $("#totalOngkos").val("0");
+      return;
+    }
 
-  // Recalculate kembalian if jumlah bayar is already entered
-  if ($("#jumlahBayar").val()) {
-    calculateKembalian();
-  }
-}
+    let total = 0;
+    const grandTotalSelector =
+      salesType === "aksesoris"
+        ? "#grand-total-aksesoris"
+        : salesType === "kotak"
+        ? "#grand-total-kotak"
+        : "#grand-total-manual";
 
-// Calculate kembalian based on payment method
-function calculateKembalian() {
-  const paymentMethod = $("#metodeBayar").val();
-  const jumlahBayar = parseFloat($("#jumlahBayar").val().replace(/\./g, "").replace(",", ".")) || 0;
+    total = parseFloat($(grandTotalSelector).text().replace(/\./g, "")) || 0;
+    $("#totalOngkos").val(utils.formatRupiah(total));
 
-  if (paymentMethod === "dp") {
-    // For DP method, kembalian = jumlah bayar - sisa pembayaran
-    const sisaPembayaran = parseFloat($("#sisaPembayaran").val().replace(/\./g, "").replace(",", ".")) || 0;
-    const kembalian = jumlahBayar - sisaPembayaran;
-    $("#kembalian").val(kembalian >= 0 ? kembalian.toLocaleString("id-ID") : "0");
-  } else {
-    // For other methods, kembalian = jumlah bayar - total
-    const total = parseFloat($("#totalOngkos").val().replace(/\./g, "").replace(",", ".")) || 0;
-    const kembalian = jumlahBayar - total;
-    $("#kembalian").val(kembalian >= 0 ? kembalian.toLocaleString("id-ID") : "0");
-  }
-}
+    if (paymentMethod === "dp") {
+      this.calculateSisaPembayaran();
+    }
+  },
 
-// Function to update grand total for a specific sales type
-function updateGrandTotal(salesType) {
-  let tableSelector;
-  let grandTotalId;
+  // Calculate sisa pembayaran
+  calculateSisaPembayaran() {
+    const total = parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0;
+    const nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "")) || 0;
+    const sisa = total - nominalDP;
+    $("#sisaPembayaran").val(utils.formatRupiah(sisa > 0 ? sisa : 0));
 
-  switch (salesType) {
-    case "aksesoris":
-      tableSelector = "#tableAksesorisDetail";
-      grandTotalId = "#grand-total-aksesoris";
-      break;
-    case "kotak":
-      tableSelector = "#tableKotakDetail";
-      grandTotalId = "#grand-total-kotak";
-      break;
-    case "gantiLock":
-      tableSelector = "#tableLockDetail";
-      grandTotalId = "#grand-total-lock";
-      break;
-    case "manual":
-      tableSelector = "#tableManualDetail";
-      grandTotalId = "#grand-total-manual";
-      break;
-  }
+    if ($("#jumlahBayar").val()) {
+      this.calculateKembalian();
+    }
+  },
 
-  let total = 0;
+  // Calculate kembalian
+  calculateKembalian() {
+    const paymentMethod = $("#metodeBayar").val();
+    const jumlahBayar = parseFloat($("#jumlahBayar").val().replace(/\./g, "")) || 0;
 
-  // Sum up all total prices
-  if (salesType === "aksesoris") {
-    // For aksesoris, we need to get values from input fields
-    $(tableSelector + " tbody tr:not(.input-row) .total-harga-input").each(function () {
-      const value = $(this).val().replace(/\./g, "").replace(",", ".");
-      total += parseFloat(value) || 0;
-    });
-  } else {
-    // For other types, we get values from text cells
-    $(tableSelector + " tbody tr:not(.input-row) .total-harga").each(function () {
-      const value = $(this).text().replace(/\./g, "").replace(",", ".");
-      total += parseFloat(value) || 0;
-    });
-  }
+    if (paymentMethod === "dp") {
+      const nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "")) || 0;
+      const kembalian = jumlahBayar - nominalDP;
+      $("#kembalian").val(utils.formatRupiah(kembalian >= 0 ? kembalian : 0));
+    } else {
+      const total = parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0;
+      const kembalian = jumlahBayar - total;
+      $("#kembalian").val(utils.formatRupiah(kembalian >= 0 ? kembalian : 0));
+    }
+  },
 
-  // Update grand total display
-  $(grandTotalId).text(total.toLocaleString("id-ID"));
+  // Search table
+  searchTable(input) {
+    const searchText = $(input).val().toLowerCase();
+    const tableId = $(input).attr("id").replace("search", "table");
 
-  // Update total in payment section
-  $("#totalOngkos").val(total.toLocaleString("id-ID"));
+    $(`#${tableId} tbody tr`).each(function () {
+      const kode = $(this).find("td:nth-child(1)").text().toLowerCase();
+      const nama = $(this).find("td:nth-child(2)").text().toLowerCase();
 
-  // If payment method is DP, update sisa pembayaran
-  if ($("#metodeBayar").val() === "dp") {
-    updateSisaPembayaran();
-  }
-}
-
-// Fungsi untuk memperbarui sisa pembayaran
-function updateSisaPembayaran() {
-  const totalStr = $("#totalOngkos").val() || "0";
-  const dpStr = $("#nominalDP").val() || "0";
-
-  const total = parseFloat(totalStr.replace(/\./g, "").replace(",", ".")) || 0;
-  const dp = parseFloat(dpStr.replace(/\./g, "").replace(",", ".")) || 0;
-
-  const sisa = total - dp;
-
-  $("#sisaPembayaran").val(sisa.toLocaleString("id-ID"));
-}
-
-// Fungsi untuk memperbarui kembalian
-function updateKembalian() {
-  const totalStr = $("#totalOngkos").val() || "0";
-  const bayarStr = $("#jumlahBayar").val() || "0";
-
-  const total = parseFloat(totalStr.replace(/\./g, "").replace(",", ".")) || 0;
-  const bayar = parseFloat(bayarStr.replace(/\./g, "").replace(",", ".")) || 0;
-
-  const kembalian = bayar - total;
-
-  $("#kembalian").val(kembalian.toLocaleString("id-ID"));
-}
-
-// Function to update total based on current sales type
-function updateTotal() {
-  const salesType = $("#jenisPenjualan").val();
-  const paymentMethod = $("#metodeBayar").val();
-
-  // If payment method is free, set total to 0
-  if (paymentMethod === "free") {
-    $("#totalOngkos").val("0");
-    return;
-  }
-
-  let total = 0;
-
-  switch (salesType) {
-    case "aksesoris":
-      total = parseFloat($("#grand-total-aksesoris").text().replace(/\./g, "").replace(",", ".")) || 0;
-      break;
-    case "kotak":
-      total = parseFloat($("#grand-total-kotak").text().replace(/\./g, "").replace(",", ".")) || 0;
-      break;
-    case "gantiLock":
-      total = parseFloat($("#grand-total-lock").text().replace(/\./g, "").replace(",", ".")) || 0;
-      break;
-    case "manual":
-      total = parseFloat($("#grand-total-manual").text().replace(/\./g, "").replace(",", ".")) || 0;
-      break;
-  }
-
-  $("#totalOngkos").val(total.toLocaleString("id-ID"));
-
-  // If payment method is DP, calculate sisa pembayaran
-  if (paymentMethod === "dp") {
-    calculateSisaPembayaran();
-  }
-}
-
-// Initialize UI for default sales type
-updateUIForSalesType("aksesoris");
-
-// Handle jumlah bayar input to calculate kembalian
-$("#jumlahBayar").on("input", function () {
-  const paymentMethod = $("#metodeBayar").val();
-  const jumlahBayar = parseFloat($(this).val().replace(/\./g, "").replace(",", ".")) || 0;
-
-  if (paymentMethod === "dp") {
-    const nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "").replace(",", ".")) || 0;
-    const kembalian = jumlahBayar - nominalDP;
-    $("#kembalian").val(kembalian >= 0 ? kembalian.toLocaleString("id-ID") : "0");
-  } else {
-    const total = parseFloat($("#totalOngkos").val().replace(/\./g, "").replace(",", ".")) || 0;
-    const kembalian = jumlahBayar - total;
-    $("#kembalian").val(kembalian >= 0 ? kembalian.toLocaleString("id-ID") : "0");
-  }
-});
-
-// Format number inputs with thousand separator
-function formatNumber(input) {
-  const value = input.value.replace(/\D/g, "");
-  input.value = parseInt(value || 0).toLocaleString("id-ID");
-}
-
-// Modify the jumlahBayar input handler
-$("#jumlahBayar").on("input", function () {
-  calculateKembalian();
-});
-
-// Format jumlah bayar with thousand separator
-$("#jumlahBayar").on("blur", function () {
-  const value = $(this).val().replace(/\./g, "");
-  $(this).val(parseInt(value || 0).toLocaleString("id-ID"));
-  calculateKembalian();
-});
-
-// Di fungsi btnBatal
-$("#btnBatal").on("click", async function () {
-  const confirmed = await showConfirm("Apakah Anda yakin ingin membatalkan transaksi ini?");
-  if (confirmed) {
-    location.reload();
-  }
-});
-
-// Modifikasi fungsi resetTableAndAddInputRow untuk lock
-function resetTableAndAddInputRow(type) {
-  let tableSelector;
-
-  if (type === "lock") {
-    tableSelector = "#tableLockDetail";
-  } else {
-    // manual
-    tableSelector = "#tableManualDetail";
-  }
-
-  // Clear existing rows
-  $(tableSelector + " tbody").empty();
-
-  // Create input row
-  const inputRow =
-    type === "lock"
-      ? `
-    <tr class="input-row">
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputKode" placeholder="Kode"></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputNamaBarang" placeholder="Nama barang"></td>
-      <td>
-        <div class="input-group input-group-sm">
-          <input type="text" class="form-control" id="${type}InputKodeLock" placeholder="Pilih kode" readonly>
-          <button class="btn btn-outline-secondary" id="${type}BtnPilihKodeLock" type="button">
-            <i class="fas fa-search"></i>
-          </button>
-        </div>
-      </td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputKadar" placeholder="Kadar" required></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputBerat" placeholder="0.00" required></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputHargaPerGram" placeholder="0" readonly></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputTotalHarga" placeholder="0" required></td>
-      <td></td>
-    </tr>
-  `
-      : `
-    <tr class="input-row">
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputKode" placeholder="Kode"></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputNamaBarang" placeholder="Nama barang"></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputKadar" placeholder="Kadar" required></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputBerat" placeholder="0.00" required></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputHargaPerGram" placeholder="0" readonly></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputTotalHarga" placeholder="0" required></td>
-      <td><input type="text" class="form-control form-control-sm" id="${type}InputKeterangan" placeholder="Keterangan"></td>
-      <td></td>
-    </tr>
-  `;
-
-  // Add input row to table
-  $(tableSelector + " tbody").append(inputRow);
-
-  // Add event listeners
-  if (type === "lock") {
-    // Event listener for pilih kode lock button
-    $(`#${type}BtnPilihKodeLock`).on("click", function () {
-      // Set baris input sebagai baris aktif
-      activeLockRow = $(this).closest("tr");
-
-      // Show modal to select lock code
-      $("#modalPilihLock").modal("show");
-    });
-
-    // Event listeners for total price calculation
-    $(`#${type}InputBerat, #${type}InputTotalHarga`).on("input", function () {
-      calculateHargaPerGram(type);
-    });
-
-    // Add keypress event listener to handle Enter key navigation
-    $(`#${type}InputKode`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputNamaBarang`).focus();
+      if (kode.includes(searchText) || nama.includes(searchText)) {
+        $(this).show();
+      } else {
+        $(this).hide();
       }
     });
+  },
 
-    $(`#${type}InputNamaBarang`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputKodeLock`).focus();
-      }
-    });
-
-    $(`#${type}InputKadar`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputBerat`).focus();
-      }
-    });
-
-    $(`#${type}InputBerat`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputTotalHarga`).focus();
-      }
-    });
-
-    // Add keypress event listener to total harga input to handle Enter key
-    $(`#${type}InputTotalHarga`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        addNewRow(type);
-      }
-    });
-  } else {
-    // Event listeners for manual type
-    $(`#${type}InputBerat, #${type}InputTotalHarga`).on("input", function () {
-      calculateHargaPerGram(type);
-    });
-
-    // Add keypress event listener to handle Enter key navigation
-    $(`#${type}InputKode`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputNamaBarang`).focus();
-      }
-    });
-
-    $(`#${type}InputNamaBarang`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputKadar`).focus();
-      }
-    });
-
-    $(`#${type}InputKadar`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputBerat`).focus();
-      }
-    });
-
-    $(`#${type}InputBerat`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputTotalHarga`).focus();
-      }
-    });
-
-    $(`#${type}InputTotalHarga`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        $(`#${type}InputKeterangan`).focus();
-      }
-    });
-
-    $(`#${type}InputKeterangan`).on("keypress", function (e) {
-      if (e.which === 13) {
-        e.preventDefault();
-        addNewRow(type);
-      }
-    });
-  }
-
-  // Focus on first field
-  $(`#${type}InputKode`).focus();
-}
-
-// Function to add new row (extracted from btnTambahBaris click handler)
-function addNewRow(type) {
- // Get values from input row
- const kode = $(`#${type}InputKode`).val() || "-";
- const namaBarang = $(`#${type}InputNamaBarang`).val();
- const kadar = $(`#${type}InputKadar`).val() || "-";
- const berat = $(`#${type}InputBerat`).val() || 0;
- const totalHargaValue = $(`#${type}InputTotalHarga`).val() || "0";
- const totalHarga = parseFloat(totalHargaValue.replace(/\./g, "").replace(",", ".")) || 0;
- const hargaPerGram = $(`#${type}InputHargaPerGram`).val() || "0";
-
- // Ambil keterangan untuk tipe manual
- const keterangan = type === "manual" ? $(`#${type}InputKeterangan`).val() || "" : "";
-
- // Get kode lock for lock type
- const kodeLock = type === "lock" ? $(`#${type}InputKodeLock`).val() || "-" : "";
-
- // Validasi
- if (!namaBarang) {
-   showAlert("Nama barang harus diisi!");
-   $(`#${type}InputNamaBarang`).focus();
-   return;
- }
- if (!kadar) {
-   showAlert("Kadar harus diisi!");
-   $(`#${type}InputKadar`).focus();
-   return;
- }
- if (berat <= 0) {
-   showAlert("Berat harus lebih dari 0!");
-   $(`#${type}InputBerat`).focus();
-   return;
- }
- if (totalHarga <= 0) {
-   showAlert("Total harga harus lebih dari 0!");
-   $(`#${type}InputTotalHarga`).focus();
-   return;
- }
-
-  // Determine target table and sales type
-  let tableSelector;
-  let salesType;
-
-  if (type === "lock") {
-    tableSelector = "#tableLockDetail";
-    salesType = "gantiLock";
-  } else {
-    // manual
-    tableSelector = "#tableManualDetail";
-    salesType = "manual";
-  }
-
-  // Create new row
-  const newRow =
-    type === "lock"
-      ? `
-    <tr>
-      <td>${kode}</td>
-      <td>${namaBarang}</td>
-      <td>${kodeLock}</td>
-      <td>${kadar}</td>
-      <td>${berat}</td>
-      <td>${hargaPerGram}</td>
-      <td class="total-harga">${parseInt(totalHarga).toLocaleString("id-ID")}</td>
-      <td>
-        <button class="btn btn-sm btn-danger btn-delete">
-          <i class="fas fa-trash"></i>
-        </button>
-      </td>
-    </tr>
-  `
-      : `
-    <tr>
-      <td>${kode}</td>
-      <td>${namaBarang}</td>
-      <td>${kadar}</td>
-      <td>${berat}</td>
-      <td>${hargaPerGram}</td>
-      <td class="total-harga">${parseInt(totalHarga).toLocaleString("id-ID")}</td>
-      <td class="keterangan">${keterangan}</td>
-      <td>
-        <button class="btn btn-sm btn-danger btn-delete">
-          <i class="fas fa-trash"></i>
-        </button>
-      </td>
-    </tr>
-  `;
-
-  // Add row to table
-  $(tableSelector + " tbody").append(newRow);
-
-  // Clear input row
-  $(`#${type}InputKode`).val("");
-  $(`#${type}InputNamaBarang`).val("");
-  $(`#${type}InputKadar`).val("");
-  $(`#${type}InputBerat`).val("");
-  $(`#${type}InputHargaPerGram`).val("");
-  $(`#${type}InputTotalHarga`).val("");
-
-  // Clear keterangan for manual type
-  if (type === "manual") {
-    $(`#${type}InputKeterangan`).val("");
-  }
-
-  // Clear kode lock for lock type
-  if (type === "lock") {
-    $(`#${type}InputKodeLock`).val("");
-  }
-
-  // Focus on first field for next entry
-  $(`#${type}InputKode`).focus();
-
-  // Update grand total
-  updateGrandTotal(salesType);
-}
-
-// Fungsi simpan penjualan
-$("#btnSimpanPenjualan").on("click", async function () {
-  try {
-    // Validasi nama sales
+  // Validate sales
+  validateSales() {
     const salesName = $("#sales").val().trim();
     if (!salesName) {
-      showAlert("Nama sales harus diisi!");
-      $("#sales").focus();
-      return;
+      $("#sales").addClass("is-invalid");
+      if (!$("#sales").next(".invalid-feedback").length) {
+        $("#sales").after('<div class="invalid-feedback">Nama sales harus diisi!</div>');
+      }
+    } else {
+      $("#sales").removeClass("is-invalid").addClass("is-valid");
+      $("#sales").next(".invalid-feedback").remove();
     }
+  },
 
-    const salesType = $("#jenisPenjualan").val();
-    const tableSelector =
-      salesType === "aksesoris"
-        ? "#tableAksesorisDetail"
-        : salesType === "kotak"
-        ? "#tableKotakDetail"
-        : salesType === "gantiLock"
-        ? "#tableLockDetail"
-        : "#tableManualDetail";
-
-    // Check if table has rows
-    if ($(tableSelector + " tbody tr:not(.input-row)").length === 0) {
-      showAlert("Tidak ada barang yang ditambahkan!");
-      return;
+  // Refresh stock
+  async refreshStock() {
+    try {
+      utils.showLoading(true);
+      cacheManager.remove("stockData");
+      await this.loadStockData(true);
+      utils.showAlert("Data stok berhasil diperbarui", "Sukses", "success");
+    } catch (error) {
+      console.error("Error refreshing stock:", error);
+      utils.showAlert("Gagal memperbarui data stok", "Error", "error");
+    } finally {
+      utils.showLoading(false);
     }
+  },
 
-    // Validasi pembayaran
-    const paymentMethod = $("#metodeBayar").val();
-    if (paymentMethod === "dp") {
-      const nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "").replace(",", ".")) || 0;
-      const total = parseFloat($("#totalOngkos").val().replace(/\./g, "").replace(",", ".")) || 0;
-
-      if (nominalDP <= 0 || nominalDP >= total) {
-        showAlert(
-          nominalDP <= 0 ? "Nominal DP harus diisi!" : "Nominal DP tidak boleh sama dengan atau melebihi total harga!"
-        );
-        $("#nominalDP").focus();
+  // Save transaction
+  async saveTransaction() {
+    try {
+      // Validate sales name
+      const salesName = $("#sales").val().trim();
+      if (!salesName) {
+        utils.showAlert("Nama sales harus diisi!");
+        $("#sales").focus();
         return;
       }
-    } else if (paymentMethod !== "free") {
-      const jumlahBayar = parseFloat($("#jumlahBayar").val().replace(/\./g, "").replace(",", ".")) || 0;
-      const total = parseFloat($("#totalOngkos").val().replace(/\./g, "").replace(",", ".")) || 0;
 
-      if (jumlahBayar < total) {
-        showAlert("Jumlah bayar kurang dari total!");
-        $("#jumlahBayar").focus();
+      const salesType = $("#jenisPenjualan").val();
+      const tableSelector =
+        salesType === "aksesoris"
+          ? "#tableAksesorisDetail"
+          : salesType === "kotak"
+          ? "#tableKotakDetail"
+          : "#tableManualDetail";
+
+      // Check if table has rows
+      if ($(tableSelector + " tbody tr:not(.input-row)").length === 0) {
+        utils.showAlert("Tidak ada barang yang ditambahkan!");
         return;
       }
-    }
 
-    // Collect items data based on sales type
-    let items = [];
+      // Validate payment
+      const paymentMethod = $("#metodeBayar").val();
+      if (paymentMethod === "dp") {
+        const nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "")) || 0;
+        const total = parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0;
+
+        if (nominalDP <= 0 || nominalDP >= total) {
+          utils.showAlert(
+            nominalDP <= 0 ? "Nominal DP harus diisi!" : "Nominal DP tidak boleh sama dengan atau melebihi total harga!"
+          );
+          $("#nominalDP").focus();
+          return;
+        }
+      } else if (paymentMethod !== "free") {
+        const jumlahBayar = parseFloat($("#jumlahBayar").val().replace(/\./g, "")) || 0;
+        const total = parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0;
+
+        if (jumlahBayar < total) {
+          utils.showAlert("Jumlah bayar kurang dari total!");
+          $("#jumlahBayar").focus();
+          return;
+        }
+      }
+
+      utils.showLoading(true);
+
+      // Collect items data
+      const items = this.collectItemsData(salesType, tableSelector);
+
+      // Prepare transaction data
+      const transactionData = {
+        jenisPenjualan: salesType,
+        tanggal: $("#tanggal").val(),
+        sales: salesName,
+        metodeBayar: paymentMethod,
+        totalHarga: parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0,
+        timestamp: serverTimestamp(),
+        items: items,
+      };
+
+      // Mark as ganti lock if applicable
+      if (salesType === "manual" && items.some((item) => item.kodeLock)) {
+        transactionData.isGantiLock = true;
+      }
+
+      // Add payment details
+      if (paymentMethod === "dp") {
+        transactionData.nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "")) || 0;
+        transactionData.sisaPembayaran = parseFloat($("#sisaPembayaran").val().replace(/\./g, "")) || 0;
+        transactionData.statusPembayaran = "DP";
+      } else if (paymentMethod === "free") {
+        transactionData.statusPembayaran = "Free";
+      } else {
+        transactionData.jumlahBayar = parseFloat($("#jumlahBayar").val().replace(/\./g, "")) || 0;
+        transactionData.kembalian = parseFloat($("#kembalian").val().replace(/\./g, "")) || 0;
+        transactionData.statusPembayaran = "Lunas";
+      }
+
+      // Save transaction
+      const docRef = await addDoc(collection(firestore, "penjualanAksesoris"), transactionData);
+
+      // PERBAIKAN: Update stock untuk SEMUA metode pembayaran (termasuk free)
+      await this.updateStock(salesType, items);
+
+      // Smart cache invalidation - hanya clear sales cache
+      sharedCacheManager.invalidateRelated("sales");
+
+      utils.showAlert("Transaksi berhasil disimpan!", "Sukses", "success");
+
+      // Store transaction data for printing
+      currentTransactionData = {
+        id: docRef.id,
+        salesType: salesType,
+        tanggal: $("#tanggal").val(),
+        sales: salesName,
+        totalHarga: $("#totalOngkos").val(),
+        items: items,
+        metodeBayar: paymentMethod,
+      };
+
+      // Add DP information if applicable
+      if (paymentMethod === "dp") {
+        currentTransactionData.nominalDP = $("#nominalDP").val();
+        currentTransactionData.sisaPembayaran = $("#sisaPembayaran").val();
+      }
+
+      // Show print modal
+      $("#printModal").modal("show");
+
+      // Reset form after modal is closed
+      $("#printModal").on("hidden.bs.modal", () => {
+        this.resetForm();
+        $("#sales").focus();
+        $("#printModal").off("hidden.bs.modal");
+      });
+    } catch (error) {
+      console.error("Error saving transaction:", error);
+      utils.showAlert("Terjadi kesalahan saat menyimpan transaksi: " + error.message, "Error", "error");
+    } finally {
+      utils.showLoading(false);
+    }
+  },
+
+  // Collect items data based on sales type
+  collectItemsData(salesType, tableSelector) {
+    const items = [];
 
     if (salesType === "aksesoris") {
       $(tableSelector + " tbody tr:not(.input-row)").each(function () {
@@ -1395,10 +1326,8 @@ $("#btnSimpanPenjualan").on("click", async function () {
         const jumlah = parseInt($(this).find(".jumlah-input").val()) || 1;
         const kadar = $(this).find(".kadar-input").val() || "-";
         const berat = parseFloat($(this).find(".berat-input").val()) || 0;
-        const hargaPerGram =
-          parseFloat($(this).find(".harga-per-gram-input").val().replace(/\./g, "").replace(",", ".")) || 0;
-        const totalHarga =
-          parseFloat($(this).find(".total-harga-input").val().replace(/\./g, "").replace(",", ".")) || 0;
+        const hargaPerGram = parseFloat($(this).find(".harga-per-gram-input").val().replace(/\./g, "")) || 0;
+        const totalHarga = parseFloat($(this).find(".total-harga-input").val().replace(/\./g, "")) || 0;
 
         items.push({
           kodeText: kode,
@@ -1415,8 +1344,8 @@ $("#btnSimpanPenjualan").on("click", async function () {
         const kode = $(this).find("td:nth-child(1)").text();
         const nama = $(this).find("td:nth-child(2)").text();
         const jumlah = parseInt($(this).find(".jumlah-input").val()) || 1;
-        const hargaSatuan = parseFloat($(this).find(".harga-input").val().replace(/\./g, "").replace(",", ".")) || 0;
-        const totalHarga = parseFloat($(this).find(".total-harga").text().replace(/\./g, "").replace(",", ".")) || 0;
+        const hargaSatuan = parseFloat($(this).find(".harga-input").val().replace(/\./g, "")) || 0;
+        const totalHarga = parseFloat($(this).find(".total-harga").text().replace(/\./g, "")) || 0;
 
         items.push({
           kodeText: kode,
@@ -1426,42 +1355,22 @@ $("#btnSimpanPenjualan").on("click", async function () {
           hargaSatuan: hargaSatuan,
         });
       });
-    } else if (salesType === "gantiLock") {
+    } else {
+      // Manual
       $(tableSelector + " tbody tr:not(.input-row)").each(function () {
         const kode = $(this).find("td:nth-child(1)").text();
         const nama = $(this).find("td:nth-child(2)").text();
         const kodeLock = $(this).find("td:nth-child(3)").text();
         const kadar = $(this).find("td:nth-child(4)").text();
         const berat = parseFloat($(this).find("td:nth-child(5)").text()) || 0;
-        const hargaPerGram =
-          parseFloat($(this).find("td:nth-child(6)").text().replace(/\./g, "").replace(",", ".")) || 0;
-        const totalHarga = parseFloat($(this).find("td:nth-child(7)").text().replace(/\./g, "").replace(",", ".")) || 0;
+        const hargaPerGram = parseFloat($(this).find("td:nth-child(6)").text().replace(/\./g, "")) || 0;
+        const totalHarga = parseFloat($(this).find("td:nth-child(7)").text().replace(/\./g, "")) || 0;
+        const keterangan = $(this).find("td:nth-child(8)").text() || "";
 
         items.push({
           kodeText: kode,
           nama: nama,
-          kodeLock: kodeLock,
-          kadar: kadar,
-          berat: berat,
-          hargaPerGram: hargaPerGram,
-          totalHarga: totalHarga,
-        });
-      });
-    } else {
-      // Manual - Tambahkan kolom keterangan
-      $(tableSelector + " tbody tr:not(.input-row)").each(function () {
-        const kode = $(this).find("td:nth-child(1)").text();
-        const nama = $(this).find("td:nth-child(2)").text();
-        const kadar = $(this).find("td:nth-child(3)").text();
-        const berat = parseFloat($(this).find("td:nth-child(4)").text()) || 0;
-        const hargaPerGram =
-          parseFloat($(this).find("td:nth-child(5)").text().replace(/\./g, "").replace(",", ".")) || 0;
-        const totalHarga = parseFloat($(this).find("td:nth-child(6)").text().replace(/\./g, "").replace(",", ".")) || 0;
-        const keterangan = $(this).find("td:nth-child(7)").text() || "";
-
-        items.push({
-          kodeText: kode,
-          nama: nama,
+          kodeLock: kodeLock !== "-" ? kodeLock : null,
           kadar: kadar,
           berat: berat,
           hargaPerGram: hargaPerGram,
@@ -1471,841 +1380,659 @@ $("#btnSimpanPenjualan").on("click", async function () {
       });
     }
 
-    // Persiapkan data transaksi
-    const transactionData = {
-      jenisPenjualan: salesType,
-      tanggal: $("#tanggal").val(),
-      sales: salesName,
-      metodeBayar: paymentMethod,
-      totalHarga: parseFloat($("#totalOngkos").val().replace(/\./g, "").replace(",", ".")) || 0,
-      timestamp: serverTimestamp(),
-      items: items,
-    };
+    return items;
+  },
 
-    // Tambahkan detail pembayaran
-    if (paymentMethod === "dp") {
-      transactionData.nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "").replace(",", ".")) || 0;
-      transactionData.sisaPembayaran = parseFloat($("#sisaPembayaran").val().replace(/\./g, "").replace(",", ".")) || 0;
-      transactionData.statusPembayaran = "DP";
-    } else if (paymentMethod === "free") {
-      transactionData.statusPembayaran = "Free";
-    } else {
-      transactionData.jumlahBayar = parseFloat($("#jumlahBayar").val().replace(/\./g, "").replace(",", ".")) || 0;
-      transactionData.kembalian = parseFloat($("#kembalian").val().replace(/\./g, "").replace(",", ".")) || 0;
-      transactionData.statusPembayaran = "Lunas";
+  // Update stock after sales
+  async updateStock(salesType, items) {
+    try {
+      const updatePromises = [];
+      const stockUpdates = new Map();
+
+      // Prepare batch updates
+      for (const item of items) {
+        const kode = item.kodeText;
+        if (!kode || kode === "-") continue;
+
+        if (salesType === "manual") {
+          // Untuk penjualan manual
+          if (item.kodeLock && item.kodeLock !== "-") {
+            // Kode aksesoris yang dipilih - mengurangi stok sebagai ganti lock
+            const lockCurrentStock = await this.getStockForItem(item.kodeLock);
+            const jumlah = parseInt(item.jumlah) || 1;
+            const lockNewStock = Math.max(0, lockCurrentStock - jumlah);
+
+            stockUpdates.set(item.kodeLock, {
+              item: {
+                ...item,
+                kodeText: item.kodeLock,
+                nama: `Ganti lock untuk ${item.nama}`,
+              },
+              currentStock: lockCurrentStock,
+              newStock: lockNewStock,
+              jumlah,
+              isGantiLock: true,
+            });
+          }
+          // Kode barcode manual tidak mengurangi stok
+        } else {
+          // Untuk penjualan aksesoris dan kotak (termasuk yang free)
+          const currentStock = await this.getStockForItem(kode);
+          const jumlah = parseInt(item.jumlah) || 1;
+          const newStock = Math.max(0, currentStock - jumlah);
+
+          stockUpdates.set(kode, {
+            item,
+            currentStock,
+            newStock,
+            jumlah,
+            isGantiLock: false,
+          });
+        }
+      }
+
+      // Execute batch updates
+      for (const [kode, updateData] of stockUpdates) {
+        updatePromises.push(this.processSingleStockUpdate(kode, updateData));
+      }
+
+      await Promise.all(updatePromises);
+
+      // Update local caches
+      for (const [kode, updateData] of stockUpdates) {
+        this.stockCache.set(kode, updateData.newStock);
+
+        // Update stockData array
+        const stockIndex = this.stockData.findIndex((item) => item.kode === kode);
+        if (stockIndex !== -1) {
+          this.stockData[stockIndex].stokAkhir = updateData.newStock;
+        }
+      }
+
+      // Smart cache invalidation
+      sharedCacheManager.setVersioned("stockData", this.stockData, 15 * 60 * 1000);
+      this.lastStockUpdate = Date.now();
+
+      return true;
+    } catch (error) {
+      console.error("Error updating stock:", error);
+      throw error;
     }
-
-    // Save transaction to Firestore
-    const docRef = await addDoc(collection(firestore, "penjualanAksesoris"), transactionData);
-    console.log("Transaction saved with ID: ", docRef.id);
-
-    // Update stock if not free
-    if (paymentMethod !== "free") {
-      await updateStock(salesType, transactionData.items);
-    }
-
-    // Show success message only after successful save
-    showAlert("Transaksi berhasil disimpan!");
-
-    // Store the current transaction data in a global variable for printing
-    currentTransactionData = {
-      id: docRef.id,
-      salesType: salesType,
-      tanggal: $("#tanggal").val(),
-      sales: salesName,
-      totalHarga: $("#totalOngkos").val(),
-      items: items,
-      metodeBayar: paymentMethod,
-    };
-
-    // Add DP information if payment method is DP
-    if (paymentMethod === "dp") {
-      currentTransactionData.nominalDP = $("#nominalDP").val();
-      currentTransactionData.sisaPembayaran = $("#sisaPembayaran").val();
-    }
-
-    console.log("Current transaction data set:", currentTransactionData);
-
-    // Trigger print modal
-    $("#printModal").modal("show");
-
-    // Reset form after modal is closed
-    $("#printModal").on("hidden.bs.modal", function () {
-      resetForm();
-      // Set focus to sales field
-      $("#sales").focus();
-      // Remove the one-time event handler to prevent multiple bindings
-      $("#printModal").off("hidden.bs.modal");
-    });
-  } catch (error) {
-    console.error("Error saving transaction: ", error);
-    showAlert("Terjadi kesalahan saat menyimpan transaksi: " + error.message);
-  }
-});
-
-// Fungsi untuk print struk kasir
-// Fungsi untuk print struk kasir
-function printReceipt() {
-  if (!currentTransactionData) {
-    showAlert("Tidak ada data transaksi untuk dicetak!");
-    return;
-  }
-
-  const transaction = currentTransactionData;
-  console.log("Printing receipt with data:", transaction);
-
-  // Buat jendela baru untuk print
-  const printWindow = window.open("", "_blank");
-
-  // Buat konten HTML untuk struk
-  let receiptHTML = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Struk Kasir</title>
-      <style>
-        body {
-          font-family: roboto;
-          font-size: 13px;
-          margin: 0;
-          padding: 0;
-          width: 80mm;
-        }
-        .receipt {          
-          margin: 0 auto;
-          padding: 5mm;
-        }
-        .receipt h3, .receipt h4 {
-          text-align: center;
-          margin: 2mm 0;
-        }
-        .receipt hr {
-          border-top: 1px dashed #000;
-        }
-        .receipt table {
-          width: 100%;
-          border-collapse: collapse;
-        }
-        .receipt th, .receipt td {
-          text-align: left;
-          padding: 1mm 2mm;
-        }
-        .text-center {
-          text-align: center;
-        }
-        .text-right {
-          text-align: right;
-        }
-        .keterangan {
-          font-style: italic;
-          font-size: 10px;
-          margin-top: 2mm;
-          border-top: 1px dotted #000;
-          padding-top: 2mm;
-        }
-        .payment-info {
-          margin-top: 2mm;
-          border-top: 1px dotted #000;
-          padding-top: 2mm;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="receipt">
-        <h3>MELATI 3</h3>
-        <h4>JL. DIPONEGORO NO. 116</h4>
-        <h4>NOTA PENJUALAN ${transaction.salesType.toUpperCase()}</h4>
-        <hr>
-        <p>Tanggal: ${transaction.tanggal}<br>Sales: ${transaction.sales}</p>
-        <hr>
-        <table>
-          <tr>
-            <th>Kode</th>
-            <th>Nama</th>
-            <th>Kadar</th>
-            <th>Gr</th>
-            <th>Harga</th>
-          </tr>
-  `;
-
-  // Tambahkan item ke struk
-  let hasKeterangan = false;
-  let keteranganText = "";
-
-  transaction.items.forEach((item) => {
-    receiptHTML += `
-      <tr>
-        <td>${item.kodeText || "-"}</td>
-        <td>${item.nama || "-"}</td>
-        <td>${item.kadar || "-"}</td>
-        <td>${item.berat || "-"}</td>
-        <td class="text-right">${parseInt(item.totalHarga).toLocaleString("id-ID")}</td>
-      </tr>
-    `;
-
-    // Simpan keterangan jika ada
-    if (item.keterangan && item.keterangan.trim() !== "") {
-      hasKeterangan = true;
-      keteranganText += item.keterangan + " ";
-    }
-  });
-
-  // Tambahkan total
-  receiptHTML += `
-          <tr>
-            <td colspan="4" class="text-right"><strong>Total:</strong></td>
-            <td class="text-right"><strong>${transaction.totalHarga}</strong></td>
-          </tr>
-        </table>
-  `;
-
-  // Tambahkan informasi pembayaran DP jika metode pembayaran adalah DP
-  if (transaction.metodeBayar === "dp") {
-    // Format DP and remaining balance with thousand separators
-    const dpAmount = parseFloat(transaction.nominalDP.replace(/\./g, "").replace(",", "."));
-    const remainingAmount = parseFloat(transaction.sisaPembayaran.replace(/\./g, "").replace(",", "."));
-    
-    receiptHTML += `
-        <div class="payment-info">
-          <table>
-            <tr>
-              <td>Total Harga:</td>
-              <td class="text-right">${transaction.totalHarga}</td>
-            </tr>
-            <tr>
-              <td>DP:</td>
-              <td class="text-right">${dpAmount.toLocaleString("id-ID")}</td>
-            </tr>
-            <tr>
-              <td><strong>SISA:</strong></td>
-              <td class="text-right"><strong>${remainingAmount.toLocaleString("id-ID")}</strong></td>
-            </tr>
-          </table>
-        </div>
-    `;
-  }
-
-  // Tambahkan keterangan jika ada
-  if (hasKeterangan && transaction.salesType === "manual") {
-    receiptHTML += `
-        <div class="keterangan">
-          <strong>Keterangan:</strong> ${keteranganText}
-        </div>
-    `;
-  }
-
-  receiptHTML += `
-        <hr>
-        <p class="text-center">Terima Kasih<br>Atas Kunjungan Anda</p>
-      </div>
-      <script>
-        window.onload = function() {
-          window.print();
-          setTimeout(function() { window.close(); }, 500);
-        };
-      </script>
-    </body>
-    </html>
-  `;
-
-  // Tulis HTML ke jendela baru
-  printWindow.document.write(receiptHTML);
-  printWindow.document.close();
-}
-
-function printInvoice() {
-  if (!currentTransactionData) {
-    showAlert("Tidak ada data transaksi untuk dicetak!");
-    return;
-  }
-  
-  const transaction = currentTransactionData;
-  console.log("Printing invoice with data:", transaction);
-  
-  // Buat jendela baru untuk print
-  const printWindow = window.open("", "_blank");
-  
-  // Buat konten HTML untuk invoice
-  let invoiceHTML = `
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <title>Invoice Customer</title>
-    <style>
-      @page {
-        size: 10cm 20cm;
-        margin: 0;
-      }
-      body {
-        font-family: Arial, sans-serif;
-        font-size: 12px;
-        margin: 0;
-        padding: 5mm;
-        width: 20cm;
-        box-sizing: border-box;
-      }
-      .invoice {
-        width: 100%;
-      }
-      .header-info {
-        text-align: right;
-        margin-bottom: 2cm;
-        margin-right:3cm:
-        margin-top:1cm;
-      }         
-      .total-row {
-        margin-top: 1.9cm;
-        text-align: right;
-        font-weight: bold;
-        margin-right: 3cm;
-      }
-      .sales{
-      text-align: right;
-      margin-top: 0.6cm;
-      margin-right:2cm;
-      }
-      .keterangan {
-        font-style: italic;
-        font-size: 10px;
-        margin-top: 2mm;
-        padding-top: 2mm;
-      }
-      
-      .item-details {
-        display: flex;
-        flex-wrap: wrap;
-      }
-      .item-price {
-        width: 100%;
-        text-align: right;
-        font-weight: bold;
-      }
-      .item-data {
-        display: grid;
-        grid-template-columns: 2cm 1.8cm 5cm 2cm 2cm 2cm;
-        width: 100%;
-        column-gap: 0.2cm;
-        margin-left: 1cm;
-        margin-top: 1.5cm;
-        margin-right: 3cm;
-      }
-      .item-data span {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="invoice">
-      <div class="header-info">
-        <p>${transaction.tanggal || this.formatTimestamp(transaction.timestamp)}</p>
-      </div>
-      <hr>
-`;
-
-// Tambahkan item ke invoice
-let hasKeterangan = false;
-let keteranganText = "";
-let totalHarga = 0;
-
-transaction.items.forEach((item) => {
-  const itemHarga = parseInt(item.totalHarga) || 0;
-  totalHarga += itemHarga;
-  
-  invoiceHTML += `
-      <div class="item-details">
-        <div class="item-data">
-          <span>${item.kodeText || "-"}</span>
-          <span>${item.jumlah || "1"}pcs</span>
-          <span>${item.nama || "-"}</span>
-          <span>${item.kadar || "-"}</span>
-          <span>${item.berat || "-"}gr</span>
-          <span>${itemHarga.toLocaleString("id-ID")}</span>
-        </div>
-      </div>
-  `;
-  
-  // Simpan keterangan jika ada
-  if (item.keterangan && item.keterangan.trim() !== "") {
-    hasKeterangan = true;
-    keteranganText += `${item.nama}: ${item.keterangan}; `;
-  }
-});
-
-// Tambahkan total di pojok kanan bawah
-invoiceHTML += `
-      <div class="total-row">
-        Rp ${totalHarga.toLocaleString("id-ID")}
-      </div>
-    <div class="sales">${transaction.sales || "-"}</div>
-`;
-
-// Tambahkan keterangan jika ada
-if (hasKeterangan && transaction.jenisPenjualan === "manual") {
-  invoiceHTML += `
-      <div class="keterangan">
-        ${keteranganText}
-      </div>
-  `;
-}
-
-invoiceHTML += `
-    </div>
-    <script>
-      window.onload = function() {
-        window.print();
-        setTimeout(function() { window.close(); }, 500);
-      };
-    </script>
-  </body>
-  </html>
-`;
-  
-  // Tulis HTML ke jendela baru
-  printWindow.document.write(invoiceHTML);
-  printWindow.document.close();
-}
-
-// Manual print button handler
-$("#btnCetak").on("click", function () {
-  if (!currentTransactionData) {
-    // Coba ambil data dari form jika tidak ada data transaksi tersimpan
+  },
+  // Perbaiki method processSingleStockUpdate tanpa menggunakan getItemInfo
+  async processSingleStockUpdate(kode, { item, currentStock, newStock, jumlah, isGantiLock }) {
+    const metodeBayar = $("#metodeBayar").val();
     const salesType = $("#jenisPenjualan").val();
-    const tableSelector =
-      salesType === "aksesoris"
-        ? "#tableAksesorisDetail"
-        : salesType === "kotak"
-        ? "#tableKotakDetail"
-        : salesType === "gantiLock"
-        ? "#tableLockDetail"
-        : "#tableManualDetail";
 
-    // Periksa apakah ada item di tabel
-    if ($(tableSelector + " tbody tr:not(.input-row)").length === 0) {
-      showAlert("Tidak ada data transaksi untuk dicetak. Simpan transaksi terlebih dahulu.");
-      return;
-    }
+    let jenisTransaksi, keterangan;
 
-    // Kumpulkan data dari form
-    let items = [];
-
-    if (salesType === "aksesoris") {
-      $(tableSelector + " tbody tr:not(.input-row)").each(function () {
-        const kode = $(this).find("td:nth-child(1)").text();
-        const nama = $(this).find("td:nth-child(2)").text();
-        const jumlah = parseInt($(this).find(".jumlah-input").val()) || 1;
-        const kadar = $(this).find(".kadar-input").val() || "-";
-        const berat = parseFloat($(this).find(".berat-input").val()) || 0;
-        const hargaPerGram =
-          parseFloat($(this).find(".harga-per-gram-input").val().replace(/\./g, "").replace(",", ".")) || 0;
-        const totalHarga =
-          parseFloat($(this).find(".total-harga-input").val().replace(/\./g, "").replace(",", ".")) || 0;
-
-        items.push({
-          kodeText: kode,
-          nama: nama,
-          jumlah: jumlah,
-          kadar: kadar,
-          berat: berat,
-          hargaPerGram: hargaPerGram,
-          totalHarga: totalHarga,
-        });
-      });
-    } else if (salesType === "kotak") {
-      $(tableSelector + " tbody tr:not(.input-row)").each(function () {
-        const kode = $(this).find("td:nth-child(1)").text();
-        const nama = $(this).find("td:nth-child(2)").text();
-        const jumlah = parseInt($(this).find(".jumlah-input").val()) || 1;
-        const hargaSatuan = parseFloat($(this).find(".harga-input").val().replace(/\./g, "").replace(",", ".")) || 0;
-        const totalHarga = parseFloat($(this).find(".total-harga").text().replace(/\./g, "").replace(",", ".")) || 0;
-
-        items.push({
-          kodeText: kode,
-          nama: nama,
-          jumlah: jumlah,
-          totalHarga: totalHarga,
-          hargaSatuan: hargaSatuan,
-        });
-      });
-    } else if (salesType === "gantiLock") {
-      $(tableSelector + " tbody tr:not(.input-row)").each(function () {
-        const kode = $(this).find("td:nth-child(1)").text();
-        const nama = $(this).find("td:nth-child(2)").text();
-        const kodeLock = $(this).find("td:nth-child(3)").text();
-        const kadar = $(this).find("td:nth-child(4)").text();
-        const berat = parseFloat($(this).find("td:nth-child(5)").text()) || 0;
-        const hargaPerGram =
-          parseFloat($(this).find("td:nth-child(6)").text().replace(/\./g, "").replace(",", ".")) || 0;
-        const totalHarga = parseFloat($(this).find("td:nth-child(7)").text().replace(/\./g, "").replace(",", ".")) || 0;
-
-        items.push({
-          kodeText: kode,
-          nama: nama,
-          kodeLock: kodeLock,
-          kadar: kadar,
-          berat: berat,
-          hargaPerGram: hargaPerGram,
-          totalHarga: totalHarga,
-        });
-      });
+    // Tentukan jenis transaksi
+    if (isGantiLock) {
+      jenisTransaksi = "gantiLock";
+      keterangan = `Ganti lock ${kode} oleh ${$("#sales").val()}`;
+    } else if (metodeBayar === "free") {
+      jenisTransaksi = "free";
+      keterangan = `Penjualan ${salesType} gratis oleh ${$("#sales").val()}`;
     } else {
-      // Manual
-      $(tableSelector + " tbody tr:not(.input-row)").each(function () {
-        const kode = $(this).find("td:nth-child(1)").text();
-        const nama = $(this).find("td:nth-child(2)").text();
-        const kadar = $(this).find("td:nth-child(3)").text();
-        const berat = parseFloat($(this).find("td:nth-child(4)").text()) || 0;
-        const hargaPerGram =
-          parseFloat($(this).find("td:nth-child(5)").text().replace(/\./g, "").replace(",", ".")) || 0;
-        const totalHarga = parseFloat($(this).find("td:nth-child(6)").text().replace(/\./g, "").replace(",", ".")) || 0;
-
-        items.push({
-          kodeText: kode,
-          nama: nama,
-          kadar: kadar,
-          berat: berat,
-          hargaPerGram: hargaPerGram,
-          totalHarga: totalHarga,
-        });
-      });
+      jenisTransaksi = "laku";
+      keterangan = `Penjualan ${salesType} oleh ${$("#sales").val()}`;
     }
 
-    // Buat data transaksi dari form
-    currentTransactionData = {
-      salesType: salesType,
-      tanggal: $("#tanggal").val(),
-      sales: $("#sales").val().trim() || "Admin",
-      totalHarga: $("#totalOngkos").val(),
-      items: items,
-    };
-
-    console.log("Created transaction data from form:", currentTransactionData);
-  }
-
-  // Tampilkan modal print
-  $("#printModal").modal("show");
-});
-
-// Tambahkan event listener untuk tombol print di modal
-$(document).ready(function () {
-  // Pastikan event listener hanya ditambahkan sekali
-  $("#btnPrintReceipt")
-    .off("click")
-    .on("click", function () {
-      printReceipt();
-    });
-
-  $("#btnPrintInvoice")
-    .off("click")
-    .on("click", function () {
-      printInvoice();
-    });
-
-  // Set tanggal hari ini
-  const today = new Date();
-  const formattedDate = formatDate(today);
-  $("#tanggal").val(formattedDate);
-
-  // Initialize datepicker
-  $("#tanggal").datepicker({
-    format: "dd/mm/yyyy",
-    autoclose: true,
-    language: "id",
-    todayHighlight: true,
-  });
-
-  // Calendar icon click handler
-  $("#calendarIcon").on("click", function () {
-    $("#tanggal").datepicker("show");
-  });
-
-  console.log("Print event handlers initialized");
-});
-
-// Helper function untuk format tanggal
-function formatDate(date) {
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
-}
-
-// Variabel untuk menandai apakah print dipanggil setelah simpan
-let printAfterSave = false;
-
-// Modifikasi event handler untuk modal print
-$("#printModal").on("show.bs.modal", function () {
-  if (printAfterSave) {
-    // Jika dipanggil setelah simpan, tambahkan pesan
-    $(this).find(".modal-body").prepend(`
-      <div class="alert alert-success mb-3">
-        <i class="fas fa-check-circle me-2"></i>
-        Transaksi berhasil disimpan! Silakan pilih jenis nota yang akan dicetak.
-      </div>
-    `);
-
-    // Reset flag
-    printAfterSave = false;
-  } else {
-    // Hapus pesan jika ada
-    $(this).find(".alert").remove();
-  }
-});
-
-// Validasi nama sales saat blur
-$("#sales").on("blur", function () {
-  const salesName = $(this).val().trim();
-  if (!salesName) {
-    $(this).addClass("is-invalid");
-    if (!$(this).next(".invalid-feedback").length) {
-      $(this).after('<div class="invalid-feedback">Nama sales harus diisi!</div>');
-    }
-  } else {
-    $(this).removeClass("is-invalid").addClass("is-valid");
-    $(this).next(".invalid-feedback").remove();
-  }
-});
-
-// Hapus validasi saat focus
-$("#sales").on("focus", function () {
-  $(this).removeClass("is-invalid is-valid");
-  $(this).next(".invalid-feedback").remove();
-});
-
-// Fungsi untuk menambahkan baris input pada tabel ganti lock
-function addLockInputRow() {
-  const inputRow = `
-    <tr class="input-row">
-      <td><input type="text" class="form-control form-control-sm" id="lockInputKode" placeholder="Kode"></td>
-      <td><input type="text" class="form-control form-control-sm" id="lockInputNamaBarang" placeholder="Nama barang"></td>
-      <td>
-        <div class="input-group input-group-sm">
-          <input type="text" class="form-control" id="lockInputKodeLock" placeholder="Pilih kode" readonly>
-          <button class="btn btn-outline-secondary" id="lockBtnPilihKodeLock" type="button">
-            <i class="fas fa-search"></i>
-          </button>
-        </div>
-      </td>
-      <td><input type="text" class="form-control form-control-sm" id="lockInputKadar" placeholder="Kadar"></td>
-      <td><input type="text" class="form-control form-control-sm" id="lockInputBerat" placeholder="0.00"></td>
-      <td><input type="text" class="form-control form-control-sm" id="lockInputHargaPerGram" placeholder="0" readonly></td>
-      <td><input type="text" class="form-control form-control-sm" id="lockInputTotalHarga" placeholder="0"></td>
-      <td></td>
-    </tr>
-  `;
-
-  // Add input row to table
-  $("#tableLockDetail tbody").append(inputRow);
-}
-
-// Fungsi untuk menambahkan baris input pada tabel manual
-function addManualInputRow() {
-  const inputRow = `
-    <tr class="input-row">
-      <td><input type="text" class="form-control form-control-sm" id="manualInputKode" placeholder="Kode"></td>
-      <td><input type="text" class="form-control form-control-sm" id="manualInputNamaBarang" placeholder="Nama barang"></td>
-      <td><input type="text" class="form-control form-control-sm" id="manualInputKadar" placeholder="Kadar"></td>
-      <td><input type="text" class="form-control form-control-sm" id="manualInputBerat" placeholder="0.00"></td>
-      <td><input type="text" class="form-control form-control-sm" id="manualInputHargaPerGram" placeholder="0" readonly></td>
-      <td><input type="text" class="form-control form-control-sm" id="manualInputTotalHarga" placeholder="0"></td>
-      <td></td>
-    </tr>
-  `;
-
-  // Add input row to table
-  $("#tableManualDetail tbody").append(inputRow);
-}
-
-// Fungsi untuk reset form setelah simpan
-function resetFormAfterSave() {
-  // Simpan jenis penjualan saat ini
-  const currentSalesType = $("#jenisPenjualan").val();
-
-  // Reset semua tabel
-  $("#tableAksesorisDetail tbody, #tableKotakDetail tbody, #tableLockDetail tbody, #tableManualDetail tbody").empty();
-
-  // Reset total-total
-  $("#grand-total-aksesoris, #grand-total-kotak, #grand-total-lock, #grand-total-manual").text("0");
-
-  // Reset form pembayaran
-  $("#totalOngkos").val("0");
-  $("#jumlahBayar").val("");
-  $("#kembalian").val("0");
-  $("#nominalDP").val("");
-  $("#sisaPembayaran").val("0");
-
-  // Refresh UI untuk jenis penjualan yang sama
-  updateUIForSalesType(currentSalesType);
-
-  // Jika jenis penjualan adalah gantiLock atau manual, tambahkan baris input baru
-  if (currentSalesType === "gantiLock") {
-    resetTableAndAddInputRow("lock");
-  } else if (currentSalesType === "manual") {
-    resetTableAndAddInputRow("manual");
-  }
-
-  // Fokus ke field pertama yang relevan
-  if (currentSalesType === "aksesoris" || currentSalesType === "kotak") {
-    $("#btnTambah").focus();
-  } else if (currentSalesType === "gantiLock") {
-    $("#lockInputKode").focus();
-  } else if (currentSalesType === "manual") {
-    $("#manualInputKode").focus();
-  }
-}
-
-// Fungsi untuk memperbarui stok setelah penjualan
-async function updateStock(salesType, items) {
-  try {
-    // Untuk setiap item yang dijual, update stok di Firestore
-    for (const item of items) {
-      const kode = item.kodeText;
-
-      // Skip jika tidak ada kode atau jenis penjualan adalah gantiLock atau manual
-      if (!kode || salesType === "gantiLock" || salesType === "manual") continue;
-
-      // Cari dokumen stok berdasarkan kode
+    try {
+      // Update stok document
       const stockQuery = query(collection(firestore, "stokAksesoris"), where("kode", "==", kode));
-
       const stockSnapshot = await getDocs(stockQuery);
 
       if (!stockSnapshot.empty) {
-        // Dokumen stok ditemukan
         const stockDoc = stockSnapshot.docs[0];
-        const stockData = stockDoc.data();
-        const currentStock = stockData.stokAkhir || 0;
-        const jumlah = parseInt(item.jumlah) || 1;
-
-        // Hitung stok baru
-        let newStock = Math.max(0, currentStock - jumlah);
-
-        // Update stok di Firestore
         await updateDoc(doc(firestore, "stokAksesoris", stockDoc.id), {
           stokAkhir: newStock,
           lastUpdate: serverTimestamp(),
         });
-
-        // Tambahkan log transaksi stok
-        await addDoc(collection(firestore, "stokAksesorisTransaksi"), {
-          kode: kode,
-          nama: item.nama || "",
-          kategori: salesType === "kotak" ? "kotak" : "aksesoris",
-          jenis: salesType === "free" ? "free" : "laku",
-          jumlah: jumlah,
-          stokSebelum: currentStock,
-          stokSesudah: newStock,
-          timestamp: serverTimestamp(),
-          keterangan: `Penjualan ${salesType} oleh ${$("#sales").val() || "Admin"}`,
-        });
       } else {
-        // Jika stok tidak ditemukan, buat dokumen baru
-        console.warn(`Stok untuk kode ${kode} tidak ditemukan, membuat data baru`);
-
-        // Tambahkan dokumen stok baru
-        await addDoc(collection(firestore, "stokAksesoris"), {
-          kode: kode,
+        // Buat document baru jika tidak ada
+        const newStockData = {
+          kode,
           nama: item.nama || "",
-          kategori: salesType === "kotak" ? "kotak" : "aksesoris",
-          stokAwal: 0,
-          stokAkhir: 0, // Stok sudah terjual
+          kategori: this.determineCategory(kode),
+          stokAwal: currentStock,
+          stokAkhir: newStock,
+          hargaJual: 0,
           lastUpdate: serverTimestamp(),
-        });
+        };
 
-        // Tambahkan log transaksi stok
-        await addDoc(collection(firestore, "stokAksesorisTransaksi"), {
-          kode: kode,
-          nama: item.nama || "",
-          kategori: salesType === "kotak" ? "kotak" : "aksesoris",
-          jenis: salesType === "free" ? "free" : "laku",
-          jumlah: parseInt(item.jumlah) || 1,
-          stokSebelum: 0,
-          stokSesudah: 0,
-          timestamp: serverTimestamp(),
-          keterangan: `Penjualan ${salesType} oleh ${$("#sales").val() || "Admin"}`,
-        });
+        await addDoc(collection(firestore, "stokAksesoris"), newStockData);
       }
+
+      // Catat transaksi stok
+      await addDoc(collection(firestore, "stokAksesorisTransaksi"), {
+        kode,
+        nama: item.nama || "",
+        kategori: this.determineCategory(kode),
+        jenis: jenisTransaksi,
+        jumlah,
+        stokSebelum: currentStock,
+        stokSesudah: newStock,
+        stokAkhir: newStock,
+        timestamp: serverTimestamp(),
+        keterangan,
+        isGantiLock: isGantiLock || false,
+      });
+
+      console.log(`Updated stock for ${kode}: ${currentStock} → ${newStock} (${jenisTransaksi})`);
+    } catch (error) {
+      console.error(`Error updating stock for ${kode}:`, error);
+      throw error;
+    }
+  },
+
+  // Method helper untuk proses update stok
+  async processStockUpdate(kode, item, jenisTransaksi, keterangan) {
+    // Cari stok berdasarkan kode
+    const stockQuery = query(collection(firestore, "stokAksesoris"), where("kode", "==", kode));
+    const stockSnapshot = await getDocs(stockQuery);
+
+    let stockDoc,
+      currentStock = 0;
+
+    if (!stockSnapshot.empty) {
+      stockDoc = stockSnapshot.docs[0];
+      currentStock = stockDoc.data().stokAkhir || 0;
+    } else {
+      // Buat entry stok baru jika tidak ada
+      const newStockData = {
+        kode,
+        nama: item.nama || "",
+        kategori: this.determineCategory(kode),
+        stokAwal: 0,
+        stokAkhir: 0,
+        lastUpdate: serverTimestamp(),
+      };
+      const newStockRef = await addDoc(collection(firestore, "stokAksesoris"), newStockData);
+      stockDoc = { id: newStockRef.id };
     }
 
-    console.log("Stock updated successfully");
-    return true;
-  } catch (error) {
-    console.error("Error updating stock:", error);
-    throw error; // Re-throw untuk penanganan di fungsi pemanggil
-  }
-}
+    // Update stok hanya untuk transaksi yang mengurangi stok
+    const jumlah = parseInt(item.jumlah) || 1;
+    const newStock = Math.max(0, currentStock - jumlah);
 
-// Function to reset the form after transaction
-function resetForm() {
+    await updateDoc(doc(firestore, "stokAksesoris", stockDoc.id), {
+      stokAkhir: newStock,
+      lastUpdate: serverTimestamp(),
+    });
+
+    // Catat transaksi stok
+    await addDoc(collection(firestore, "stokAksesorisTransaksi"), {
+      kode,
+      nama: item.nama || "",
+      kategori: this.determineCategory(kode),
+      jenis: jenisTransaksi,
+      jumlah,
+      stokSebelum: currentStock,
+      stokSesudah: newStock,
+      stokAkhir: newStock,
+      timestamp: serverTimestamp(),
+      keterangan,
+    });
+  },
+
+  // Helper untuk menentukan kategori berdasarkan kode
+  determineCategory(kode) {
+    // Logic sederhana berdasarkan pattern kode atau bisa disesuaikan
+    if (kode.startsWith("K") || kode.includes("KOTAK")) return "kotak";
+    return "aksesoris";
+  },
+  // Print receipt
+  printReceipt() {
+    if (!currentTransactionData) {
+      utils.showAlert("Tidak ada data transaksi untuk dicetak!");
+      return;
+    }
+
+    const transaction = currentTransactionData;
+    const printWindow = window.open("", "_blank");
+
+    if (!printWindow) {
+      utils.showAlert("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak.", "Error", "error");
+      return;
+    }
+
+    let receiptHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Struk Kasir</title>
+        <style>
+          body {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin: 0;
+            padding: 0;
+            width: 80mm;
+          }
+          .receipt {          
+            margin: 0 auto;
+            padding: 5mm;
+          }
+          .receipt h3, .receipt h4 {
+            text-align: center;
+            margin: 2mm 0;
+          }
+          .receipt hr {
+            border-top: 1px dashed #000;
+          }
+          .receipt table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+          .receipt th, .receipt td {
+            text-align: left;
+            padding: 1mm 2mm;
+          }
+          .text-center {
+            text-align: center;
+          }
+          .text-right {
+            text-align: right;
+          }
+          .keterangan {
+            font-style: italic;
+            font-size: 10px;
+            margin-top: 2mm;
+            border-top: 1px dotted #000;
+            padding-top: 2mm;
+          }
+          .payment-info {
+            margin-top: 2mm;
+            border-top: 1px dotted #000;
+            padding-top: 2mm;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="receipt">
+          <h3>MELATI 3</h3>
+          <h4>JL. DIPONEGORO NO. 116</h4>
+          <h4>NOTA PENJUALAN ${transaction.salesType.toUpperCase()}</h4>
+          <hr>
+          <p>Tanggal: ${transaction.tanggal}<br>Sales: ${transaction.sales}</p>
+          <hr>
+          <table>
+            <tr>
+              <th>Kode</th>
+              <th>Nama</th>
+              <th>Kadar</th>
+              <th>Gr</th>
+              <th>Harga</th>
+            </tr>
+    `;
+
+    let hasKeterangan = false;
+    let keteranganText = "";
+
+    transaction.items.forEach((item) => {
+      const itemHarga = parseInt(item.totalHarga) || 0;
+      receiptHTML += `
+        <tr>
+          <td>${item.kodeText || "-"}</td>
+          <td>${item.nama || "-"}</td>
+          <td>${item.kadar || "-"}</td>
+          <td>${item.berat || "-"}</td>
+          <td class="text-right">${utils.formatRupiah(itemHarga)}</td>
+        </tr>
+      `;
+
+      if (item.keterangan && item.keterangan.trim() !== "") {
+        hasKeterangan = true;
+        keteranganText += item.keterangan + " ";
+      }
+    });
+
+    const totalHarga = parseInt(transaction.totalHarga.replace(/\./g, "")) || 0;
+    receiptHTML += `
+            <tr>
+              <td colspan="4" class="text-right"><strong>Total:</strong></td>
+              <td class="text-right"><strong>${utils.formatRupiah(totalHarga)}</strong></td>
+            </tr>
+          </table>
+    `;
+
+    // Add DP information if applicable
+    if (transaction.metodeBayar === "dp") {
+      const dpAmount = parseInt(transaction.nominalDP.replace(/\./g, "")) || 0;
+      const remainingAmount = parseInt(transaction.sisaPembayaran.replace(/\./g, "")) || 0;
+
+      receiptHTML += `
+          <div class="payment-info">
+            <table>
+              <tr>
+                <td>Total Harga:</td>
+                <td class="text-right">${utils.formatRupiah(totalHarga)}</td>
+              </tr>
+              <tr>
+                <td>DP:</td>
+                <td class="text-right">${utils.formatRupiah(dpAmount)}</td>
+              </tr>
+              <tr>
+                <td><strong>SISA:</strong></td>
+                <td class="text-right"><strong>${utils.formatRupiah(remainingAmount)}</strong></td>
+              </tr>
+            </table>
+          </div>
+      `;
+    }
+
+    // Add keterangan if exists and is manual sale
+    if (hasKeterangan && transaction.salesType === "manual") {
+      receiptHTML += `
+          <div class="keterangan">
+            <strong>Keterangan:</strong> ${keteranganText.trim()}
+          </div>
+      `;
+    }
+
+    receiptHTML += `
+          <hr>
+          <p class="text-center">Terima Kasih<br>Atas Kunjungan Anda</p>
+        </div>
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(receiptHTML);
+    printWindow.document.close();
+  },
+
+  // Print invoice
+  printInvoice() {
+    if (!currentTransactionData) {
+      utils.showAlert("Tidak ada data transaksi untuk dicetak!");
+      return;
+    }
+
+    const transaction = currentTransactionData;
+    const printWindow = window.open("", "_blank");
+
+    if (!printWindow) {
+      utils.showAlert("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak.", "Error", "error");
+      return;
+    }
+
+    let invoiceHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice Customer</title>
+        <style>
+          @page {
+            size: 10cm 20cm;
+            margin: 0;
+          }
+          body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            margin: 0;
+            padding: 5mm;
+            width: 20cm;
+            box-sizing: border-box;
+          }
+          .invoice {
+            width: 100%;
+          }
+          .header-info {
+            text-align: right;
+            margin-bottom: 2cm;
+            margin-right: 3cm;
+            margin-top: 1cm;
+          }         
+          .total-row {
+            margin-top: 1.9cm;
+            text-align: right;
+            font-weight: bold;
+            margin-right: 3cm;
+          }
+          .sales {
+            text-align: right;
+            margin-top: 0.6cm;
+            margin-right: 2cm;
+          }
+          .keterangan {
+            font-style: italic;
+            font-size: 10px;
+            margin-top: 1cm;
+            padding-top: 2mm;
+            text-align: left;
+            margin-left: 1cm;
+            margin-right: 3cm;
+          }
+          .item-details {
+            display: flex;
+            flex-wrap: wrap;
+          }
+          .item-data {
+            display: grid;
+            grid-template-columns: 2cm 1.8cm 5cm 2cm 2cm 2cm;
+            width: 100%;
+            column-gap: 0.2cm;
+            margin-left: 1cm;
+            margin-top: 1.5cm;
+            margin-right: 3cm;
+          }
+          .item-data span {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="invoice">
+          <div class="header-info">
+            <p>${transaction.tanggal}</p>
+          </div>
+          <hr>
+    `;
+
+    let hasKeterangan = false;
+    let keteranganText = "";
+    let totalHarga = 0;
+
+    transaction.items.forEach((item) => {
+      const itemHarga = parseInt(item.totalHarga) || 0;
+      totalHarga += itemHarga;
+
+      invoiceHTML += `
+        <div class="item-details">
+          <div class="item-data">
+            <span>${item.kodeText || "-"}</span>
+            <span>${item.jumlah || "1"}pcs</span>
+            <span>${item.nama || "-"}</span>
+            <span>${item.kadar || "-"}</span>
+            <span>${item.berat || "-"}gr</span>
+            <span>${utils.formatRupiah(itemHarga)}</span>
+          </div>
+        </div>
+      `;
+
+      if (item.keterangan && item.keterangan.trim() !== "") {
+        hasKeterangan = true;
+        keteranganText += `${item.keterangan}; `;
+      }
+    });
+
+    invoiceHTML += `
+        <div class="total-row">
+          Rp ${utils.formatRupiah(totalHarga)}
+        </div>
+        <div class="sales">${transaction.sales || "-"}</div>
+    `;
+
+    if (hasKeterangan && transaction.salesType === "manual") {
+      invoiceHTML += `
+        <div class="keterangan">
+          <strong>Keterangan:</strong><br>
+          ${keteranganText.trim()}
+        </div>
+      `;
+    }
+
+    invoiceHTML += `
+        </div>
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(invoiceHTML);
+    printWindow.document.close();
+  },
+
+  // Reset form
+  resetForm() {
+    try {
+      // Reset sales type to default
+      $("#jenisPenjualan").val("aksesoris").trigger("change");
+
+      // Reset date to current date
+      this.setDefaultDate();
+
+      // Reset sales name field
+      $("#sales").val("").removeClass("is-valid is-invalid");
+
+      // Clear all tables
+      $("#tableAksesorisDetail tbody, #tableKotakDetail tbody, #tableManualDetail tbody").empty();
+
+      // Reset payment fields
+      $("#metodeBayar").val("tunai").trigger("change");
+      $("#nominalDP, #totalOngkos, #sisaPembayaran, #jumlahBayar, #kembalian").val("");
+
+      // Reset grand totals
+      $("#grand-total-aksesoris, #grand-total-kotak, #grand-total-manual").text("0");
+
+      // Clear current transaction data
+      currentTransactionData = null;
+
+      // Set focus to sales field
+      $("#sales").focus();
+
+      console.log("Form reset successfully");
+    } catch (error) {
+      console.error("Error resetting form:", error);
+    }
+  },
+
+  // Cleanup when page unloads
+  cleanup() {
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+    }
+
+    // Clear old cache entries
+    cacheManager.clearOldCache();
+  },
+};
+
+// Initialize when document is ready
+$(document).ready(async function () {
   try {
-    // Reset sales type to default
-    $("#jenisPenjualan").val("aksesoris").trigger("change");
+    // Initialize print event handlers
+    $("#btnPrintReceipt")
+      .off("click")
+      .on("click", () => penjualanHandler.printReceipt());
+    $("#btnPrintInvoice")
+      .off("click")
+      .on("click", () => penjualanHandler.printInvoice());
 
-    // Reset date to current date
-    const today = new Date();
-    const formattedDate = formatDate(today);
-    $("#tanggal").val(formattedDate);
+    // Add refresh stock button if not exists
+    if ($("#refreshStok").length === 0) {
+      $(".catalog-select").before(`
+        <button type="button" class="btn btn-outline-primary me-2" id="refreshStok">
+          <i class="fas fa-sync-alt me-1"></i> Refresh Stok
+        </button>
+      `);
+    }
 
-    // Reset sales name field
-    $("#sales").val("").removeClass("is-valid is-invalid");
+    // Initialize the main handler
+    await penjualanHandler.init();
 
-    // Clear all tables
-    $("#tableAksesorisDetail tbody").empty();
-    $("#tableKotakDetail tbody").empty();
-    $("#tableLockDetail tbody").empty();
-    $("#tableManualDetail tbody").empty();
-
-    // Reset payment fields
-    $("#metodeBayar").val("tunai").trigger("change");
-    $("#nominalDP").val("");
-    $("#totalOngkos").val("0");
-    $("#sisaPembayaran").val("0");
-    $("#jumlahBayar").val("");
-    $("#kembalian").val("0");
-
-    // Reset grand totals
-    $("#grand-total-aksesoris").text("0");
-    $("#grand-total-kotak").text("0");
-    $("#grand-total-lock").text("0");
-    $("#grand-total-manual").text("0");
-
-    // Set focus to sales field after reset
-    $("#sales").focus();
-
-    console.log("Form reset successfully");
+    console.log("Penjualan Aksesoris initialized successfully");
+    console.log("Cache info:", cacheManager.getCacheInfo());
   } catch (error) {
-    console.error("Error resetting form:", error);
+    console.error("Error initializing penjualan aksesoris:", error);
+    utils.showAlert("Terjadi kesalahan saat memuat halaman: " + error.message, "Error", "error");
   }
+});
+
+// Cleanup when page unloads
+$(window).on("beforeunload", () => {
+  penjualanHandler.cleanup();
+});
+
+// Handle visibility change to refresh data when tab becomes active
+document.addEventListener("visibilitychange", async () => {
+  if (!document.hidden) {
+    // Page became visible, check if cache is stale
+    const stockCacheAge = 3 * 60 * 1000; // 3 minutes
+    const salesCacheAge = 1 * 60 * 1000; // 1 minute
+
+    if (!cacheManager.isValid("stockData", stockCacheAge)) {
+      console.log("Refreshing stale stock cache");
+      await penjualanHandler.loadStockData(true);
+    }
+
+    if (!cacheManager.isValid("todaySales", salesCacheAge)) {
+      console.log("Refreshing stale sales cache");
+      await penjualanHandler.loadTodaySales(true);
+    }
+  }
+});
+
+// Export for potential use in other modules
+window.penjualanHandler = penjualanHandler;
+window.cacheManager = cacheManager;
+
+// Utility functions for backward compatibility
+function showAlert(message, title = "Informasi", type = "info") {
+  return utils.showAlert(message, title, type);
 }
 
-// Search functionality for aksesoris modal
-$("#searchAksesoris").on("input", function () {
-  const searchText = $(this).val().toLowerCase();
+function showConfirm(message, title = "Konfirmasi") {
+  return utils.showConfirm(message, title);
+}
 
-  $("#tableAksesoris tbody tr").each(function () {
-    const kode = $(this).find("td:nth-child(1)").text().toLowerCase();
-    const nama = $(this).find("td:nth-child(2)").text().toLowerCase();
+function formatDate(date) {
+  return utils.formatDate(date);
+}
 
-    if (kode.includes(searchText) || nama.includes(searchText)) {
-      $(this).show();
-    } else {
-      $(this).hide();
+// Auto-clear cache every hour to prevent localStorage bloat
+setInterval(() => {
+  cacheManager.clearOldCache();
+  console.log("Performed automatic cache cleanup");
+}, 60 * 60 * 1000);
+
+// Monitor localStorage usage
+setInterval(() => {
+  try {
+    const usage = JSON.stringify(localStorage).length;
+    const maxSize = 5 * 1024 * 1024; // 5MB typical limit
+
+    if (usage > maxSize * 0.8) {
+      // 80% of limit
+      console.warn("localStorage usage high:", usage, "bytes");
+      cacheManager.clearOldCache();
     }
-  });
-});
-
-// Search functionality for kotak modal
-$("#searchKotak").on("input", function () {
-  const searchText = $(this).val().toLowerCase();
-
-  $("#tableKotak tbody tr").each(function () {
-    const kode = $(this).find("td:nth-child(1)").text().toLowerCase();
-    const nama = $(this).find("td:nth-child(2)").text().toLowerCase();
-
-    if (kode.includes(searchText) || nama.includes(searchText)) {
-      $(this).show();
-    } else {
-      $(this).hide();
-    }
-  });
-});
+  } catch (error) {
+    console.warn("Could not check localStorage usage:", error);
+  }
+}, 5 * 60 * 1000); // Check every 5 minutes

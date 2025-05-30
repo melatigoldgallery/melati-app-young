@@ -116,6 +116,24 @@
               </a>
             </li>
             <li class="nav-item">
+              <a class="nav-link" href="manajemenStok.html">
+                <i class="fa-solid fa-boxes-stacked"></i>
+                <span class="menu-text">Manajemen Stok</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="mutasiKode.html">
+                <i class="fa-solid fa-calendar-xmark"></i>
+                <span class="menu-text">Mutasi Kode</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link active" href="maintenance.html">
+                <i class="fas fa-tools"></i>
+                <span class="menu-text">Maintenance</span>
+              </a>
+            </li>
+            <li class="nav-item">
               <a
                 class="nav-link collapsed"
                 href="#"
@@ -165,21 +183,27 @@
               <div class="collapse" id="aksesorisSubmenu" data-bs-parent="#sidebarAccordion">
                 <ul class="nav flex-column ms-3">
                   <li class="nav-item">
-                    <a class="nav-link active" href="tambahAksesoris.html">
+                    <a class="nav-link" href="tambahAksesoris.html">
                       <i class="fas fa-plus-circle"></i>
                       <span class="menu-text">Tambah Aksesoris</span>
                     </a>
                   </li>
                   <li class="nav-item">
-                    <a class="nav-link" href="penjualanAksesoris.html">
+                    <a class="nav-link" href="dataPenjualan.html">
                       <i class="fas fa-shopping-cart"></i>
                       <span class="menu-text">Penjualan Aksesoris</span>
                     </a>
                   </li>
                   <li class="nav-item">
-                    <a class="nav-link" href="laporanAksesoris.html">
-                      <i class="fas fa-chart-bar"></i>
-                      <span class="menu-text">Laporan Aksesoris</span>
+                    <a class="nav-link" href="laporanPenjualan.html">
+                      <i class="fas fa-chart-line"></i>
+                      <span class="menu-text">Laporan Penjualan</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="laporanStok.html">
+                      <i class="fas fa-boxes"></i>
+                      <span class="menu-text">Laporan Stok</span>
                     </a>
                   </li>
                 </ul>
@@ -325,6 +349,7 @@
                 </button>
               </div>
             </div>
+            <!-- Perbaiki section riwayat dengan filter tanggal dan print laporan -->
             <div class="card mb-4">
               <div class="card-header">
                 <h2>
@@ -335,18 +360,36 @@
               <div class="card-body">
                 <div class="row mb-3">
                   <div class="col-md-3">
-                    <label for="filterDate" class="form-label">Filter Tanggal</label>
+                    <label for="filterDateStart" class="form-label">Tanggal Mulai</label>
                     <div class="input-group">
-                      <input type="text" class="form-control datepicker" id="filterDate" placeholder="Pilih tanggal" />
-                      <span class="input-group-text bg-primary text-white" id="filterDateIcon" style="cursor: pointer">
+                      <input
+                        type="text"
+                        class="form-control datepicker"
+                        id="filterDateStart"
+                        placeholder="dd/mm/yyyy"
+                      />
+                      <span class="input-group-text bg-primary text-white" style="cursor: pointer">
                         <i class="fa-solid fa-calendar-days"></i>
                       </span>
                     </div>
                   </div>
-                  <div class="col-md-2 d-flex align-items-end">
-                    <button class="btn btn-primary" id="btnFilterHistory">
+                  <div class="col-md-3">
+                    <label for="filterDateEnd" class="form-label">Tanggal Akhir</label>
+                    <div class="input-group">
+                      <input type="text" class="form-control datepicker" id="filterDateEnd" placeholder="dd/mm/yyyy" />
+                      <span class="input-group-text bg-primary text-white" style="cursor: pointer">
+                        <i class="fa-solid fa-calendar-days"></i>
+                      </span>
+                    </div>
+                  </div>
+                  <div class="col-md-3 d-flex align-items-end">
+                    <button class="btn btn-primary me-2" id="btnFilterHistory">
                       <i class="fas fa-filter me-2"></i>
                       Filter
+                    </button>
+                    <button class="btn btn-success" id="btnPrintLaporan">
+                      <i class="fas fa-print me-2"></i>
+                      Print Laporan
                     </button>
                   </div>
                 </div>
