@@ -12,24 +12,29 @@ import {
   orderBy,
   Timestamp,
   serverTimestamp,
+  onSnapshot,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
 // Konstanta untuk caching
 const CACHE_KEY = "kodeDataCache";
-const CACHE_DURATION = 5 * 60 * 1000; // 5 menit dalam milidetik
+const CACHE_DURATION = 10 * 60 * 1000; // 10 menit
+const CACHE_VERSION = "v3.0"; // Update versi untuk sistem fallback
 
-// Fungsi untuk menampilkan alert yang lebih menarik
+// Variabel untuk real-time listener dan tracking sumber data
+let unsubscribeListener = null;
+let currentDataSource = null; // Track sumber data yang sedang digunakan
+
+// Fungsi utility untuk alert dan konfirmasi
 function showAlert(message, title = "Informasi", type = "info") {
   return Swal.fire({
     title: title,
     text: message,
-    icon: type, // 'success', 'error', 'warning', 'info', 'question'
+    icon: type,
     confirmButtonText: "OK",
-    confirmButtonColor: "#0d6efd", // Warna primary Bootstrap
+    confirmButtonColor: "#0d6efd",
   });
 }
 
-// Fungsi untuk konfirmasi
 function showConfirm(message, title = "Konfirmasi") {
   return Swal.fire({
     title: title,
@@ -40,15 +45,13 @@ function showConfirm(message, title = "Konfirmasi") {
     cancelButtonText: "Batal",
     confirmButtonColor: "#0d6efd",
     cancelButtonColor: "#6c757d",
-  }).then((result) => {
-    return result.isConfirmed;
-  });
+  }).then((result) => result.isConfirmed);
 }
 
 // Definisi jenis barang
 const jenisBarang = {
   C: "Cincin",
-  K: "Kalung",
+  K: "Kalung", 
   L: "Liontin",
   A: "Anting",
   G: "Gelang",
@@ -67,72 +70,191 @@ let selectedKodes = {
   mutated: new Set(),
 };
 
-// Fungsi untuk memeriksa apakah cache masih valid
+// Fungsi untuk cache management
 function isCacheValid() {
   const cachedData = localStorage.getItem(CACHE_KEY);
   if (!cachedData) return false;
 
   try {
-    const { timestamp, data } = JSON.parse(cachedData);
-    return Date.now() - timestamp < CACHE_DURATION;
+    const { timestamp, data, version } = JSON.parse(cachedData);
+    return version === CACHE_VERSION && Date.now() - timestamp < CACHE_DURATION;
   } catch (error) {
     console.error("Error parsing cache:", error);
+    localStorage.removeItem(CACHE_KEY);
     return false;
   }
 }
 
-// Fungsi untuk menyimpan data ke cache
-function saveToCache(data) {
+function saveToCache(data, source) {
   try {
     const cacheData = {
       timestamp: Date.now(),
+      version: CACHE_VERSION,
       data: data,
+      source: source, // Track sumber data
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
-    console.log("Data saved to cache");
+    console.log(`Data saved to cache from source: ${source}`);
   } catch (error) {
     console.error("Error saving to cache:", error);
+    try {
+      localStorage.removeItem(CACHE_KEY);
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+    } catch (retryError) {
+      console.error("Failed to save cache after cleanup:", retryError);
+    }
   }
 }
 
-// Fungsi untuk mengambil data dari cache
 function getFromCache() {
   try {
     const cachedData = localStorage.getItem(CACHE_KEY);
     if (cachedData) {
-      const { data } = JSON.parse(cachedData);
-      return data;
+      const { data, version, source } = JSON.parse(cachedData);
+      if (version === CACHE_VERSION) {
+        console.log(`Using cached data from source: ${source}`);
+        currentDataSource = source;
+        return data;
+      } else {
+        localStorage.removeItem(CACHE_KEY);
+        console.log("Old cache version removed");
+      }
     }
     return null;
   } catch (error) {
     console.error("Error getting from cache:", error);
+    localStorage.removeItem(CACHE_KEY);
     return null;
   }
 }
 
-// Fungsi untuk memuat data kode dari Firestore atau cache
-async function loadKodeData(forceRefresh = false) {
-  try {
-    // Cek apakah cache valid dan tidak dipaksa refresh
-    if (!forceRefresh && isCacheValid()) {
-      console.log("Using cached data");
-      const cachedData = getFromCache();
-      if (cachedData) {
-        kodeData = cachedData;
-        updateKodeDisplay();
-        updateCounters();
-        return;
-      }
+// Fungsi untuk memproses data dari penjualanAksesoris
+function processPenjualanData(docs) {
+  const processedData = {
+    active: [],
+    mutated: [],
+  };
+
+  docs.forEach((doc) => {
+    const data = { id: doc.id, ...doc.data() };
+    
+    // Filter hanya penjualan manual dengan items yang memiliki kode
+    if (data.jenisPenjualan !== "manual" || !data.items || !Array.isArray(data.items)) {
+      return;
     }
 
-    console.log("Fetching fresh data from Firestore");
+    // Proses setiap item dalam transaksi
+    data.items.forEach((item, index) => {
+      // Skip item yang tidak memiliki kode atau kode kosong
+      if (!item.kodeText || item.kodeText === "-" || !item.kodeText.trim()) {
+        return;
+      }
 
-    // Reset data
-    kodeData = {
-      active: [],
-      mutated: [],
+      const kode = item.kodeText.trim();
+      const prefix = kode.charAt(0).toUpperCase();
+
+      // Periksa apakah prefix ada dalam daftar jenis barang
+      if (!(prefix in jenisBarang)) {
+        console.warn("Unknown prefix:", prefix, "for code:", kode);
+        return;
+      }
+
+      // Buat objek kode dengan struktur yang konsisten
+      const kodeItem = {
+        id: `${data.id}_${index}`, // ID unik untuk setiap item
+        kode: kode,
+        nama: item.nama || "Tidak ada nama",
+        kadar: item.kadar || "-",
+        berat: item.berat || 0,
+        tanggalInput: data.tanggal || formatTimestamp(data.timestamp),
+        keterangan: item.keterangan || "",
+        jenisPrefix: prefix,
+        jenisNama: jenisBarang[prefix],
+        penjualanId: data.id,
+        isMutated: false, // Data dari penjualan selalu aktif
+        tanggalMutasi: null,
+        mutasiKeterangan: "",
+        mutasiHistory: [],
+        // Metadata tambahan
+        timestamp: data.timestamp,
+        lastUpdated: data.timestamp,
+        sales: data.sales || "",
+        hargaPerGram: item.hargaPerGram || 0,
+        totalHarga: item.totalHarga || 0,
+      };
+
+      // Semua data dari penjualanAksesoris dianggap aktif
+      processedData.active.push(kodeItem);
+    });
+  });
+
+  return processedData;
+}
+
+// Fungsi untuk memproses data dari mutasiKode
+function processMutasiKodeData(docs) {
+  const processedData = {
+    active: [],
+    mutated: [],
+  };
+
+  docs.forEach((doc) => {
+    const data = { id: doc.id, ...doc.data() };
+    
+    // Validasi data yang diperlukan
+    if (!data.kode || !data.namaBarang) {
+      console.warn("Invalid mutasiKode data found:", data);
+      return;
+    }
+
+    const prefix = data.kode.charAt(0).toUpperCase();
+
+    // Periksa apakah prefix ada dalam daftar jenis barang
+    if (!(prefix in jenisBarang)) {
+      console.warn("Unknown prefix:", prefix, "for code:", data.kode);
+      return;
+    }
+
+    // Buat objek kode dengan struktur yang konsisten
+    const kodeItem = {
+      id: data.id,
+      kode: data.kode,
+      nama: data.namaBarang || "Tidak ada nama",
+      kadar: data.kadar || "-",
+      berat: data.berat || 0,
+      tanggalInput: data.tanggalInput || formatTimestamp(data.timestamp || data.createdAt),
+      keterangan: data.keterangan || "",
+      jenisPrefix: prefix,
+      jenisNama: jenisBarang[prefix],
+      penjualanId: data.penjualanId || data.id,
+      isMutated: data.isMutated || false,
+      tanggalMutasi: data.tanggalMutasi || null,
+      mutasiKeterangan: data.mutasiKeterangan || "",
+      mutasiHistory: data.mutasiHistory || [],
+      // Metadata tambahan
+      timestamp: data.timestamp || data.createdAt,
+      lastUpdated: data.lastUpdated || data.timestamp || data.createdAt,
+      sales: data.sales || "",
+      hargaPerGram: data.hargaPerGram || 0,
+      totalHarga: data.totalHarga || 0,
     };
 
+    // Tambahkan ke array yang sesuai berdasarkan status mutasi
+    if (kodeItem.isMutated) {
+      processedData.mutated.push(kodeItem);
+    } else {
+      processedData.active.push(kodeItem);
+    }
+  });
+
+  return processedData;
+}
+
+// Fungsi untuk mengambil data dari penjualanAksesoris
+async function loadFromPenjualanAksesoris() {
+  try {
+    console.log("Attempting to load data from penjualanAksesoris...");
+    
     // Query untuk mengambil data penjualan manual
     const penjualanQuery = query(
       collection(firestore, "penjualanAksesoris"),
@@ -140,338 +262,296 @@ async function loadKodeData(forceRefresh = false) {
       orderBy("timestamp", "desc")
     );
 
-    const penjualanSnapshot = await getDocs(penjualanQuery);
+    const querySnapshot = await getDocs(penjualanQuery);
+    
+    if (querySnapshot.empty) {
+      console.log("No data found in penjualanAksesoris");
+      return null;
+    }
 
-    // Proses setiap dokumen penjualan
-    penjualanSnapshot.forEach((doc) => {
-      const penjualan = { id: doc.id, ...doc.data() };
+    console.log(`Found ${querySnapshot.docs.length} manual transactions in penjualanAksesoris`);
+    
+    // Proses data yang diterima
+    const processedData = processPenjualanData(querySnapshot.docs);
+    
+    // Filter hanya yang memiliki kode
+    const totalItems = processedData.active.length + processedData.mutated.length;
+    
+    if (totalItems === 0) {
+      console.log("No items with barcode found in penjualanAksesoris");
+      return null;
+    }
 
-      // Proses setiap item dalam penjualan
-      if (penjualan.items && Array.isArray(penjualan.items)) {
-        penjualan.items.forEach((item) => {
-          // Periksa apakah kode memenuhi pola (huruf diikuti angka)
-          if (item.kodeText && /^[a-zA-Z]+-\d+$/.test(item.kodeText)) {
-            // Ekstrak prefix kode (huruf pertama)
-            const prefix = item.kodeText.charAt(0).toUpperCase();
+    console.log(`Processed ${totalItems} items with barcode from penjualanAksesoris`);
+    currentDataSource = "penjualanAksesoris";
+    
+    return processedData;
+  } catch (error) {
+    console.error("Error loading from penjualanAksesoris:", error);
+    return null;
+  }
+}
 
-            // Periksa apakah prefix ada dalam daftar jenis barang
-            if (prefix in jenisBarang) {
-              // Buat objek kode
-              const kodeItem = {
-                id: `${penjualan.id}_${item.kodeText}`,
-                kode: item.kodeText,
-                nama: item.nama || "Tidak ada nama",
-                kadar: item.kadar || "-",
-                berat: item.berat || 0,
-                tanggalInput: penjualan.tanggal || formatTimestamp(penjualan.timestamp),
-                keterangan: item.keterangan || "",
-                jenisPrefix: prefix,
-                jenisNama: jenisBarang[prefix],
-                penjualanId: penjualan.id,
-                isMutated: item.isMutated || false,
-                tanggalMutasi: item.tanggalMutasi || null,
-                mutasiKeterangan: item.mutasiKeterangan || "",
-                mutasiHistory: item.mutasiHistory || [],
-              };
+// Fungsi untuk mengambil data dari mutasiKode
+async function loadFromMutasiKode() {
+  try {
+    console.log("Loading data from mutasiKode collection...");
+    
+    const mutasiKodeQuery = query(
+      collection(firestore, "mutasiKode"),
+      orderBy("timestamp", "desc")
+    );
 
-              // Tambahkan ke array yang sesuai berdasarkan status mutasi
-              if (kodeItem.isMutated) {
-                kodeData.mutated.push(kodeItem);
-              } else {
-                kodeData.active.push(kodeItem);
-              }
-            }
-          }
-        });
+    const querySnapshot = await getDocs(mutasiKodeQuery);
+    
+    if (querySnapshot.empty) {
+      console.log("No data found in mutasiKode");
+      return {
+        active: [],
+        mutated: [],
+      };
+    }
+
+    console.log(`Found ${querySnapshot.docs.length} items in mutasiKode`);
+    
+    // Proses data yang diterima
+    const processedData = processMutasiKodeData(querySnapshot.docs);
+    
+    console.log(`Processed data from mutasiKode: ${processedData.active.length} active, ${processedData.mutated.length} mutated`);
+    currentDataSource = "mutasiKode";
+    
+    return processedData;
+  } catch (error) {
+    console.error("Error loading from mutasiKode:", error);
+    throw error;
+  }
+}
+
+// Fungsi utama untuk memuat data dengan sistem fallback
+async function loadKodeData(forceRefresh = false) {
+  try {
+    // Cek cache terlebih dahulu jika tidak dipaksa refresh
+    if (!forceRefresh && isCacheValid()) {
+      console.log("Using cached data");
+      const cachedData = getFromCache();
+      if (cachedData) {
+        kodeData = cachedData;
+        updateKodeDisplay();
+        updateCounters();
+        updateDataSourceIndicator();
+        return;
       }
+    }
+
+    console.log("Fetching fresh data...");
+
+    // Tampilkan loading indicator
+    const loadingToast = Swal.fire({
+      title: "Memuat Data",
+      text: "Mengambil data dari server...",
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
     });
 
-    // Simpan data ke cache
-    saveToCache(kodeData);
+    let loadedData = null;
+
+    // Prioritas 1: Coba ambil dari penjualanAksesoris
+    loadedData = await loadFromPenjualanAksesoris();
+
+    // Prioritas 2: Jika gagal atau kosong, ambil dari mutasiKode
+    if (!loadedData) {
+      console.log("Falling back to mutasiKode collection...");
+      loadedData = await loadFromMutasiKode();
+    }
+
+    // Set data yang berhasil dimuat
+    kodeData = loadedData;
+
+    // Urutkan data berdasarkan timestamp terbaru
+    sortKodeData();
+
+    // Simpan ke cache dengan informasi sumber
+    saveToCache(kodeData, currentDataSource);
 
     // Update tampilan
     updateKodeDisplay();
-
-    // Update counter
     updateCounters();
+    updateDataSourceIndicator();
 
-    console.log("Data kode berhasil dimuat:", kodeData);
+    // Tutup loading
+    loadingToast.close();
+
+    console.log(`Data successfully loaded from ${currentDataSource}:`, {
+      active: kodeData.active.length,
+      mutated: kodeData.mutated.length
+    });
+
   } catch (error) {
     console.error("Error loading kode data:", error);
-    showAlert("Gagal memuat data kode: " + error.message, "Error", "error");
-  }
-}
-
-// Fungsi untuk memperbarui tampilan kode
-function updateKodeDisplay() {
-  // Filter berdasarkan kriteria yang dipilih
-  const filteredActive = filterKodeData(kodeData.active);
-  const filteredMutated = filterKodeData(kodeData.mutated);
-
-  // Render tabel kode aktif
-  renderKodeTable(filteredActive, "active");
-
-  // Render tabel kode yang sudah dimutasi
-  renderKodeTable(filteredMutated, "mutated");
-
-  // Update counter
-  updateCounters();
-}
-
-// Fungsi untuk memfilter data kode berdasarkan kriteria
-function filterKodeData(data) {
-  const jenisFilter = $("#filterJenis").val();
-  const searchText = $("#searchKode").val().toLowerCase();
-
-  return data.filter((item) => {
-    // Filter berdasarkan jenis barang
-    if (jenisFilter && item.jenisPrefix !== jenisFilter) {
-      return false;
-    }
-
-    // Filter berdasarkan teks pencarian
-    if (searchText) {
-      const matchesKode = item.kode.toLowerCase().includes(searchText);
-      const matchesNama = item.nama.toLowerCase().includes(searchText);
-
-      if (!matchesKode && !matchesNama) {
-        return false;
-      }
-    }
-
-    return true;
-  });
-}
-
-// Fungsi untuk merender tabel kode
-function renderKodeTable(data, type) {
-  const tableId = type === "active" ? "tableActiveKode" : "tableMutatedKode";
-  const tableBody = $(`#${tableId} tbody`);
-
-  // Kosongkan tabel
-  tableBody.empty();
-
-  // Jika tidak ada data, tampilkan pesan
-  if (data.length === 0) {
-    const colSpan = type === "active" ? 6 : 6;
-    tableBody.html(`<tr><td colspan="${colSpan}" class="text-center">Tidak ada data kode</td></tr>`);
-    return;
-  }
-
-  // Render baris untuk setiap item
-  data.forEach((item) => {
-    const row = `
-      <tr data-id="${item.id}">
-        <td>
-          <input type="checkbox" class="form-check-input kode-checkbox" data-id="${item.id}" data-type="${type}">
-        </td>
-        <td>${item.kode}</td>
-        <td>${item.nama}</td>
-        <td>${item.kadar}</td>
-        <td>${item.berat}</td>
-        <td>${type === "active" ? item.tanggalInput : item.tanggalMutasi || "-"}</td>
-        <td>
-          <button class="btn btn-sm btn-info btn-detail" data-id="${item.id}" data-type="${type}">
-            <i class="fas fa-info-circle"></i>
-          </button>
-          ${
-            type === "active"
-              ? `
-          <button class="btn btn-sm btn-warning btn-mutasi" data-id="${item.id}">
-            <i class="fas fa-exchange-alt"></i>
-          </button>
-          `
-              : `
-          <button class="btn btn-sm btn-secondary btn-restore" data-id="${item.id}">
-            <i class="fas fa-undo"></i>
-          </button>
-          `
-          }
-        </td>
-      </tr>
-    `;
-
-    tableBody.append(row);
-  });
-
-  // Attach event handlers
-  attachTableEventHandlers(type);
-}
-
-// Fungsi untuk menambahkan event handler ke tabel
-function attachTableEventHandlers(type) {
-  // Handler untuk checkbox
-  $(`#table${type.charAt(0).toUpperCase() + type.slice(1)}Kode .kode-checkbox`).on("change", function () {
-    const id = $(this).data("id");
-    const checkboxType = $(this).data("type");
-
-    if ($(this).is(":checked")) {
-      selectedKodes[checkboxType].add(id);
+    
+    // Tutup loading jika ada error
+    Swal.close();
+    
+    // Coba gunakan cache sebagai fallback
+    const cachedData = getFromCache();
+    if (cachedData) {
+      console.log("Using cached data as fallback");
+      kodeData = cachedData;
+      updateKodeDisplay();
+      updateCounters();
+      updateDataSourceIndicator();
+      
+      showAlert(
+        "Gagal memuat data terbaru, menggunakan data cache. Periksa koneksi internet Anda.",
+        "Peringatan",
+        "warning"
+      );
     } else {
-      selectedKodes[checkboxType].delete(id);
+      showAlert("Gagal memuat data kode: " + error.message, "Error", "error");
     }
+  }
+}
 
-    // Update status tombol mutasi/restore
-    updateButtonStatus(checkboxType);
+// Fungsi untuk mengurutkan data
+function sortKodeData() {
+  // Urutkan data aktif berdasarkan timestamp terbaru
+  kodeData.active.sort((a, b) => {
+    const timeA = a.timestamp?.toDate?.() || new Date(a.tanggalInput);
+    const timeB = b.timestamp?.toDate?.() || new Date(b.tanggalInput);
+    return timeB - timeA;
   });
 
-  // Handler untuk tombol detail
-  $(`#table${type.charAt(0).toUpperCase() + type.slice(1)}Kode .btn-detail`).on("click", function () {
-    const id = $(this).data("id");
-    const itemType = $(this).data("type");
-
-    showKodeDetail(id, itemType);
+  // Urutkan data mutated berdasarkan timestamp terbaru
+  kodeData.mutated.sort((a, b) => {
+    const timeA = a.lastUpdated?.toDate?.() || new Date(a.tanggalMutasi || a.tanggalInput);
+    const timeB = b.lastUpdated?.toDate?.() || new Date(b.tanggalMutasi || b.tanggalInput);
+    return timeB - timeA;
   });
-
-  // Handler untuk tombol mutasi (hanya untuk kode aktif)
-  if (type === "active") {
-    $(`#tableActiveKode .btn-mutasi`).on("click", function () {
-      const id = $(this).data("id");
-
-      // Tambahkan ke set kode yang dipilih
-      selectedKodes.active = new Set([id]);
-
-      // Tampilkan modal mutasi
-      showMutasiModal();
-    });
-  }
-
-  // Handler untuk tombol restore (hanya untuk kode yang sudah dimutasi)
-  if (type === "mutated") {
-    $(`#tableMutatedKode .btn-restore`).on("click", function () {
-      const id = $(this).data("id");
-
-      // Tambahkan ke set kode yang dipilih
-      selectedKodes.mutated = new Set([id]);
-
-      // Konfirmasi restore
-      confirmRestoreKode();
-    });
-  }
 }
 
-// Fungsi untuk memperbarui status tombol mutasi/restore
-function updateButtonStatus(type) {
-  if (type === "active") {
-    const hasSelected = selectedKodes.active.size > 0;
-    $("#btnMutasiSelected").prop("disabled", !hasSelected);
-  } else {
-    const hasSelected = selectedKodes.mutated.size > 0;
-    $("#btnRestoreSelected").prop("disabled", !hasSelected);
-    $("#btnDeleteSelected").prop("disabled", !hasSelected);
-  }
-}
-
-// Fungsi untuk menampilkan detail kode
-function showKodeDetail(id, type) {
-  // Cari item berdasarkan id
-  const item =
-    type === "active"
-      ? kodeData.active.find((item) => item.id === id)
-      : kodeData.mutated.find((item) => item.id === id);
-
-  if (!item) {
-    showAlert("Data kode tidak ditemukan", "Error", "error");
-    return;
-  }
-
-  // Isi modal dengan data item
-  $("#detailKode").val(item.kode);
-  $("#detailNama").val(item.nama);
-  $("#detailKadar").val(item.kadar);
-  $("#detailBerat").val(item.berat);
-  $("#detailTanggal").val(item.tanggalInput);
-  $("#detailJenis").val(item.jenisNama);
-  $("#detailKeterangan").val(item.keterangan);
-
-  // Tambahan informasi untuk kode yang sudah dimutasi
-  if (type === "mutated") {
-    $("#mutasiInfoContainer").show();
-    $("#detailTanggalMutasi").val(item.tanggalMutasi);
-    $("#detailKeteranganMutasi").val(item.mutasiKeterangan);
-
-    // Tampilkan riwayat mutasi jika ada
-    const historyContainer = $("#mutasiHistoryContainer");
-    historyContainer.empty();
-
-    if (item.mutasiHistory && item.mutasiHistory.length > 0) {
-      historyContainer.show();
-
-      // Buat daftar riwayat
-      const historyList = $("<ul class='list-group'></ul>");
-
-      item.mutasiHistory.forEach((history) => {
-        const historyItem = $(`
-          <li class="list-group-item">
-            <div class="d-flex justify-content-between">
-              <span>${history.tanggal}</span>
-              <span class="badge bg-secondary">${history.status}</span>
-            </div>
-            <div class="mt-1">${history.keterangan}</div>
-          </li>
-        `);
-
-        historyList.append(historyItem);
-      });
-
-      historyContainer.append(historyList);
-    } else {
-      historyContainer.hide();
-    }
-  } else {
-    $("#mutasiInfoContainer").hide();
-    $("#mutasiHistoryContainer").hide();
-  }
-
-  // Tampilkan modal
-  $("#kodeDetailModal").modal("show");
-}
-
-// Fungsi untuk menampilkan modal mutasi
-function showMutasiModal() {
-  // Reset form
-  $("#mutasiForm")[0].reset();
-
-  // Tampilkan kode yang dipilih
-  const selectedIds = Array.from(selectedKodes.active);
-  const selectedItems = kodeData.active.filter((item) => selectedIds.includes(item.id));
-
-  const kodeList = $("#selectedKodeList");
-  kodeList.empty();
-
-  selectedItems.forEach((item) => {
-    kodeList.append(`
-      <li class="list-group-item d-flex justify-content-between align-items-center">
-        ${item.kode} - ${item.nama}
-        <span class="badge bg-primary rounded-pill">${item.jenisNama}</span>
-      </li>
+// Fungsi untuk update indikator sumber data
+function updateDataSourceIndicator() {
+  const indicator = $("#dataSourceIndicator");
+  if (indicator.length === 0) {
+    // Buat indikator jika belum ada
+    $(".page-header").append(`
+      <div id="dataSourceIndicator" class="mt-2">
+        <small class="text-muted">
+          <i class="fas fa-database me-1"></i>
+          Sumber data: <span id="dataSourceText">-</span>
+        </small>
+      </div>
     `);
-  });
-
-  // Set tanggal hari ini
-  const today = new Date();
-  const formattedDate = `${today.getDate().toString().padStart(2, "0")}/${(today.getMonth() + 1)
-    .toString()
-    .padStart(2, "0")}/${today.getFullYear()}`;
-  $("#tanggalMutasi").val(formattedDate);
-
-  // Tampilkan modal
-  $("#mutasiModal").modal("show");
+  }
+  
+  const sourceText = currentDataSource === "penjualanAksesoris" 
+    ? "Transaksi Penjualan (Live)" 
+    : "Arsip Mutasi Kode";
+    
+  const sourceColor = currentDataSource === "penjualanAksesoris" 
+    ? "text-success" 
+    : "text-info";
+    
+  $("#dataSourceText").text(sourceText).removeClass("text-success text-info").addClass(sourceColor);
 }
 
-// Fungsi untuk mengonfirmasi restore kode
-async function confirmRestoreKode() {
-  const confirmed = await showConfirm("Apakah Anda yakin ingin mengembalikan kode yang dipilih ke status aktif?");
+// Fungsi untuk setup real-time listener berdasarkan sumber data
+function setupRealtimeListener() {
+  try {
+    // Hapus listener sebelumnya jika ada
+    if (unsubscribeListener) {
+      unsubscribeListener();
+    }
 
-  if (confirmed) {
-    restoreSelectedKodes();
+    // Setup listener berdasarkan sumber data yang sedang digunakan
+    if (currentDataSource === "penjualanAksesoris") {
+      const penjualanQuery = query(
+        collection(firestore, "penjualanAksesoris"),
+        where("jenisPenjualan", "==", "manual"),
+        orderBy("timestamp", "desc")
+      );
+
+      unsubscribeListener = onSnapshot(
+        penjualanQuery,
+        (snapshot) => {
+          console.log("Real-time update from penjualanAksesoris");
+          const processedData = processPenjualanData(snapshot.docs);
+          
+          if (processedData.active.length === 0 && processedData.mutated.length === 0) {
+            // Jika data penjualan kosong, switch ke mutasiKode
+            console.log("penjualanAksesoris is empty, switching to mutasiKode");
+            loadKodeData(true);
+            return;
+          }
+          
+          kodeData = processedData;
+          sortKodeData();
+          saveToCache(kodeData, currentDataSource);
+          updateKodeDisplay();
+          updateCounters();
+          resetSelections();
+        },
+        (error) => {
+          console.error("Real-time listener error for penjualanAksesoris:", error);
+          // Fallback ke mutasiKode jika ada error
+          setTimeout(() => loadKodeData(true), 5000);
+        }
+      );
+    } else {
+      const mutasiKodeQuery = query(
+        collection(firestore, "mutasiKode"),
+        orderBy("timestamp", "desc")
+      );
+
+      unsubscribeListener = onSnapshot(
+        mutasiKodeQuery,
+        (snapshot) => {
+          console.log("Real-time update from mutasiKode");
+          kodeData = processMutasiKodeData(snapshot.docs);
+          sortKodeData();
+          saveToCache(kodeData, currentDataSource);
+          updateKodeDisplay();
+          updateCounters();
+          resetSelections();
+        },
+        (error) => {
+          console.error("Real-time listener error for mutasiKode:", error);
+          setTimeout(() => loadKodeData(true), 5000);
+        }
+      );
+    }
+
+    console.log(`Real-time listener setup for ${currentDataSource}`);
+  } catch (error) {
+    console.error("Error setting up real-time listener:", error);
   }
 }
 
-// Fungsi untuk memutasi kode yang dipilih
+// Fungsi untuk reset selections
+function resetSelections() {
+  selectedKodes.active = new Set();
+  selectedKodes.mutated = new Set();
+  updateButtonStatus("active");
+  updateButtonStatus("mutated");
+  $("#selectAllActive, #selectAllMutated").prop("checked", false);
+}
+
+// Fungsi untuk memutasi kode (hanya untuk data dari mutasiKode)
 async function mutateSelectedKodes() {
   try {
-    // Ambil data dari form
+    // Validasi: hanya bisa mutasi jika data dari mutasiKode
+    if (currentDataSource !== "mutasiKode") {
+      showAlert(
+        "Mutasi kode hanya dapat dilakukan pada data arsip. Data dari transaksi penjualan tidak dapat dimutasi.",
+        "Informasi",
+        "info"
+      );
+      return;
+    }
+
     const tanggalMutasi = $("#tanggalMutasi").val();
     const keteranganMutasi = $("#keteranganMutasi").val();
 
@@ -480,7 +560,6 @@ async function mutateSelectedKodes() {
       return;
     }
 
-    // Ambil kode yang dipilih
     const selectedIds = Array.from(selectedKodes.active);
     const selectedItems = kodeData.active.filter((item) => selectedIds.includes(item.id));
 
@@ -501,84 +580,30 @@ async function mutateSelectedKodes() {
 
     // Proses setiap kode yang dipilih
     for (const item of selectedItems) {
-      // Ambil referensi dokumen penjualan
-      const penjualanRef = doc(firestore, "penjualanAksesoris", item.penjualanId);
-      const penjualanDoc = await getDoc(penjualanRef);
-
-      if (!penjualanDoc.exists()) {
-        console.error(`Dokumen penjualan ${item.penjualanId} tidak ditemukan`);
-        continue;
-      }
-
-      const penjualanData = penjualanDoc.data();
-
-      // Cari item dalam array items
-      if (!penjualanData.items || !Array.isArray(penjualanData.items)) {
-        console.error(`Dokumen penjualan ${item.penjualanId} tidak memiliki array items`);
-        continue;
-      }
-
-      // Cari indeks item dengan kode yang sesuai
-      const itemIndex = penjualanData.items.findIndex((i) => i.kodeText === item.kode);
-
-      if (itemIndex === -1) {
-        console.error(`Item dengan kode ${item.kode} tidak ditemukan dalam dokumen penjualan ${item.penjualanId}`);
-        continue;
-      }
-
-      // Buat objek riwayat mutasi
+      const mutasiKodeRef = doc(firestore, "mutasiKode", item.id);
+      
       const mutasiHistory = {
         tanggal: tanggalMutasi,
         status: "Mutasi",
         keterangan: keteranganMutasi,
+        timestamp: serverTimestamp(),
       };
 
-      // Update item
-      penjualanData.items[itemIndex].isMutated = true;
-      penjualanData.items[itemIndex].tanggalMutasi = tanggalMutasi;
-      penjualanData.items[itemIndex].mutasiKeterangan = keteranganMutasi;
-
-      // Tambahkan ke riwayat mutasi jika belum ada
-      if (!penjualanData.items[itemIndex].mutasiHistory) {
-        penjualanData.items[itemIndex].mutasiHistory = [];
-      }
-
-      penjualanData.items[itemIndex].mutasiHistory.unshift(mutasiHistory);
-
-      // Update dokumen penjualan
-      await updateDoc(penjualanRef, {
-        items: penjualanData.items,
-      });
-
-      // Update data lokal
-      // Hapus dari array active
-      kodeData.active = kodeData.active.filter((i) => i.id !== item.id);
-
-      // Tambahkan ke array mutated dengan data yang diperbarui
-      const mutatedItem = {
-        ...item,
+      const updateData = {
         isMutated: true,
         tanggalMutasi: tanggalMutasi,
         mutasiKeterangan: keteranganMutasi,
         mutasiHistory: [mutasiHistory, ...(item.mutasiHistory || [])],
+        lastUpdated: serverTimestamp(),
       };
 
-      kodeData.mutated.push(mutatedItem);
+      await updateDoc(mutasiKodeRef, updateData);
     }
 
-    // Update cache dengan data terbaru
-    saveToCache(kodeData);
-
-    // Reset selected kodes
+    // Reset form dan selections
     selectedKodes.active = new Set();
-
-    // Update tampilan
-    updateKodeDisplay();
-
-    // Tutup modal
     $("#mutasiModal").modal("hide");
 
-    // Tampilkan pesan sukses
     Swal.fire({
       title: "Berhasil",
       text: `${selectedItems.length} kode berhasil dimutasi`,
@@ -587,7 +612,6 @@ async function mutateSelectedKodes() {
     });
   } catch (error) {
     console.error("Error mutating kodes:", error);
-
     Swal.fire({
       title: "Error",
       text: `Gagal memutasi kode: ${error.message}`,
@@ -597,10 +621,18 @@ async function mutateSelectedKodes() {
   }
 }
 
-// Fungsi untuk mengembalikan kode yang dipilih
+// Fungsi untuk restore kode (hanya untuk data dari mutasiKode)
 async function restoreSelectedKodes() {
   try {
-    // Ambil kode yang dipilih
+    if (currentDataSource !== "mutasiKode") {
+      showAlert(
+        "Restore kode hanya dapat dilakukan pada data arsip.",
+        "Informasi",
+        "info"
+      );
+      return;
+    }
+
     const selectedIds = Array.from(selectedKodes.mutated);
     const selectedItems = kodeData.mutated.filter((item) => selectedIds.includes(item.id));
 
@@ -609,7 +641,6 @@ async function restoreSelectedKodes() {
       return;
     }
 
-    // Tampilkan loading
     Swal.fire({
       title: "Memproses Pengembalian",
       text: "Mohon tunggu...",
@@ -619,34 +650,9 @@ async function restoreSelectedKodes() {
       },
     });
 
-    // Proses setiap kode yang dipilih
     for (const item of selectedItems) {
-      // Ambil referensi dokumen penjualan
-      const penjualanRef = doc(firestore, "penjualanAksesoris", item.penjualanId);
-      const penjualanDoc = await getDoc(penjualanRef);
+      const mutasiKodeRef = doc(firestore, "mutasiKode", item.id);
 
-      if (!penjualanDoc.exists()) {
-        console.error(`Dokumen penjualan ${item.penjualanId} tidak ditemukan`);
-        continue;
-      }
-
-      const penjualanData = penjualanDoc.data();
-
-      // Cari item dalam array items
-      if (!penjualanData.items || !Array.isArray(penjualanData.items)) {
-        console.error(`Dokumen penjualan ${item.penjualanId} tidak memiliki array items`);
-        continue;
-      }
-
-      // Cari indeks item dengan kode yang sesuai
-      const itemIndex = penjualanData.items.findIndex((i) => i.kodeText === item.kode);
-
-      if (itemIndex === -1) {
-        console.error(`Item dengan kode ${item.kode} tidak ditemukan dalam dokumen penjualan ${item.penjualanId}`);
-        continue;
-      }
-
-      // Buat objek riwayat restore
       const today = new Date();
       const formattedDate = `${today.getDate().toString().padStart(2, "0")}/${(today.getMonth() + 1)
         .toString()
@@ -656,47 +662,20 @@ async function restoreSelectedKodes() {
         tanggal: formattedDate,
         status: "Dikembalikan",
         keterangan: "Kode dikembalikan ke status aktif",
+        timestamp: serverTimestamp(),
       };
 
-      // Update item
-      penjualanData.items[itemIndex].isMutated = false;
-
-      // Tambahkan ke riwayat mutasi
-      if (!penjualanData.items[itemIndex].mutasiHistory) {
-        penjualanData.items[itemIndex].mutasiHistory = [];
-      }
-
-      penjualanData.items[itemIndex].mutasiHistory.unshift(restoreHistory);
-
-      // Update dokumen penjualan
-      await updateDoc(penjualanRef, {
-        items: penjualanData.items,
-      });
-
-      // Update data lokal
-      // Hapus dari array mutated
-      kodeData.mutated = kodeData.mutated.filter((i) => i.id !== item.id);
-
-      // Tambahkan ke array active dengan data yang diperbarui
-      const activeItem = {
-        ...item,
+      const updateData = {
         isMutated: false,
         mutasiHistory: [restoreHistory, ...(item.mutasiHistory || [])],
+        lastUpdated: serverTimestamp(),
       };
 
-      kodeData.active.push(activeItem);
+      await updateDoc(mutasiKodeRef, updateData);
     }
 
-    // Update cache dengan data terbaru
-    saveToCache(kodeData);
-
-    // Reset selected kodes
     selectedKodes.mutated = new Set();
 
-    // Update tampilan
-    updateKodeDisplay();
-
-    // Tampilkan pesan sukses
     Swal.fire({
       title: "Berhasil",
       text: `${selectedItems.length} kode berhasil dikembalikan`,
@@ -705,7 +684,6 @@ async function restoreSelectedKodes() {
     });
   } catch (error) {
     console.error("Error restoring kodes:", error);
-
     Swal.fire({
       title: "Error",
       text: `Gagal mengembalikan kode: ${error.message}`,
@@ -715,46 +693,81 @@ async function restoreSelectedKodes() {
   }
 }
 
-// Fungsi untuk memperbarui counter
-function updateCounters() {
-  // Filter berdasarkan kriteria yang dipilih
-  const filteredActive = filterKodeData(kodeData.active);
-  const filteredMutated = filterKodeData(kodeData.mutated);
+// Fungsi untuk delete kode (hanya untuk data dari mutasiKode)
+async function deleteSelectedKodes() {
+  try {
+    if (currentDataSource !== "mutasiKode") {
+      showAlert(
+        "Hapus kode hanya dapat dilakukan pada data arsip.",
+        "Informasi",
+        "info"
+      );
+      return;
+    }
 
-  // Update counter
-  $("#activeKodeCount").text(filteredActive.length);
-  $("#mutatedKodeCount").text(filteredMutated.length);
+    const confirmed = await showConfirm(
+      "Apakah Anda yakin ingin menghapus kode yang dipilih? Tindakan ini tidak dapat dibatalkan.",
+      "Konfirmasi Penghapusan"
+    );
 
-  // Update counter per jenis barang
-  const jenisCountActive = {};
-  const jenisCountMutated = {};
+    if (!confirmed) return;
 
-  // Inisialisasi counter untuk semua jenis barang
-  Object.keys(jenisBarang).forEach((prefix) => {
-    jenisCountActive[prefix] = 0;
-    jenisCountMutated[prefix] = 0;
-  });
+    const selectedIds = Array.from(selectedKodes.mutated);
+    const selectedItems = kodeData.mutated.filter((item) => selectedIds.includes(item.id));
 
-  // Hitung jumlah kode per jenis barang
-  filteredActive.forEach((item) => {
-    jenisCountActive[item.jenisPrefix] = (jenisCountActive[item.jenisPrefix] || 0) + 1;
-  });
+    if (selectedItems.length === 0) {
+      showAlert("Tidak ada kode yang dipilih", "Validasi", "warning");
+      return;
+    }
 
-  filteredMutated.forEach((item) => {
-    jenisCountMutated[item.jenisPrefix] = (jenisCountMutated[item.jenisPrefix] || 0) + 1;
-  });
+    Swal.fire({
+      title: "Memproses Penghapusan",
+      text: "Mohon tunggu...",
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
 
-  // Update badge counter
-  Object.keys(jenisBarang).forEach((prefix) => {
-    $(`#activeCount${prefix}`).text(jenisCountActive[prefix] || 0);
-    $(`#mutatedCount${prefix}`).text(jenisCountMutated[prefix] || 0);
-  });
+    for (const item of selectedItems) {
+      const mutasiKodeRef = doc(firestore, "mutasiKode", item.id);
+      await deleteDoc(mutasiKodeRef);
+    }
+
+    selectedKodes.mutated = new Set();
+
+    Swal.fire({
+      title: "Berhasil",
+      text: `${selectedItems.length} kode berhasil dihapus`,
+      icon: "success",
+      confirmButtonText: "OK",
+    });
+  } catch (error) {
+    console.error("Error deleting kodes:", error);
+    Swal.fire({
+      title: "Error",
+      text: `Gagal menghapus kode: ${error.message}`,
+      icon: "error",
+      confirmButtonText: "OK",
+    });
+  }
 }
 
-// Fungsi untuk memformat timestamp
+// Fungsi untuk refresh data manual
+async function refreshData() {
+  try {
+    localStorage.removeItem(CACHE_KEY);
+    await loadKodeData(true);
+    showAlert("Data berhasil diperbarui", "Berhasil", "success");
+  } catch (error) {
+    console.error("Error refreshing data:", error);
+    showAlert("Gagal memperbarui data: " + error.message, "Error", "error");
+  }
+}
+
+// Fungsi utility yang sudah ada sebelumnya
 function formatTimestamp(timestamp) {
   if (!timestamp) return "-";
-
   try {
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
@@ -766,132 +779,234 @@ function formatTimestamp(timestamp) {
   }
 }
 
-// Fungsi untuk menghapus kode yang dipilih
-async function deleteSelectedKodes() {
-  try {
-    // Konfirmasi penghapusan
-    const confirmed = await showConfirm(
-      "Apakah Anda yakin ingin menghapus kode yang dipilih? Tindakan ini tidak dapat dibatalkan.",
-      "Konfirmasi Penghapusan"
-    );
+// Fungsi untuk update tampilan (menggunakan fungsi yang sudah ada)
+function updateKodeDisplay() {
+  const filteredActive = filterKodeData(kodeData.active);
+  const filteredMutated = filterKodeData(kodeData.mutated);
+  renderKodeTable(filteredActive, "active");
+  renderKodeTable(filteredMutated, "mutated");
+  updateCounters();
+}
 
-    if (!confirmed) return;
+function filterKodeData(data) {
+  const jenisFilter = $("#filterJenis").val();
+  const searchText = $("#searchKode").val().toLowerCase();
 
-    // Ambil kode yang dipilih
-    const selectedIds = Array.from(selectedKodes.mutated);
-    const selectedItems = kodeData.mutated.filter((item) => selectedIds.includes(item.id));
-
-    if (selectedItems.length === 0) {
-      showAlert("Tidak ada kode yang dipilih", "Validasi", "warning");
-      return;
+  return data.filter((item) => {
+    if (jenisFilter && item.jenisPrefix !== jenisFilter) return false;
+    if (searchText) {
+      const matchesKode = item.kode.toLowerCase().includes(searchText);
+      const matchesNama = item.nama.toLowerCase().includes(searchText);
+      if (!matchesKode && !matchesNama) return false;
     }
+    return true;
+  });
+}
 
-    // Tampilkan loading
-    Swal.fire({
-      title: "Memproses Penghapusan",
-      text: "Mohon tunggu...",
-      allowOutsideClick: false,
-      didOpen: () => {
-        Swal.showLoading();
-      },
+function renderKodeTable(data, type) {
+  const tableId = type === "active" ? "tableActiveKode" : "tableMutatedKode";
+  const tableBody = $(`#${tableId} tbody`);
+  tableBody.empty();
+
+  if (data.length === 0) {
+    tableBody.html(`<tr><td colspan="7" class="text-center">Tidak ada data kode</td></tr>`);
+    return;
+  }
+
+  data.forEach((item) => {
+    const row = `
+      <tr data-id="${item.id}">
+        <td>
+          <input type="checkbox" class="form-check-input kode-checkbox" data-id="${item.id}" data-type="${type}">
+        </td>
+        <td>${item.kode}</td>
+        <td>${item.nama}</td>
+        <td>${item.kadar}</td>
+        <td>${item.berat}</td>
+        <td>${type === "active" ? item.tanggalInput : item.tanggalMutasi || "-"}</td>
+        <td>
+          <button class="btn btn-sm btn-info btn-detail" data-id="${item.id}" data-type="${type}">
+            <i class="fas fa-info-circle"></i>
+          </button>
+          ${
+            type === "active" && currentDataSource === "mutasiKode"
+              ? `<button class="btn btn-sm btn-warning btn-mutasi" data-id="${item.id}">
+                  <i class="fas fa-exchange-alt"></i>
+                </button>`
+              : ""
+          }
+          ${
+            type === "mutated" && currentDataSource === "mutasiKode"
+              ? `<button class="btn btn-sm btn-secondary btn-restore" data-id="${item.id}">
+                  <i class="fas fa-undo"></i>
+                </button>`
+              : ""
+          }
+        </td>
+      </tr>
+    `;
+    tableBody.append(row);
+  });
+
+  attachTableEventHandlers(type);
+}
+
+function attachTableEventHandlers(type) {
+  // Handler untuk checkbox
+  $(`#table${type.charAt(0).toUpperCase() + type.slice(1)}Kode .kode-checkbox`).on("change", function () {
+    const id = $(this).data("id");
+    const checkboxType = $(this).data("type");
+
+    if ($(this).is(":checked")) {
+      selectedKodes[checkboxType].add(id);
+    } else {
+      selectedKodes[checkboxType].delete(id);
+    }
+    updateButtonStatus(checkboxType);
+  });
+
+  // Handler untuk tombol detail
+  $(`#table${type.charAt(0).toUpperCase() + type.slice(1)}Kode .btn-detail`).on("click", function () {
+    const id = $(this).data("id");
+    const itemType = $(this).data("type");
+    showKodeDetail(id, itemType);
+  });
+
+  // Handler untuk tombol mutasi (hanya untuk data dari mutasiKode)
+  if (type === "active") {
+    $(`#tableActiveKode .btn-mutasi`).on("click", function () {
+      const id = $(this).data("id");
+      selectedKodes.active = new Set([id]);
+      showMutasiModal();
     });
+  }
 
-    // Proses setiap kode yang dipilih
-    for (const item of selectedItems) {
-      // Ambil referensi dokumen penjualan
-      const penjualanRef = doc(firestore, "penjualanAksesoris", item.penjualanId);
-      const penjualanDoc = await getDoc(penjualanRef);
+  // Handler untuk tombol restore (hanya untuk data dari mutasiKode)
+  if (type === "mutated") {
+    $(`#tableMutatedKode .btn-restore`).on("click", function () {
+      const id = $(this).data("id");
+      selectedKodes.mutated = new Set([id]);
+      confirmRestoreKode();
+    });
+  }
+}
 
-      if (!penjualanDoc.exists()) {
-        console.error(`Dokumen penjualan ${item.penjualanId} tidak ditemukan`);
-        continue;
-      }
+function updateButtonStatus(type) {
+  if (type === "active") {
+    const hasSelected = selectedKodes.active.size > 0;
+    const canMutate = currentDataSource === "mutasiKode";
+    $("#btnMutasiSelected").prop("disabled", !hasSelected || !canMutate);
+  } else {
+    const hasSelected = selectedKodes.mutated.size > 0;
+    const canModify = currentDataSource === "mutasiKode";
+    $("#btnRestoreSelected").prop("disabled", !hasSelected || !canModify);
+    $("#btnDeleteSelected").prop("disabled", !hasSelected || !canModify);
+  }
+}
 
-      const penjualanData = penjualanDoc.data();
+function updateCounters() {
+  const filteredActive = filterKodeData(kodeData.active);
+  const filteredMutated = filterKodeData(kodeData.mutated);
+  $("#activeKodeCount").text(filteredActive.length);
+  $("#mutatedKodeCount").text(filteredMutated.length);
+}
 
-      // Cari item dalam array items
-      if (!penjualanData.items || !Array.isArray(penjualanData.items)) {
-        console.error(`Dokumen penjualan ${item.penjualanId} tidak memiliki array items`);
-        continue;
-      }
+function showKodeDetail(id, type) {
+  const item = type === "active"
+    ? kodeData.active.find((item) => item.id === id)
+    : kodeData.mutated.find((item) => item.id === id);
 
-      // Filter array items untuk menghapus item dengan kode yang sesuai
-      penjualanData.items = penjualanData.items.filter((i) => i.kodeText !== item.kode);
+  if (!item) {
+    showAlert("Data kode tidak ditemukan", "Error", "error");
+    return;
+  }
 
-      // Update dokumen penjualan
-      await updateDoc(penjualanRef, {
-        items: penjualanData.items,
+  $("#detailKode").val(item.kode);
+  $("#detailNama").val(item.nama);
+  $("#detailKadar").val(item.kadar);
+  $("#detailBerat").val(item.berat);
+  $("#detailTanggal").val(item.tanggalInput);
+  $("#detailJenis").val(item.jenisNama);
+  $("#detailKeterangan").val(item.keterangan);
+
+  if (type === "mutated") {
+    $("#mutasiInfoContainer").show();
+    $("#detailTanggalMutasi").val(item.tanggalMutasi);
+    $("#detailKeteranganMutasi").val(item.mutasiKeterangan);
+
+    const historyContainer = $("#mutasiHistoryContainer");
+    historyContainer.empty();
+
+    if (item.mutasiHistory && item.mutasiHistory.length > 0) {
+      historyContainer.show();
+      const historyList = $("<ul class='list-group'></ul>");
+
+      item.mutasiHistory.forEach((history) => {
+        const historyItem = $(`
+          <li class="list-group-item">
+            <div class="d-flex justify-content-between">
+              <span>${history.tanggal}</span>
+              <span class="badge bg-secondary">${history.status}</span>
+            </div>
+            <div class="mt-1">${history.keterangan}</div>
+          </li>
+        `);
+        historyList.append(historyItem);
       });
 
-      // Update data lokal
-      kodeData.mutated = kodeData.mutated.filter((i) => i.id !== item.id);
+      historyContainer.append(historyList);
+    } else {
+      historyContainer.hide();
     }
+  } else {
+    $("#mutasiInfoContainer").hide();
+    $("#mutasiHistoryContainer").hide();
+  }
 
-    // Update cache dengan data terbaru
-    saveToCache(kodeData);
+  $("#kodeDetailModal").modal("show");
+}
 
-    // Reset selected kodes
-    selectedKodes.mutated = new Set();
+function showMutasiModal() {
+  if (currentDataSource !== "mutasiKode") {
+    showAlert("Mutasi kode hanya dapat dilakukan pada data arsip.", "Informasi", "info");
+    return;
+  }
 
-    // Update tampilan
-    updateKodeDisplay();
+  $("#mutasiForm")[0].reset();
+  const selectedIds = Array.from(selectedKodes.active);
+  const selectedItems = kodeData.active.filter((item) => selectedIds.includes(item.id));
 
-    // Tampilkan pesan sukses
-    Swal.fire({
-      title: "Berhasil",
-      text: `${selectedItems.length} kode berhasil dihapus`,
-      icon: "success",
-      confirmButtonText: "OK",
-    });
-  } catch (error) {
-    console.error("Error deleting kodes:", error);
+  const kodeList = $("#selectedKodeList");
+  kodeList.empty();
 
-    Swal.fire({
-      title: "Error",
-      text: `Gagal menghapus kode: ${error.message}`,
-      icon: "error",
-      confirmButtonText: "OK",
-    });
+  selectedItems.forEach((item) => {
+    kodeList.append(`
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        ${item.kode} - ${item.nama}
+        <span class="badge bg-primary rounded-pill">${item.jenisNama}</span>
+      </li>
+    `);
+  });
+
+  const today = new Date();
+  const formattedDate = `${today.getDate().toString().padStart(2, "0")}/${(today.getMonth() + 1)
+    .toString()
+    .padStart(2, "0")}/${today.getFullYear()}`;
+  $("#tanggalMutasi").val(formattedDate);
+
+  $("#mutasiModal").modal("show");
+}
+
+async function confirmRestoreKode() {
+  const confirmed = await showConfirm("Apakah Anda yakin ingin mengembalikan kode yang dipilih ke status aktif?");
+  if (confirmed) {
+    restoreSelectedKodes();
   }
 }
 
-// Fungsi untuk memuat data awal
-async function initializePage() {
-  try {
-    // Tampilkan loading
-    Swal.fire({
-      title: "Memuat Data",
-      text: "Mohon tunggu...",
-      allowOutsideClick: false,
-      didOpen: () => {
-        Swal.showLoading();
-      },
-    });
-
-    // Muat data kode
-    await loadKodeData();
-
-    // Sembunyikan loading
-    Swal.close();
-
-    // Inisialisasi event handler
-    initializeEventHandlers();
-  } catch (error) {
-    console.error("Error initializing page:", error);
-
-    Swal.fire({
-      title: "Error",
-      text: `Gagal memuat data: ${error.message}`,
-      icon: "error",
-      confirmButtonText: "OK",
-    });
-  }
-}
-
-// Fungsi untuk export data ke Excel
+// Export functions
 function exportToExcel(data, filename, sheetName = "Data") {
   try {
-    // Cek apakah XLSX library tersedia
     if (typeof XLSX === 'undefined') {
       showAlert("Library Excel tidak tersedia. Pastikan XLSX library sudah dimuat.", "Error", "error");
       return;
@@ -902,7 +1017,6 @@ function exportToExcel(data, filename, sheetName = "Data") {
       return;
     }
     
-    // Siapkan data untuk export
     const exportData = data.map((item) => ({
       Kode: item.kode,
       "Nama Barang": item.nama,
@@ -913,36 +1027,24 @@ function exportToExcel(data, filename, sheetName = "Data") {
       "Tanggal Mutasi": item.tanggalMutasi || "-",
       "Keterangan Mutasi": item.mutasiKeterangan || "-",
       Keterangan: item.keterangan,
+      "Sumber Data": currentDataSource === "penjualanAksesoris" ? "Live" : "Arsip",
     }));
     
-    // Buat workbook dan worksheet
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(exportData);
     
-    // Set column widths
     const colWidths = [
-      { wch: 10 }, // Kode
-      { wch: 25 }, // Nama Barang
-      { wch: 7 }, // Kadar
-      { wch: 7 }, // Berat
-      { wch: 15 }, // Tanggal Input
-      { wch: 15 }, // Status
-      { wch: 15 }, // Tanggal Mutasi
-      { wch: 25 }, // Keterangan Mutasi
-      { wch: 25 }, // Keterangan
+      { wch: 10 }, { wch: 25 }, { wch: 7 }, { wch: 7 }, { wch: 15 },
+      { wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 25 }, { wch: 10 }
     ];
     ws["!cols"] = colWidths;
     
-    // Tambahkan worksheet ke workbook
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
     
-    // Generate filename dengan timestamp
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
     const fullFilename = `${filename}_${timestamp}.xlsx`;
     
-    // Download file
     XLSX.writeFile(wb, fullFilename);
-    
     showAlert(`Data berhasil di-export ke ${fullFilename}`, "Berhasil", "success");
   } catch (error) {
     console.error("Error exporting to Excel:", error);
@@ -950,63 +1052,36 @@ function exportToExcel(data, filename, sheetName = "Data") {
   }
 }
 
-// Fungsi untuk export kode aktif
 function exportActiveKodes() {
-  console.log("Export active kodes clicked"); // Debug log
   const filteredData = filterKodeData(kodeData.active);
-  console.log("Filtered active data:", filteredData); // Debug log
   exportToExcel(filteredData, "Kode_Aktif", "Kode Aktif");
 }
 
-// Fungsi untuk export kode yang sudah dimutasi
 function exportMutatedKodes() {
-  console.log("Export mutated kodes clicked"); // Debug log
   const filteredData = filterKodeData(kodeData.mutated);
-  console.log("Filtered mutated data:", filteredData); // Debug log
   exportToExcel(filteredData, "Kode_Dimutasi", "Kode Dimutasi");
 }
 
-// Fungsi untuk menginisialisasi event handler - DIPERBAIKI
+// Initialize event handlers
 function initializeEventHandlers() {
-  // Handler untuk filter jenis barang
-  $("#filterJenis").on("change", function() {
-    updateKodeDisplay();
-  });
+  $("#filterJenis").on("change", updateKodeDisplay);
   
-  // Handler untuk pencarian
   $("#searchKode").on("input", function() {
     clearTimeout(window.searchTimeout);
-    window.searchTimeout = setTimeout(() => {
-      updateKodeDisplay();
-    }, 300);
+    window.searchTimeout = setTimeout(updateKodeDisplay, 300);
   });
   
-  // Handler untuk tombol refresh
-  $("#btnRefresh").on("click", function() {
-    loadKodeData(true);
-  });
+  $("#btnRefresh").on("click", refreshData);
+  $("#btnExportActive").on("click", exportActiveKodes);
+  $("#btnExportMutated").on("click", exportMutatedKodes);
   
-  // Handler untuk export Excel - PINDAHKAN KE SINI
-  $("#btnExportActive").on("click", function() {
-    exportActiveKodes();
-  });
-  
-  $("#btnExportMutated").on("click", function() {
-    exportMutatedKodes();
-  });
-  
-  // Handler untuk tombol filter dan reset
-  $("#btnFilter").on("click", function() {
-    updateKodeDisplay();
-  });
-  
+  $("#btnFilter").on("click", updateKodeDisplay);
   $("#btnReset").on("click", function() {
     $("#filterJenis").val("");
     $("#searchKode").val("");
     updateKodeDisplay();
   });
   
-  // Handler untuk tombol mutasi terpilih
   $("#btnMutasiSelected").on("click", function() {
     if (selectedKodes.active.size > 0) {
       showMutasiModal();
@@ -1015,7 +1090,6 @@ function initializeEventHandlers() {
     }
   });
   
-  // Handler untuk tombol restore terpilih
   $("#btnRestoreSelected").on("click", function() {
     if (selectedKodes.mutated.size > 0) {
       confirmRestoreKode();
@@ -1024,7 +1098,6 @@ function initializeEventHandlers() {
     }
   });
   
-  // Handler untuk tombol hapus terpilih
   $("#btnDeleteSelected").on("click", function() {
     if (selectedKodes.mutated.size > 0) {
       deleteSelectedKodes();
@@ -1033,82 +1106,107 @@ function initializeEventHandlers() {
     }
   });
   
-  // Handler untuk tombol simpan mutasi
-  $("#btnSaveMutasi").on("click", function() {
-    mutateSelectedKodes();
-  });
+  $("#btnSaveMutasi").on("click", mutateSelectedKodes);
   
-  // Handler untuk checkbox "Pilih Semua" pada tab aktif
   $("#selectAllActive").on("change", function() {
     const isChecked = $(this).is(":checked");
     $("#tableActiveKode .kode-checkbox").prop("checked", isChecked);
     
     if (isChecked) {
       const filteredActive = filterKodeData(kodeData.active);
-      filteredActive.forEach(item => {
-        selectedKodes.active.add(item.id);
-      });
+      filteredActive.forEach(item => selectedKodes.active.add(item.id));
     } else {
       selectedKodes.active = new Set();
     }
-    
     updateButtonStatus("active");
   });
   
-  // Handler untuk checkbox "Pilih Semua" pada tab mutasi
   $("#selectAllMutated").on("change", function() {
     const isChecked = $(this).is(":checked");
     $("#tableMutatedKode .kode-checkbox").prop("checked", isChecked);
     
     if (isChecked) {
       const filteredMutated = filterKodeData(kodeData.mutated);
-      filteredMutated.forEach(item => {
-        selectedKodes.mutated.add(item.id);
-      });
+      filteredMutated.forEach(item => selectedKodes.mutated.add(item.id));
     } else {
       selectedKodes.mutated = new Set();
     }
-    
     updateButtonStatus("mutated");
   });
   
-  // Handler untuk tab
-  $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
-    $("#selectAllActive").prop("checked", false);
-    $("#selectAllMutated").prop("checked", false);
-    
-    selectedKodes.active = new Set();
-    selectedKodes.mutated = new Set();
-    
-    updateButtonStatus("active");
-    updateButtonStatus("mutated");
+  $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function () {
+    resetSelections();
+  });
+
+  $(window).on('beforeunload', function() {
+    if (unsubscribeListener) {
+      unsubscribeListener();
+    }
   });
 }
 
+// Initialize page
+async function initializePage() {
+  try {
+    Swal.fire({
+      title: "Memuat Data",
+      text: "Mohon tunggu...",
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
 
-// Inisialisasi halaman saat dokumen siap
-$(document).ready(function () {
-  initializePage();
-});
+    await loadKodeData();
+    setupRealtimeListener();
+    Swal.close();
+    initializeEventHandlers();
+    
+    console.log("Page initialized successfully");
+  } catch (error) {
+    console.error("Error initializing page:", error);
+    Swal.fire({
+      title: "Error",
+      text: `Gagal memuat data: ${error.message}`,
+      icon: "error",
+      confirmButtonText: "OK",
+    });
+  }
+}
 
-// Fungsi untuk menangani logout
+// Cleanup function
+function cleanup() {
+  if (unsubscribeListener) {
+    unsubscribeListener();
+    console.log("Real-time listener unsubscribed");
+  }
+}
+
+// Authentication functions
 function handleLogout() {
-  // Clear session storage
+  cleanup();
   sessionStorage.removeItem("currentUser");
-
-  // Redirect ke halaman login
   window.location.href = "index.html";
 }
 
-// Fungsi untuk memeriksa status login
 async function checkLoginStatus() {
   const user = sessionStorage.getItem("currentUser");
-
   if (!user) {
-    // Redirect ke halaman login jika tidak ada user yang login
     window.location.href = "index.html";
   }
 }
 
-// Periksa status login saat halaman dimuat
-checkLoginStatus();
+// Initialize when document is ready
+$(document).ready(function () {
+  checkLoginStatus();
+  initializePage();
+});
+
+// Cleanup when page unloads
+$(window).on('beforeunload', cleanup);
+
+// Export global functions
+window.handleLogout = handleLogout;
+window.refreshData = refreshData;
+
+

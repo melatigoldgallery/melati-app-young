@@ -9,6 +9,7 @@ import {
   getDoc,
   Timestamp,
   serverTimestamp,
+  limit,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 import { firestore } from "./configFirebase.js";
 
@@ -185,7 +186,7 @@ const laporanStokHandler = {
       }
 
       // Check cache
-      const cacheKey = `stock_${startDateStr}`;
+      const cacheKey = `stock_${startDateStr}_v2`;
       if (this.cache[cacheKey] && this.cache[cacheKey].data) {
         console.log("Using cached stock data");
         this.filteredStockData = [...this.cache[cacheKey].data];
@@ -220,26 +221,21 @@ const laporanStokHandler = {
   // Load stock data
   async loadStockData() {
     try {
-      // Get stock data from Firestore
-      const stockRef = collection(firestore, "stokAksesoris");
-      const stockSnapshot = await getDocs(stockRef);
-
+      // Load current stock
+      const stockSnapshot = await getDocs(collection(firestore, "stokAksesoris"));
       this.stockData = [];
+
       stockSnapshot.forEach((doc) => {
-        const data = doc.data();
-        this.stockData.push({
-          id: doc.id,
-          ...data,
-        });
+        this.stockData.push({ id: doc.id, ...doc.data() });
       });
 
-      // Load all kode aksesoris
+      // Load all kode aksesoris for complete list
       await this.loadAllKodeAksesoris();
 
-      return Promise.resolve();
+      console.log(`Loaded ${this.stockData.length} stock items`);
     } catch (error) {
       console.error("Error loading stock data:", error);
-      return Promise.reject(error);
+      throw error;
     }
   },
 
@@ -305,43 +301,417 @@ const laporanStokHandler = {
     }
   },
 
+  // Check if snapshot data exists for previous month
+  async checkSnapshotAvailability(selectedDate) {
+    try {
+      const prevMonth = new Date(selectedDate);
+      prevMonth.setMonth(prevMonth.getMonth() - 1);
+      const monthKey = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}`;
+
+      const snapshotQuery = query(collection(firestore, "stokSnapshot"), where("bulan", "==", monthKey), limit(1));
+
+      const snapshot = await getDocs(snapshotQuery);
+      return !snapshot.empty;
+    } catch (error) {
+      console.warn("Error checking snapshot availability:", error);
+      return false;
+    }
+  },
+
+  // Load stock data from snapshot for specific month
+  async loadStockFromSnapshot(monthKey) {
+    try {
+      const snapshotQuery = query(collection(firestore, "stokSnapshot"), where("bulan", "==", monthKey));
+
+      const snapshot = await getDocs(snapshotQuery);
+      const snapshotData = new Map();
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        snapshotData.set(data.kode, {
+          stokAkhir: data.stok_akhir || 0,
+          nama: data.nama || "",
+          kategori: data.kategori || "",
+        });
+      });
+
+      console.log(`Loaded ${snapshotData.size} items from snapshot ${monthKey}`);
+      return snapshotData;
+    } catch (error) {
+      console.error("Error loading snapshot data:", error);
+      return new Map();
+    }
+  },
+
   // Calculate stock continuity
- async calculateStockContinuity(selectedDate) {
-  try {
-    // Create day before selected date
-    const previousDay = new Date(selectedDate);
-    previousDay.setDate(previousDay.getDate() - 1);
-    previousDay.setHours(23, 59, 59, 999);
+  async calculateStockContinuity(selectedDate) {
+    try {
+      const endOfSelectedDate = new Date(selectedDate);
+      endOfSelectedDate.setHours(23, 59, 59, 999);
 
-    // Set end of selected date
-    const endOfSelectedDate = new Date(selectedDate);
-    endOfSelectedDate.setHours(23, 59, 59, 999);
+      // Step 1: Try to get snapshot data as base
+      const snapshotData = await this.getSnapshotAsBase(selectedDate);
 
-    // Get stock transactions
+      // Step 2: Get current month transactions
+      const currentMonthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+      const transactions = await this.getCurrentMonthTransactions(currentMonthStart, endOfSelectedDate);
+
+      // Step 3: Merge and calculate
+      this.mergeSnapshotWithTransactions(snapshotData, transactions);
+    } catch (error) {
+      console.error("Error calculating stock continuity:", error);
+      // Fallback: use current stock data as-is
+      this.filteredStockData = [...this.stockData];
+    }
+  },
+
+  // Get snapshot data as base stock
+  async getSnapshotAsBase(selectedDate) {
+    const prevMonth = new Date(selectedDate);
+    prevMonth.setMonth(prevMonth.getMonth() - 1);
+    const monthKey = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}`;
+
+    try {
+      const snapshotQuery = query(collection(firestore, "stokSnapshot"), where("bulan", "==", monthKey));
+
+      const snapshot = await getDocs(snapshotQuery);
+      const snapshotMap = new Map();
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        snapshotMap.set(data.kode, {
+          stokAwal: data.stok_akhir || 0,
+          nama: data.nama || "",
+          kategori: data.kategori || "",
+        });
+      });
+
+      console.log(`Loaded ${snapshotMap.size} items from snapshot ${monthKey}`);
+      return snapshotMap;
+    } catch (error) {
+      console.warn("No snapshot data found, using current stock");
+      return new Map();
+    }
+  },
+
+  // Get current month transactions only
+  async getCurrentMonthTransactions(startDate, endDate) {
+    const transactionMap = new Map();
+
+    try {
+      // Get stock transactions
+      const transQuery = query(
+        collection(firestore, "stokAksesorisTransaksi"),
+        where("timestamp", ">=", Timestamp.fromDate(startDate)),
+        where("timestamp", "<=", Timestamp.fromDate(endDate))
+      );
+
+      const transSnapshot = await getDocs(transQuery);
+
+      transSnapshot.forEach((doc) => {
+        const data = doc.data();
+        const kode = data.kode;
+
+        if (!kode) return;
+
+        if (!transactionMap.has(kode)) {
+          transactionMap.set(kode, {
+            tambahStok: 0,
+            laku: 0,
+            free: 0,
+            gantiLock: 0,
+            nama: data.nama || "",
+            kategori: data.kategori || "",
+          });
+        }
+
+        const trans = transactionMap.get(kode);
+        const jumlah = data.jumlah || 0;
+
+        switch (data.jenis) {
+          case "tambah":
+            trans.tambahStok += jumlah;
+            break;
+          case "laku":
+            trans.laku += jumlah;
+            break;
+          case "free":
+            trans.free += jumlah;
+            break;
+          case "gantiLock":
+            trans.gantiLock += jumlah;
+            break;
+        }
+      });
+
+      // Get stock additions
+      const addQuery = query(
+        collection(firestore, "stockAdditions"),
+        where("timestamp", ">=", Timestamp.fromDate(startDate)),
+        where("timestamp", "<=", Timestamp.fromDate(endDate))
+      );
+
+      const addSnapshot = await getDocs(addQuery);
+
+      addSnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (!data.items?.length) return;
+
+        data.items.forEach((item) => {
+          const kode = item.kodeText;
+          if (!kode) return;
+
+          if (!transactionMap.has(kode)) {
+            transactionMap.set(kode, {
+              tambahStok: 0,
+              laku: 0,
+              free: 0,
+              gantiLock: 0,
+              nama: item.nama || "",
+              kategori: "",
+            });
+          }
+
+          const trans = transactionMap.get(kode);
+          trans.tambahStok += parseInt(item.jumlah) || 0;
+        });
+      });
+
+      console.log(`Found transactions for ${transactionMap.size} items`);
+      return transactionMap;
+    } catch (error) {
+      console.error("Error getting transactions:", error);
+      return new Map();
+    }
+  },
+
+  // Merge snapshot with current transactions
+  mergeSnapshotWithTransactions(snapshotData, transactions) {
+    const resultMap = new Map();
+
+    // Start with snapshot data
+    snapshotData.forEach((data, kode) => {
+      resultMap.set(kode, {
+        kode,
+        nama: data.nama,
+        kategori: data.kategori,
+        stokAwal: data.stokAwal,
+        tambahStok: 0,
+        laku: 0,
+        free: 0,
+        gantiLock: 0,
+        stokAkhir: data.stokAwal,
+      });
+    });
+
+    // Add current stock data for items not in snapshot
+    this.stockData.forEach((item) => {
+      if (!resultMap.has(item.kode)) {
+        resultMap.set(item.kode, {
+          kode: item.kode,
+          nama: item.nama || "",
+          kategori: item.kategori || "",
+          stokAwal: 0,
+          tambahStok: 0,
+          laku: 0,
+          free: 0,
+          gantiLock: 0,
+          stokAkhir: item.stokAkhir || 0,
+        });
+      }
+    });
+
+    // Apply transactions
+    transactions.forEach((trans, kode) => {
+      if (!resultMap.has(kode)) {
+        resultMap.set(kode, {
+          kode,
+          nama: trans.nama,
+          kategori: trans.kategori,
+          stokAwal: 0,
+          tambahStok: 0,
+          laku: 0,
+          free: 0,
+          gantiLock: 0,
+          stokAkhir: 0,
+        });
+      }
+
+      const item = resultMap.get(kode);
+      item.tambahStok = trans.tambahStok;
+      item.laku = trans.laku;
+      item.free = trans.free;
+      item.gantiLock = trans.gantiLock;
+
+      // Calculate final stock
+      item.stokAkhir = Math.max(0, item.stokAwal + item.tambahStok - item.laku - item.free - item.gantiLock);
+    });
+
+    // Convert to array and sort
+    this.filteredStockData = Array.from(resultMap.values()).sort((a, b) => {
+      if (a.kategori !== b.kategori) {
+        return a.kategori === "kotak" ? -1 : 1;
+      }
+      return a.kode.localeCompare(b.kode);
+    });
+
+    console.log(`Final result: ${this.filteredStockData.length} items`);
+
+    // Set flag for UI
+    this.usedSnapshotFlag = snapshotData.size > 0;
+  },
+
+  // Fallback method using original calculation
+  async calculateStockContinuityFallback(selectedDate) {
+    try {
+      const previousDay = new Date(selectedDate);
+      previousDay.setDate(previousDay.getDate() - 1);
+      previousDay.setHours(23, 59, 59, 999);
+
+      const endOfSelectedDate = new Date(selectedDate);
+      endOfSelectedDate.setHours(23, 59, 59, 999);
+
+      // Use original logic without snapshot
+      const stockTransactionsRef = collection(firestore, "stokAksesorisTransaksi");
+      const transactionsQuery = query(
+        stockTransactionsRef,
+        where("timestamp", "<=", Timestamp.fromDate(endOfSelectedDate)),
+        orderBy("timestamp", "asc")
+      );
+
+      const transactionsSnapshot = await getDocs(transactionsQuery);
+      const stockByCode = {};
+
+      // Process all transactions with original logic
+      transactionsSnapshot.forEach((doc) => {
+        const transaction = doc.data();
+        const kode = transaction.kode;
+        const timestamp = transaction.timestamp.toDate();
+
+        if (!kode) return;
+
+        if (!stockByCode[kode]) {
+          stockByCode[kode] = {
+            before: { stokAwal: 0, tambahStok: 0, laku: 0, free: 0, gantiLock: 0 },
+            during: { tambahStok: 0, laku: 0, free: 0, gantiLock: 0 },
+            nama: transaction.nama || "",
+            kategori: transaction.kategori || "",
+          };
+        }
+
+        const isPeriodBefore = timestamp <= previousDay;
+        const isPeriodDuring = timestamp > previousDay && timestamp <= endOfSelectedDate;
+
+        if (isPeriodBefore) {
+          switch (transaction.jenis) {
+            case "stokAwal":
+              stockByCode[kode].before.stokAwal = transaction.jumlah || 0;
+              break;
+            case "tambah":
+              stockByCode[kode].before.tambahStok += transaction.jumlah || 0;
+              break;
+            case "laku":
+              stockByCode[kode].before.laku += transaction.jumlah || 0;
+              break;
+            case "free":
+              stockByCode[kode].before.free += transaction.jumlah || 0;
+              break;
+            case "gantiLock":
+              stockByCode[kode].before.gantiLock += transaction.jumlah || 0;
+              break;
+          }
+        } else if (isPeriodDuring) {
+          switch (transaction.jenis) {
+            case "tambah":
+              stockByCode[kode].during.tambahStok += transaction.jumlah || 0;
+              break;
+            case "laku":
+              stockByCode[kode].during.laku += transaction.jumlah || 0;
+              break;
+            case "free":
+              stockByCode[kode].during.free += transaction.jumlah || 0;
+              break;
+            case "gantiLock":
+              stockByCode[kode].during.gantiLock += transaction.jumlah || 0;
+              break;
+          }
+        }
+      });
+
+      // Process stock additions with original logic
+      await this.processStockAdditions(new Date(selectedDate.getFullYear(), 0, 1), endOfSelectedDate, stockByCode);
+
+      // Calculate final stock data
+      this.calculateFinalStockData(stockByCode, false);
+    } catch (error) {
+      console.error("Error in fallback calculation:", error);
+      throw error;
+    }
+  },
+
+  // Determine if snapshot should be used
+  async shouldUseSnapshot(selectedDate) {
+    try {
+      const firstDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+
+      // Check if there's transaction data before current month
+      const checkQuery = query(
+        collection(firestore, "stokAksesorisTransaksi"),
+        where("timestamp", "<", Timestamp.fromDate(firstDayOfMonth)),
+        orderBy("timestamp", "desc"),
+        limit(1)
+      );
+
+      const checkSnapshot = await getDocs(checkQuery);
+
+      if (checkSnapshot.empty) {
+        // No historical data, check if snapshot exists for previous month
+        const prevMonth = new Date(selectedDate);
+        prevMonth.setMonth(prevMonth.getMonth() - 1);
+        const monthKey = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}`;
+
+        const hasSnapshot = await this.checkSnapshotAvailability(selectedDate);
+
+        return {
+          needed: hasSnapshot,
+          monthKey: monthKey,
+          startDate: firstDayOfMonth,
+        };
+      }
+
+      return {
+        needed: false,
+        startDate: new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1),
+      };
+    } catch (error) {
+      console.warn("Error in shouldUseSnapshot:", error);
+      // Fallback: don't use snapshot if there's an error
+      return {
+        needed: false,
+        startDate: new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1),
+      };
+    }
+  },
+
+  // Get transactions for current period
+  async getCurrentPeriodTransactions(startDate, endDate, initialStockData) {
     const stockTransactionsRef = collection(firestore, "stokAksesorisTransaksi");
     const transactionsQuery = query(
       stockTransactionsRef,
-      where("timestamp", "<=", Timestamp.fromDate(endOfSelectedDate)),
+      where("timestamp", ">=", Timestamp.fromDate(startDate)),
+      where("timestamp", "<=", Timestamp.fromDate(endDate)),
       orderBy("timestamp", "asc")
     );
 
     const transactionsSnapshot = await getDocs(transactionsQuery);
-
-    // Map to store stock data by code
     const stockByCode = {};
 
-    // Process all transactions
-    transactionsSnapshot.forEach((doc) => {
-      const transaction = doc.data();
-      const kode = transaction.kode;
-      const timestamp = transaction.timestamp.toDate();
-
-      if (!kode) return;
-
-      if (!stockByCode[kode]) {
+    // Initialize with snapshot data if available
+    if (initialStockData.size > 0) {
+      initialStockData.forEach((data, kode) => {
         stockByCode[kode] = {
           before: {
-            stokAwal: 0,
+            stokAwal: data.stokAkhir,
             tambahStok: 0,
             laku: 0,
             free: 0,
@@ -353,126 +723,103 @@ const laporanStokHandler = {
             free: 0,
             gantiLock: 0,
           },
+          nama: data.nama,
+          kategori: data.kategori,
+        };
+      });
+    }
+
+    // Process transactions
+    transactionsSnapshot.forEach((doc) => {
+      const transaction = doc.data();
+      const kode = transaction.kode;
+
+      if (!kode) return;
+
+      if (!stockByCode[kode]) {
+        stockByCode[kode] = {
+          before: { stokAwal: 0, tambahStok: 0, laku: 0, free: 0, gantiLock: 0 },
+          during: { tambahStok: 0, laku: 0, free: 0, gantiLock: 0 },
           nama: transaction.nama || "",
           kategori: transaction.kategori || "",
         };
       }
 
-      // Determine if transaction is before or during the selected date
-      const isPeriodBefore = timestamp <= previousDay;
-      const isPeriodDuring = timestamp > previousDay && timestamp <= endOfSelectedDate;
-
-      // Update data based on transaction type and period
-      if (isPeriodBefore) {
-        switch (transaction.jenis) {
-          case "stokAwal":
-            stockByCode[kode].before.stokAwal = transaction.jumlah || 0;
-            break;
-          case "tambah":
-            stockByCode[kode].before.tambahStok += transaction.jumlah || 0;
-            break;
-          case "laku":
-            stockByCode[kode].before.laku += transaction.jumlah || 0;
-            break;
-          case "free":
-            stockByCode[kode].before.free += transaction.jumlah || 0;
-            break;
-          case "gantiLock":
-            stockByCode[kode].before.gantiLock += transaction.jumlah || 0;
-            break;
-        }
-      } else if (isPeriodDuring) {
-        switch (transaction.jenis) {
-          case "tambah":
-            stockByCode[kode].during.tambahStok += transaction.jumlah || 0;
-            break;
-          case "laku":
-            stockByCode[kode].during.laku += transaction.jumlah || 0;
-            break;
-          case "free":
-            stockByCode[kode].during.free += transaction.jumlah || 0;
-            break;
-          case "gantiLock":
-            stockByCode[kode].during.gantiLock += transaction.jumlah || 0;
-            break;
-        }
+      // All transactions in this period are "during"
+      switch (transaction.jenis) {
+        case "tambah":
+          stockByCode[kode].during.tambahStok += transaction.jumlah || 0;
+          break;
+        case "laku":
+          stockByCode[kode].during.laku += transaction.jumlah || 0;
+          break;
+        case "free":
+          stockByCode[kode].during.free += transaction.jumlah || 0;
+          break;
+        case "gantiLock":
+          stockByCode[kode].during.gantiLock += transaction.jumlah || 0;
+          break;
       }
     });
 
-    // Get additional stock data from stockAdditions
+    return stockByCode;
+  },
+
+  // Process stock additions
+  async processStockAdditions(startDate, endDate, stockByCode) {
     const stockAddRef = collection(firestore, "stockAdditions");
-    const stockAddSnapshot = await getDocs(stockAddRef);
+    const stockAddQuery = query(
+      stockAddRef,
+      where("timestamp", ">=", Timestamp.fromDate(startDate)),
+      where("timestamp", "<=", Timestamp.fromDate(endDate))
+    );
+
+    const stockAddSnapshot = await getDocs(stockAddQuery);
 
     stockAddSnapshot.forEach((doc) => {
       const data = doc.data();
-      if (!data.timestamp) return;
+      if (!data.items?.length) return;
 
-      const timestamp = data.timestamp.toDate();
+      data.items.forEach((item) => {
+        const kode = item.kodeText;
+        if (!kode) return;
 
-      if (data.items && data.items.length) {
-        data.items.forEach((item) => {
-          const kode = item.kodeText;
-          if (!kode) return;
+        const quantity = parseInt(item.jumlah) || 0;
 
-          const quantity = parseInt(item.jumlah) || 0;
+        if (!stockByCode[kode]) {
+          stockByCode[kode] = {
+            before: { stokAwal: 0, tambahStok: 0, laku: 0, free: 0, gantiLock: 0 },
+            during: { tambahStok: 0, laku: 0, free: 0, gantiLock: 0 },
+            nama: item.nama || "",
+            kategori: "",
+          };
+        }
 
-          if (!stockByCode[kode]) {
-            stockByCode[kode] = {
-              before: {
-                stokAwal: 0,
-                tambahStok: 0,
-                laku: 0,
-                free: 0,
-                gantiLock: 0,
-              },
-              during: {
-                tambahStok: 0,
-                laku: 0,
-                free: 0,
-                gantiLock: 0,
-              },
-              nama: item.nama || "",
-              kategori: "",
-            };
-          }
-
-          // Categorize based on date
-          if (timestamp <= previousDay) {
-            stockByCode[kode].before.tambahStok += quantity;
-          } else if (timestamp <= endOfSelectedDate) {
-            stockByCode[kode].during.tambahStok += quantity;
-          }
-        });
-      }
+        stockByCode[kode].during.tambahStok += quantity;
+      });
     });
+  },
 
-    // Create stock data with correct continuity
+  // Calculate final stock data
+  calculateFinalStockData(stockByCode, usedSnapshot) {
+    // Store snapshot usage flag for UI indicator
+    this.usedSnapshotFlag = usedSnapshot;
+
     this.filteredStockData = this.stockData.map((item) => {
       const kode = item.kode;
       const stockInfo = stockByCode[kode] || {
-        before: {
-          stokAwal: 0,
-          tambahStok: 0,
-          laku: 0,
-          free: 0,
-          gantiLock: 0,
-        },
-        during: {
-          tambahStok: 0,
-          laku: 0,
-          free: 0,
-          gantiLock: 0,
-        },
+        before: { stokAwal: 0, tambahStok: 0, laku: 0, free: 0, gantiLock: 0 },
+        during: { tambahStok: 0, laku: 0, free: 0, gantiLock: 0 },
       };
 
-      // PERBAIKAN: Ganti lock MENGURANGI stok
-      // Calculate initial stock (end stock from previous period)
-      const initialStock =
-        stockInfo.before.stokAwal +
-        stockInfo.before.tambahStok -
-        stockInfo.before.laku -
-        stockInfo.before.free -
-        stockInfo.before.gantiLock; // Ganti lock mengurangi stok
+      // Calculate initial stock
+      const initialStock = usedSnapshot
+        ? stockInfo.before.stokAwal // From snapshot
+        : stockInfo.before.stokAwal +
+          stockInfo.before.tambahStok -
+          stockInfo.before.laku -
+          stockInfo.before.free -
+          stockInfo.before.gantiLock;
 
       // Calculate final stock
       const finalStock =
@@ -480,9 +827,8 @@ const laporanStokHandler = {
         stockInfo.during.tambahStok -
         stockInfo.during.laku -
         stockInfo.during.free -
-        stockInfo.during.gantiLock; // Ganti lock mengurangi stok
+        stockInfo.during.gantiLock;
 
-      // Create stock object with correct continuity
       return {
         ...item,
         stokAwal: Math.max(0, initialStock),
@@ -496,100 +842,93 @@ const laporanStokHandler = {
 
     // Sort by category then by code
     this.filteredStockData.sort((a, b) => {
-      // Prioritize category
       if ((a.kategori || "unknown") !== (b.kategori || "unknown")) {
         return (a.kategori || "unknown") === "kotak" ? -1 : 1;
       }
-
-      // If category is the same, sort by code
       return (a.kode || "").localeCompare(b.kode || "");
     });
-  } catch (error) {
-    console.error("Error calculating stock continuity:", error);
-    throw error;
-  }
-},
+  },
 
   // Tambahkan method untuk menghitung transaksi ganti lock
-async calculateStockMovements(kode, startDate, endDate) {
-  try {
-    const movements = {
-      tambahStok: 0,
-      laku: 0,
-      free: 0,
-      gantiLock: 0
-    };
+  async calculateStockMovements(kode, startDate, endDate) {
+    try {
+      const movements = {
+        tambahStok: 0,
+        laku: 0,
+        free: 0,
+        gantiLock: 0,
+      };
 
-    // Query transaksi dalam rentang tanggal untuk kode ini
-    const transactionQuery = query(
-      collection(firestore, "stokAksesorisTransaksi"),
-      where("kode", "==", kode),
-      where("timestamp", ">=", Timestamp.fromDate(startDate)),
-      where("timestamp", "<=", Timestamp.fromDate(endDate))
-    );
+      // Query transaksi dalam rentang tanggal untuk kode ini
+      const transactionQuery = query(
+        collection(firestore, "stokAksesorisTransaksi"),
+        where("kode", "==", kode),
+        where("timestamp", ">=", Timestamp.fromDate(startDate)),
+        where("timestamp", "<=", Timestamp.fromDate(endDate))
+      );
 
-    const transactionSnapshot = await getDocs(transactionQuery);
-    
-    transactionSnapshot.forEach((doc) => {
-      const data = doc.data();
-      const jenis = data.jenis;
-      const jumlah = data.jumlah || 0;
+      const transactionSnapshot = await getDocs(transactionQuery);
 
-      switch (jenis) {
-        case "tambah":
-          movements.tambahStok += jumlah;
-          break;
-        case "laku":
-          movements.laku += jumlah;
-          break;
-        case "free":
-          movements.free += jumlah;
-          break;
-        case "gantiLock":
-          movements.gantiLock += jumlah;
-          break;
-      }
-    });
+      transactionSnapshot.forEach((doc) => {
+        const data = doc.data();
+        const jenis = data.jenis;
+        const jumlah = data.jumlah || 0;
 
-    return movements;
-  } catch (error) {
-    console.error("Error calculating stock movements:", error);
-    return {
-      tambahStok: 0,
-      laku: 0,
-      free: 0,
-      gantiLock: 0
-    };
-  }
-},
+        switch (jenis) {
+          case "tambah":
+            movements.tambahStok += jumlah;
+            break;
+          case "laku":
+            movements.laku += jumlah;
+            break;
+          case "free":
+            movements.free += jumlah;
+            break;
+          case "gantiLock":
+            movements.gantiLock += jumlah;
+            break;
+        }
+      });
 
-// Perbaiki method untuk menampilkan data dengan kolom ganti lock
-async displayStockData(stockData, selectedDate) {
-  const tableBody = $("#stockTable tbody");
-  tableBody.empty();
+      return movements;
+    } catch (error) {
+      console.error("Error calculating stock movements:", error);
+      return {
+        tambahStok: 0,
+        laku: 0,
+        free: 0,
+        gantiLock: 0,
+      };
+    }
+  },
 
-  if (stockData.length === 0) {
-    tableBody.append(`
+  // Perbaiki method untuk menampilkan data dengan kolom ganti lock
+  async displayStockData(stockData, selectedDate) {
+    const tableBody = $("#stockTable tbody");
+    tableBody.empty();
+
+    if (stockData.length === 0) {
+      tableBody.append(`
       <tr>
         <td colspan="9" class="text-center">Tidak ada data stok untuk tanggal ${selectedDate}</td>
       </tr>
     `);
-    return;
-  }
+      return;
+    }
 
-  // Hitung tanggal untuk query transaksi
-  const startDate = new Date(selectedDate);
-  startDate.setHours(0, 0, 0, 0);
-  const endDate = new Date(selectedDate);
-  endDate.setHours(23, 59, 59, 999);
+    // Hitung tanggal untuk query transaksi
+    const startDate = new Date(selectedDate);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(selectedDate);
+    endDate.setHours(23, 59, 59, 999);
 
-  for (let i = 0; i < stockData.length; i++) {
-    const item = stockData[i];
-    
-    // Hitung pergerakan stok
-    const movements = await this.calculateStockMovements(item.kode, startDate, endDate);
-    
-    const row = `
+    for (let i = 0; i < stockData.length; i++) {
+      const item = stockData[i];
+
+      // Hitung pergerakan stok
+      const movements = await this.calculateStockMovements(item.kode, startDate, endDate);
+
+      const row = `
       <tr>
         <td>${i + 1}</td>
         <td>${item.kode || "-"}</td>
@@ -602,10 +941,10 @@ async displayStockData(stockData, selectedDate) {
         <td class="text-center">${item.stokAkhir || 0}</td>
       </tr>
     `;
-    
-    tableBody.append(row);
-  }
-},
+
+      tableBody.append(row);
+    }
+  },
 
   // Render stock table
   renderStockTable() {
@@ -620,6 +959,11 @@ async displayStockData(stockData, selectedDate) {
       // Safely destroy DataTable if it exists
       try {
         if ($.fn.DataTable.isDataTable("#stockTable")) {
+          try {
+            this.addDataSourceIndicator(this.usedSnapshotFlag || false);
+          } catch (error) {
+            console.warn("Error adding data source indicator:", error);
+          }
           $("#stockTable").DataTable().destroy();
         }
       } catch (error) {
@@ -640,7 +984,19 @@ async displayStockData(stockData, selectedDate) {
               <td colspan="9" class="text-center">Tidak ada data yang sesuai dengan filter</td>
             </tr>
           `;
+        // Add data source indicator
+        if (this.usedSnapshotFlag) {
+          const indicator = document.createElement("div");
+          indicator.className = "alert alert-info mb-2";
+          indicator.innerHTML =
+            '<i class="fas fa-database me-2"></i>Menggunakan data snapshot bulan lalu + transaksi bulan ini';
 
+          const tableContainer = document.querySelector("#stockTable").parentElement;
+          const existingIndicator = tableContainer.querySelector(".alert");
+          if (existingIndicator) existingIndicator.remove();
+
+          tableContainer.insertBefore(indicator, tableContainer.firstChild);
+        }
         // Initialize empty DataTable
         $("#stockTable").DataTable({
           responsive: true,
@@ -877,6 +1233,31 @@ async displayStockData(stockData, selectedDate) {
     }
   },
 
+  // Add data source indicator
+  addDataSourceIndicator(usedSnapshot = false) {
+    try {
+      const tableContainer =
+        document.querySelector("#stockTable_wrapper") || document.querySelector("#stockTable")?.parentElement;
+
+      if (!tableContainer) return;
+
+      // Remove existing indicator
+      const existingIndicator = document.querySelector(".data-source-indicator");
+      if (existingIndicator) existingIndicator.remove();
+
+      // Create new indicator
+      const indicator = document.createElement("div");
+      indicator.className = "data-source-indicator alert alert-info mb-2";
+      indicator.innerHTML = usedSnapshot
+        ? '<i class="fas fa-database me-2"></i>Data menggunakan snapshot bulan sebelumnya + transaksi bulan ini'
+        : '<i class="fas fa-chart-line me-2"></i>Data dihitung dari seluruh riwayat transaksi';
+
+      tableContainer.insertBefore(indicator, tableContainer.firstChild);
+    } catch (error) {
+      console.warn("Error adding data source indicator:", error);
+    }
+  },
+
   // Add category headers
   addCategoryHeaders(kotakItems, aksesorisItems, otherItems) {
     // Add container for category headers above the table
@@ -1105,4 +1486,3 @@ document.addEventListener("DOMContentLoaded", function () {
 
 // Export the handler for potential use in other modules
 export default laporanStokHandler;
-
