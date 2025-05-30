@@ -12,9 +12,6 @@ import {
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
-let deleteDataType = null;
-let deleteStartDate = null;
-let deleteEndDate = null;
 const VERIFICATION_PASSWORD = "smlt116";
 
 // Cache management dengan localStorage dan TTL
@@ -171,8 +168,6 @@ class DataPenjualanApp {
       btnPrintInvoice: () => this.printDocument("invoice"),
       btnSaveEdit: () => this.saveEditTransaction(),
       btnConfirmDelete: () => this.confirmDeleteTransaction(),
-      btnDeleteRangeData: () => this.handleDeleteRange(),
-      btnConfirmDeleteRange: () => this.confirmDeleteRange(),
     };
 
     Object.entries(events).forEach(([id, handler]) => {
@@ -222,110 +217,6 @@ class DataPenjualanApp {
           if (id) this.handleDelete(id);
         }, 300)
       );
-  }
-
-  handleDeleteRange() {
-    const startDateStr = document.getElementById("filterTanggalMulai").value;
-    const endDateStr = document.getElementById("filterTanggalAkhir").value;
-
-    if (!startDateStr || !endDateStr) {
-      return utils.showAlert("Pilih rentang tanggal terlebih dahulu.", "Peringatan", "warning");
-    }
-
-    const startDate = utils.parseDate(startDateStr);
-    const endDate = utils.parseDate(endDateStr);
-
-    if (!startDate || !endDate) {
-      return utils.showAlert("Format tanggal tidak valid.", "Peringatan", "warning");
-    }
-
-    if (startDate > endDate) {
-      return utils.showAlert("Tanggal mulai tidak boleh lebih besar dari tanggal akhir.", "Peringatan", "warning");
-    }
-
-    startDate.setHours(0, 0, 0, 0);
-    endDate.setHours(23, 59, 59, 999);
-
-    this.showVerificationModal("sales", startDate, endDate);
-  }
-
-  // Show verification modal
-  showVerificationModal(dataType, startDate, endDate) {
-    deleteDataType = dataType;
-    deleteStartDate = startDate;
-    deleteEndDate = endDate;
-
-    const startDateStr = utils.formatDate(startDate);
-    const endDateStr = utils.formatDate(endDate);
-
-    const confirmationText = document.getElementById("deleteConfirmationText");
-    if (confirmationText) {
-      confirmationText.textContent = `Anda akan menghapus data penjualan dari ${startDateStr} hingga ${endDateStr}. Tindakan ini tidak dapat dibatalkan.`;
-    }
-
-    const passwordInput = document.getElementById("verificationPassword");
-    if (passwordInput) {
-      passwordInput.value = "";
-    }
-
-    const modal = new bootstrap.Modal(document.getElementById("verificationModal"));
-    modal.show();
-  }
-
-  // Confirm delete range
-  async confirmDeleteRange() {
-    const password = document.getElementById("verificationPassword").value;
-
-    if (password !== VERIFICATION_PASSWORD) {
-      return utils.showAlert("Kata sandi verifikasi salah.", "Error", "error");
-    }
-
-    const modal = bootstrap.Modal.getInstance(document.getElementById("verificationModal"));
-    modal.hide();
-
-    if (deleteDataType === "sales") {
-      await this.deleteSalesData(deleteStartDate, deleteEndDate);
-    }
-  }
-
-  async deleteSalesData(startDate, endDate) {
-    try {
-      utils.showLoading(true);
-
-      const salesRef = collection(firestore, "penjualanAksesoris");
-      const q = query(
-        salesRef,
-        where("timestamp", ">=", Timestamp.fromDate(startDate)),
-        where("timestamp", "<=", Timestamp.fromDate(endDate))
-      );
-
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
-        utils.showLoading(false);
-        return utils.showAlert("Tidak ada data penjualan dalam rentang tanggal yang dipilih.", "Info", "info");
-      }
-
-      const deletePromises = [];
-      querySnapshot.forEach((docSnapshot) => {
-        deletePromises.push(deleteDoc(doc(firestore, "penjualanAksesoris", docSnapshot.id)));
-      });
-
-      await Promise.all(deletePromises);
-
-      // Clear cache and reload data
-      cacheManager.clear();
-      await this.loadSalesData(true);
-      this.populateSalesFilter();
-      this.filterData();
-
-      utils.showLoading(false);
-      return utils.showAlert(`Berhasil menghapus ${querySnapshot.size} data penjualan.`, "Sukses", "success");
-    } catch (error) {
-      console.error("Error deleting sales data:", error);
-      utils.showLoading(false);
-      return utils.showAlert("Gagal menghapus data: " + error.message, "Error", "error");
-    }
   }
 
   // Setup auto filter functionality
@@ -973,18 +864,34 @@ class DataPenjualanApp {
     const date = utils.formatDate(transaction.timestamp || transaction.tanggal);
 
     document.getElementById("deleteTransactionInfo").innerHTML = `
-      <div class="text-start">
-        <p><strong>Tanggal:</strong> ${date}</p>
-        <p><strong>Sales:</strong> ${transaction.sales || "Admin"}</p>
-        <p><strong>Total Harga:</strong> Rp ${utils.formatRupiah(transaction.totalHarga || 0)}</p>
-      </div>
-    `;
+    <div class="text-start">
+      <p><strong>Tanggal:</strong> ${date}</p>
+      <p><strong>Sales:</strong> ${transaction.sales || "Admin"}</p>
+      <p><strong>Total Harga:</strong> Rp ${utils.formatRupiah(transaction.totalHarga || 0)}</p>
+    </div>
+  `;
+
+    // Clear password field
+    const passwordInput = document.getElementById("deleteVerificationPassword");
+    if (passwordInput) {
+      passwordInput.value = "";
+    }
 
     $("#deleteModal").modal("show");
   }
 
   // Confirm delete transaction
   async confirmDeleteTransaction() {
+    const password = document.getElementById("deleteVerificationPassword").value;
+
+    if (!password) {
+      return utils.showAlert("Masukkan kata sandi verifikasi terlebih dahulu.", "Peringatan", "warning");
+    }
+
+    if (password !== VERIFICATION_PASSWORD) {
+      return utils.showAlert("Kata sandi verifikasi salah.", "Error", "error");
+    }
+
     try {
       utils.showLoading(true);
 
@@ -1156,85 +1063,95 @@ class DataPenjualanApp {
     const tanggal = utils.formatDate(transaction.timestamp || transaction.tanggal);
 
     let invoiceHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Invoice Customer</title>
-        <style>
-          @page { size: 10cm 20cm; margin: 0; }
-          body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; box-sizing: border-box; }
-          .invoice { width: 100%; }
-          .header-info { text-align: right; margin-bottom: 2cm; margin-right: 3cm; margin-top: 1cm; }
-          .total-row { margin-top: 1.9cm; text-align: right; font-weight: bold; margin-right: 3cm; }
-          .sales { text-align: right; margin-top: 0.6cm; margin-right: 2cm; }
-          .keterangan { font-style: italic; font-size: 10px; margin-top: 1cm; padding-top: 2mm; text-align: left; margin-left: 1cm; margin-right: 3cm; }
-          .item-details { display: flex; flex-wrap: wrap; }
-          .item-data { display: grid; grid-template-columns: 2cm 1.8cm 5cm 2cm 2cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 1cm; margin-top: 1.5cm; margin-right: 3cm; }
-          .item-data span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        </style>
-      </head>
-      <body>
-        <div class="invoice">
-          <div class="header-info">
-            <p>${tanggal}</p>
-          </div>
-          <hr>
-    `;
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Invoice Customer</title>
+      <style>
+        @page { size: 10cm 20cm; margin: 0; }
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; box-sizing: border-box; }
+        .invoice { width: 100%; }
+        .header-info { text-align: right; margin-bottom: 2cm; margin-right: 3cm; margin-top: 0.8cm; }
+        .total-row { margin-top: 0.7cm; text-align: right; font-weight: bold; margin-right: 3cm; }
+        .sales { text-align: right; margin-top: 0.6cm; margin-right: 2cm; }
+        .keterangan { font-style: italic; font-size: 10px; margin-top: 1cm; margin-bottom: 0.5cm; padding-top: 2mm; text-align: left; margin-left: 0.5cm; margin-right: 3cm; }
+        .keterangan-spacer { height: 1.6cm; }
+        .item-details { display: flex; flex-wrap: wrap; }
+        .item-data { display: grid; grid-template-columns: 2cm 1.8cm 5cm 2cm 2cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 0.5cm; margin-top: 1cm; margin-right: 3cm; }
+        .item-data span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      </style>
+    </head>
+    <body>
+      <div class="invoice">
+        <div class="header-info">
+          <p>${tanggal}</p>
+        </div>
+        <hr>
+  `;
 
     let hasKeterangan = false;
     let keteranganText = "";
     let totalHarga = 0;
 
+    // Loop untuk menampilkan semua item-data terlebih dahulu
     transaction.items?.forEach((item) => {
       const itemHarga = parseInt(item.totalHarga || 0);
       totalHarga += itemHarga;
 
       invoiceHTML += `
-        <div class="item-details">
-          <div class="item-data">
-            <span>${item.kodeText || "-"}</span>
-            <span>${item.jumlah || "1"}pcs</span>
-            <span>${item.nama || "-"}</span>
-            <span>${item.kadar || "-"}</span>
-            <span>${item.berat || "-"}gr</span>
-            <span>${utils.formatRupiah(itemHarga)}</span>
-          </div>
+      <div class="item-details">
+        <div class="item-data">
+          <span>${item.kodeText || "-"}</span>
+          <span>${item.jumlah || "1"}pcs</span>
+          <span>${item.nama || "-"}</span>
+          <span>${item.kadar || "-"}</span>
+          <span>${item.berat || "-"}gr</span>
+          <span>${utils.formatRupiah(itemHarga)}</span>
         </div>
-      `;
+      </div>
+    `;
 
+      // Kumpulkan keterangan
       if (item.keterangan && item.keterangan.trim() !== "") {
         hasKeterangan = true;
         keteranganText += `${item.keterangan}; `;
       }
     });
 
-    invoiceHTML += `
-        <div class="total-row">
-          Rp ${utils.formatRupiah(totalHarga)}
-        </div>
-        <div class="sales">${transaction.sales || "-"}</div>
-    `;
-
+    // Tampilkan keterangan atau spacer untuk menjaga posisi total-row
     if (hasKeterangan && transaction.jenisPenjualan === "manual") {
       invoiceHTML += `
-        <div class="keterangan">
-          <strong>Keterangan:</strong><br>
-          ${keteranganText.trim()}
-        </div>
-      `;
+      <div class="keterangan">
+        <strong>Keterangan:</strong><br>
+        ${keteranganText.trim()}
+      </div>
+    `;
+    } else {
+      // Tambahkan spacer jika tidak ada keterangan untuk menjaga posisi total-row
+      invoiceHTML += `
+      <div class="keterangan-spacer"></div>
+    `;
     }
 
+    // Tampilkan total dan sales
     invoiceHTML += `
-        </div>
-        <script>
-          window.onload = function() {
-            window.print();
-            setTimeout(function() { window.close(); }, 500);
-          };
-        </script>
-      </body>
-      </html>
-    `;
+      <div class="total-row">
+        Rp ${utils.formatRupiah(totalHarga)}
+      </div>
+      <div class="sales">${transaction.sales || "-"}</div>
+  `;
+
+    invoiceHTML += `
+      </div>
+      <script>
+        window.onload = function() {
+          window.print();
+          setTimeout(function() { window.close(); }, 500);
+        };
+      </script>
+    </body>
+    </html>
+  `;
 
     return invoiceHTML;
   }

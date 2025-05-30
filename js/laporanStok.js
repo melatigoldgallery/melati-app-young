@@ -111,15 +111,6 @@ const laporanStokHandler = {
             doc.styles.tableHeader.fontSize = 9;
           },
         },
-        {
-          extend: "print",
-          text: '<i class="fas fa-print me-2"></i>Print',
-          className: "btn btn-primary btn-sm",
-          exportOptions: {
-            columns: ":visible",
-          },
-          title: "Laporan Stok",
-        },
       ],
     });
   },
@@ -1129,53 +1120,6 @@ const laporanStokHandler = {
                   }
                 });
               });
-            },
-          },
-          {
-            extend: "print",
-            text: '<i class="fas fa-print me-2"></i>Print',
-            className: "btn btn-primary btn-sm",
-            exportOptions: {
-              columns: ":visible",
-            },
-            title: `Laporan Stok (${selectedDate})`,
-            customize: function (win) {
-              $(win.document.head).append(`
-                  <style>
-                    @page { size: landscape; }
-                    table.dataTable {
-                      width: 100% !important;
-                      table-layout: fixed !important;
-                      border-collapse: collapse !important;
-                    }
-                    table.dataTable th, table.dataTable td {
-                      white-space: normal !important;
-                      word-wrap: break-word !important;
-                      padding: 5px !important;
-                      font-size: 10pt !important;
-                      border: 1px solid #ddd !important;
-                      vertical-align: middle !important;
-                    }
-                    table.dataTable th:nth-child(1), table.dataTable td:nth-child(1) { width: 5% !important; text-align: center !important; }
-                    table.dataTable th:nth-child(2), table.dataTable td:nth-child(2) { width: 10% !important; text-align: center !important; }
-                    table.dataTable th:nth-child(3), table.dataTable td:nth-child(3) { width: 35% !important; text-align: left !important; }
-                    table.dataTable th:nth-child(4), table.dataTable td:nth-child(4),
-                    table.dataTable th:nth-child(5), table.dataTable td:nth-child(5),
-                    table.dataTable th:nth-child(6), table.dataTable td:nth-child(6),
-                    table.dataTable th:nth-child(7), table.dataTable td:nth-child(7),
-                    table.dataTable th:nth-child(8), table.dataTable td:nth-child(8),
-                    table.dataTable th:nth-child(9), table.dataTable td:nth-child(9) { 
-                      width: 8.33% !important; 
-                      text-align: center !important;
-                    }
-                    table.dataTable thead th {
-                      background-color: #f2f2f2 !important;
-                      font-weight: bold !important;
-                    }
-                  </style>
-                `);
-              $(win.document.body).find("table td:not(:nth-child(3))").css("text-align", "center");
-              $(win.document.body).find("table").css("width", "100%");
             },
           },
         ],
