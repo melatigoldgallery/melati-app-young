@@ -521,7 +521,6 @@ const penjualanHandler = {
   },
 
   // Populate stock tables
-  // Perbaiki method populateStockTables untuk tidak menampilkan kolom stok
   populateStockTables() {
     const categories = {
       aksesoris: "#tableAksesoris",
@@ -643,7 +642,7 @@ const penjualanHandler = {
         <input type="number" class="form-control form-control-sm jumlah-input" value="1" min="1">
       </td>
       <td>
-        <input type="text" class="form-control form-control-sm kadar-input" value="" placeholder="Kadar" required>
+        <input type="text" class="form-control form-control-sm kadar-input" value="" placeholder="Masukkan kadar" required>
       </td>
       <td>
         <input type="text" class="form-control form-control-sm berat-input" value="" placeholder="0.00" required>
@@ -652,7 +651,7 @@ const penjualanHandler = {
         <input type="text" class="form-control form-control-sm harga-per-gram-input" value="0" readonly>
       </td>
       <td>
-        <input type="text" class="form-control form-control-sm total-harga-input" value="" placeholder="0" required>
+        <input type="text" class="form-control form-control-sm total-harga-input" value="" placeholder="Masukkan harga" required>
       </td>
       <td>
         <button class="btn btn-sm btn-danger btn-delete">
@@ -673,7 +672,8 @@ const penjualanHandler = {
   addKotakToTable(data) {
     const { kode, nama, harga } = data;
     const jumlah = 1;
-    const totalHarga = jumlah * (harga || 0);
+    const hargaSatuan = harga;
+    const totalHarga = jumlah * hargaSatuan;
 
     const newRow = `
     <tr>
@@ -684,8 +684,8 @@ const penjualanHandler = {
       </td>
       <td>
         <input type="text" class="form-control form-control-sm harga-input" value="${utils.formatRupiah(
-          harga || 0
-        )}" required>
+          hargaSatuan
+        )}" placeholder="Masukkan harga" required>
       </td>
       <td class="total-harga">${utils.formatRupiah(totalHarga)}</td>
       <td>
@@ -698,7 +698,10 @@ const penjualanHandler = {
 
     $("#tableKotakDetail tbody").append(newRow);
     const $newRow = $("#tableKotakDetail tbody tr:last-child");
-    $newRow.find(".jumlah-input").focus();
+
+    // Focus ke harga input untuk kotak
+    $newRow.find(".harga-input").focus().select();
+
     this.attachRowEventHandlers($newRow);
     this.updateGrandTotal("kotak");
   },
@@ -756,7 +759,7 @@ const penjualanHandler = {
       $(this).val(utils.formatRupiah(parseInt(value || 0)));
     });
 
-    // Enter key navigation
+    // Enter key navigation untuk aksesoris
     $kadarInput.on("keypress", (e) => {
       if (e.which === 13) {
         e.preventDefault();
@@ -767,16 +770,18 @@ const penjualanHandler = {
     $beratInput.on("keypress", (e) => {
       if (e.which === 13) {
         e.preventDefault();
-        $totalHargaInput.focus();
+        $totalHargaInput.focus().select();
       }
     });
 
     $totalHargaInput.on("keypress", (e) => {
       if (e.which === 13) {
         e.preventDefault();
-        const value = $(this).val().replace(/\./g, "");
-        $(this).val(utils.formatRupiah(parseInt(value || 0)));
+        const value = $totalHargaInput.val().replace(/\./g, "");
+        $totalHargaInput.val(utils.formatRupiah(parseInt(value || 0)));
         calculateHargaPerGram();
+
+        // Langsung ke jumlah bayar
         $("#jumlahBayar").focus();
       }
     });
@@ -789,7 +794,7 @@ const penjualanHandler = {
     const $totalCell = $row.find(".total-harga");
 
     const calculateTotal = () => {
-      const jumlah = parseInt($jumlahInput.val()) || 0;
+      const jumlah = parseInt($jumlahInput.val());
       const harga = parseInt($hargaInput.val().replace(/\./g, "")) || 0;
       const total = jumlah * harga;
       $totalCell.text(utils.formatRupiah(total));
@@ -798,18 +803,30 @@ const penjualanHandler = {
 
     $jumlahInput.add($hargaInput).on("input", calculateTotal);
 
+    // Format harga saat blur
     $hargaInput.on("blur", function () {
       const value = $(this).val().replace(/\./g, "");
-      $(this).val(utils.formatRupiah(parseInt(value || 0)));
+      $(this).val(utils.formatRupiah(parseInt(value)));
     });
 
+    // Enter key navigation untuk kotak
     $hargaInput.on("keypress", (e) => {
       if (e.which === 13) {
         e.preventDefault();
-        const value = $(this).val().replace(/\./g, "");
-        $(this).val(utils.formatRupiah(parseInt(value || 0)));
+        const value = $hargaInput.val().replace(/\./g, "");
+        $hargaInput.val(utils.formatRupiah(parseInt(value)));
         calculateTotal();
+
+        // Langsung ke jumlah bayar
         $("#jumlahBayar").focus();
+      }
+    });
+
+    // Enter key navigation untuk jumlah
+    $jumlahInput.on("keypress", (e) => {
+      if (e.which === 13) {
+        e.preventDefault();
+        $hargaInput.focus().select();
       }
     });
   },
@@ -897,25 +914,25 @@ const penjualanHandler = {
     $("#tableManualDetail tbody").empty();
 
     const inputRow = `
-      <tr class="input-row">
-        <td><input type="text" class="form-control form-control-sm" id="manualInputKode" placeholder="Kode"></td>
-        <td><input type="text" class="form-control form-control-sm" id="manualInputNamaBarang" placeholder="Nama barang"></td>
-        <td>
-          <div class="input-group input-group-sm">
-            <input type="text" class="form-control" id="manualInputKodeLock" placeholder="Pilih kode" readonly>
-            <button class="btn btn-outline-secondary" id="manualBtnPilihKodeLock" type="button">
-              <i class="fas fa-search"></i>
-            </button>
-          </div>
-        </td>
-        <td><input type="text" class="form-control form-control-sm" id="manualInputKadar" placeholder="Kadar" required></td>
-        <td><input type="text" class="form-control form-control-sm" id="manualInputBerat" placeholder="0.00" required></td>
-        <td><input type="text" class="form-control form-control-sm" id="manualInputHargaPerGram" placeholder="0" readonly></td>
-        <td><input type="text" class="form-control form-control-sm" id="manualInputTotalHarga" placeholder="0" required></td>
-        <td><input type="text" class="form-control form-control-sm" id="manualInputKeterangan" placeholder="Keterangan"></td>
-        <td></td>
-      </tr>
-    `;
+    <tr class="input-row">
+      <td><input type="text" class="form-control form-control-sm" id="manualInputKode" placeholder="Kode"></td>
+      <td><input type="text" class="form-control form-control-sm" id="manualInputNamaBarang" placeholder="Nama barang"></td>
+      <td>
+        <div class="input-group input-group-sm">
+          <input type="text" class="form-control" id="manualInputKodeLock" placeholder="Pilih kode" readonly>
+          <button class="btn btn-outline-secondary" id="manualBtnPilihKodeLock" type="button">
+            <i class="fas fa-search"></i>
+          </button>
+        </div>
+      </td>
+      <td><input type="text" class="form-control form-control-sm" id="manualInputKadar" placeholder="Kadar" required></td>
+      <td><input type="text" class="form-control form-control-sm" id="manualInputBerat" placeholder="0.00" required></td>
+      <td><input type="text" class="form-control form-control-sm" id="manualInputHargaPerGram" placeholder="0" readonly></td>
+      <td><input type="text" class="form-control form-control-sm" id="manualInputTotalHarga" placeholder="Masukkan harga" required></td>
+      <td><input type="text" class="form-control form-control-sm" id="manualInputKeterangan" placeholder="Keterangan"></td>
+      <td></td>
+    </tr>
+  `;
 
     $("#tableManualDetail tbody").append(inputRow);
     this.attachManualInputHandlers();
@@ -1187,10 +1204,73 @@ const penjualanHandler = {
     }
   },
 
+  // Fungsi untuk menduplikat transaksi manual ke mutasiKode
+   async duplicateToMutasiKode(transactionData, transactionId) {
+    try {
+      // Hanya proses jika jenis penjualan adalah manual
+      if (transactionData.jenisPenjualan !== "manual" || !transactionData.items) {
+        return;
+      }
+
+      const jenisBarang = { C: "Cincin", K: "Kalung", L: "Liontin", A: "Anting", G: "Gelang", S: "Giwang" };
+      const duplicatePromises = [];
+
+      transactionData.items.forEach((item, index) => {
+        // Skip item tanpa kode atau kode kosong
+        if (!item.kodeText || item.kodeText === "-" || !item.kodeText.trim()) {
+          return;
+        }
+
+        const kode = item.kodeText.trim();
+        const prefix = kode.charAt(0).toUpperCase();
+
+        // Skip jika prefix tidak valid
+        if (!jenisBarang[prefix]) {
+          return;
+        }
+
+        // Data untuk mutasiKode
+        const mutasiKodeData = {
+          kode: kode,
+          namaBarang: item.nama || "Tidak ada nama",
+          kadar: item.kadar || "-",
+          berat: parseFloat(item.berat) || 0,
+          keterangan: item.keterangan || "",
+          hargaPerGram: parseFloat(item.hargaPerGram) || 0,
+          totalHarga: parseFloat(item.totalHarga) || 0,
+          tanggalInput: transactionData.tanggal,
+          sales: transactionData.sales || "",
+          penjualanId: transactionId,
+          isMutated: false,
+          tanggalMutasi: null,
+          mutasiKeterangan: "",
+          mutasiHistory: [],
+          timestamp: serverTimestamp(),
+          lastUpdated: serverTimestamp(),
+          jenisPrefix: prefix,
+          jenisNama: jenisBarang[prefix]
+        };
+
+        duplicatePromises.push(
+          addDoc(collection(firestore, "mutasiKode"), mutasiKodeData)
+        );
+      });
+
+      if (duplicatePromises.length > 0) {
+        await Promise.all(duplicatePromises);
+        console.log(`✅ Duplicated ${duplicatePromises.length} items to mutasiKode`);
+      }
+
+    } catch (error) {
+      console.error("❌ Error duplicating to mutasiKode:", error);
+      // Jangan throw error agar tidak mengganggu proses utama
+    }
+  },
+
   // Save transaction
   async saveTransaction() {
     try {
-      // Validate sales name
+      // Validasi sales name
       const salesName = $("#sales").val().trim();
       if (!salesName) {
         utils.showAlert("Nama sales harus diisi!");
@@ -1212,7 +1292,7 @@ const penjualanHandler = {
         return;
       }
 
-      // Validate payment
+      // Validasi pembayaran (kode yang sudah ada)...
       const paymentMethod = $("#metodeBayar").val();
       if (paymentMethod === "dp") {
         const nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "")) || 0;
@@ -1273,10 +1353,15 @@ const penjualanHandler = {
       // Save transaction
       const docRef = await addDoc(collection(firestore, "penjualanAksesoris"), transactionData);
 
-      // PERBAIKAN: Update stock untuk SEMUA metode pembayaran (termasuk free)
+      // Update stock
       await this.updateStock(salesType, items);
 
-      // Smart cache invalidation - hanya clear sales cache
+      // Duplikasi ke mutasiKode jika transaksi manual
+      if (transactionData.jenisPenjualan === "manual") {
+        await this.duplicateToMutasiKode(transactionData, docRef.id);
+      }
+
+      // Smart cache invalidation
       sharedCacheManager.invalidateRelated("sales");
 
       utils.showAlert("Transaksi berhasil disimpan!", "Sukses", "success");
@@ -1307,13 +1392,14 @@ const penjualanHandler = {
         $("#sales").focus();
         $("#printModal").off("hidden.bs.modal");
       });
+
     } catch (error) {
       console.error("Error saving transaction:", error);
       utils.showAlert("Terjadi kesalahan saat menyimpan transaksi: " + error.message, "Error", "error");
     } finally {
       utils.showLoading(false);
     }
-  },
+  },  
 
   // Collect items data based on sales type
   collectItemsData(salesType, tableSelector) {
@@ -1604,7 +1690,7 @@ const penjualanHandler = {
         <title>Struk Kasir</title>
         <style>
           body {
-            font-family: 'Courier New', monospace;
+            font-family: roboto;
             font-size: 12px;
             margin: 0;
             padding: 0;
@@ -1765,134 +1851,139 @@ const penjualanHandler = {
     }
 
     let invoiceHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Invoice Customer</title>
-        <style>
-          @page {
-            size: 10cm 20cm;
-            margin: 0;
-          }
-          body {
-            font-family: Arial, sans-serif;
-            font-size: 12px;
-            margin: 0;
-            padding: 5mm;
-            width: 20cm;
-            box-sizing: border-box;
-          }
-          .invoice {
-            width: 100%;
-          }
-          .header-info {
-            text-align: right;
-            margin-bottom: 2cm;
-            margin-right: 3cm;
-            margin-top: 1cm;
-          }         
-          .total-row {
-            margin-top: 1.9cm;
-            text-align: right;
-            font-weight: bold;
-            margin-right: 3cm;
-          }
-          .sales {
-            text-align: right;
-            margin-top: 0.6cm;
-            margin-right: 2cm;
-          }
-          .keterangan {
-            font-style: italic;
-            font-size: 10px;
-            margin-top: 1cm;
-            padding-top: 2mm;
-            text-align: left;
-            margin-left: 1cm;
-            margin-right: 3cm;
-          }
-          .item-details {
-            display: flex;
-            flex-wrap: wrap;
-          }
-          .item-data {
-            display: grid;
-            grid-template-columns: 2cm 1.8cm 5cm 2cm 2cm 2cm;
-            width: 100%;
-            column-gap: 0.2cm;
-            margin-left: 1cm;
-            margin-top: 1.5cm;
-            margin-right: 3cm;
-          }
-          .item-data span {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="invoice">
-          <div class="header-info">
-            <p>${transaction.tanggal}</p>
-          </div>
-          <hr>
-    `;
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Invoice Customer</title>
+      <style>
+        @page {
+          size: 10cm 20cm;
+          margin: 0;
+        }
+        body {
+          font-family: Arial, sans-serif;
+          font-size: 12px;
+          margin: 0;
+          padding: 5mm;
+          width: 20cm;
+          box-sizing: border-box;
+        }
+        .invoice {
+          width: 100%;
+        }
+        .header-info {
+          text-align: right;
+          margin-bottom: 2cm;
+          margin-right: 3cm;
+          margin-top: 0.8cm;
+        }         
+        .total-row {
+          margin-top: 0.7cm;
+          text-align: right;
+          font-weight: bold;
+          margin-right: 3cm;
+        }
+        .sales {
+          text-align: right;
+          margin-top: 0.6cm;
+          margin-right: 2cm;
+        }
+        .keterangan {
+          font-style: italic;
+          font-size: 10px;
+          margin-top: 1cm;
+          margin-bottom: 0.5cm;
+          padding-top: 2mm;
+          text-align: left;
+          margin-left: 0.5cm;
+          margin-right: 3cm;
+        }
+        .item-details {
+          display: flex;
+          flex-wrap: wrap;
+        }
+        .item-data {
+          display: grid;
+          grid-template-columns: 2cm 1.8cm 5cm 2cm 2cm 2cm;
+          width: 100%;
+          column-gap: 0.2cm;
+          margin-left: 0.5cm;
+          margin-top: 1cm;
+          margin-right: 3cm;
+        }
+        .item-data span {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="invoice">
+        <div class="header-info">
+          <p>${transaction.tanggal}</p>
+        </div>
+        <hr>
+  `;
 
     let hasKeterangan = false;
     let keteranganText = "";
     let totalHarga = 0;
 
+    // Loop untuk menampilkan semua item-data terlebih dahulu
     transaction.items.forEach((item) => {
       const itemHarga = parseInt(item.totalHarga) || 0;
       totalHarga += itemHarga;
 
       invoiceHTML += `
-        <div class="item-details">
-          <div class="item-data">
-            <span>${item.kodeText || "-"}</span>
-            <span>${item.jumlah || "1"}pcs</span>
-            <span>${item.nama || "-"}</span>
-            <span>${item.kadar || "-"}</span>
-            <span>${item.berat || "-"}gr</span>
-            <span>${utils.formatRupiah(itemHarga)}</span>
-          </div>
+      <div class="item-details">
+        <div class="item-data">
+          <span>${item.kodeText || "-"}</span>
+          <span>${item.jumlah || "1"}pcs</span>
+          <span>${item.nama || "-"}</span>
+          <span>${item.kadar || "-"}</span>
+          <span>${item.berat || "-"}gr</span>
+          <span>${utils.formatRupiah(itemHarga)}</span>
         </div>
-      `;
+      </div>
+    `;
 
+      // Kumpulkan keterangan
       if (item.keterangan && item.keterangan.trim() !== "") {
         hasKeterangan = true;
         keteranganText += `${item.keterangan}; `;
       }
     });
 
-    invoiceHTML += `
-        <div class="total-row">
-          Rp ${utils.formatRupiah(totalHarga)}
-        </div>
-        <div class="sales">${transaction.sales || "-"}</div>
-    `;
-
+    // Tampilkan keterangan setelah semua item-data (jika ada)
     if (hasKeterangan && transaction.salesType === "manual") {
       invoiceHTML += `
-        <div class="keterangan">
-          <strong>Keterangan:</strong><br>
-          ${keteranganText.trim()}
-        </div>
-      `;
+      <div class="keterangan">
+        <strong>Keterangan:</strong><br>
+        ${keteranganText.trim()}
+      </div>
+    `;
     }
 
+    // Tampilkan total dan sales
     invoiceHTML += `
-        </div>
-        <script>
-          window.onload = function() {
-            window.print();
-            setTimeout(function() { window.close(); }, 500);
-          };
-        </script>
-      </body>
-      </html>
-    `;
+      <div class="total-row">
+        Rp ${utils.formatRupiah(totalHarga)}
+      </div>
+      <div class="sales">${transaction.sales || "-"}</div>
+  `;
+
+    invoiceHTML += `
+      </div>
+      <script>
+        window.onload = function() {
+          window.print();
+          setTimeout(function() { window.close(); }, 500);
+        };
+      </script>
+    </body>
+    </html>
+  `;
 
     printWindow.document.write(invoiceHTML);
     printWindow.document.close();

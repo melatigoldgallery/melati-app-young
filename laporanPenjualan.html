@@ -38,7 +38,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
     <script src="https://cdn.datatables.net/buttons/2.2.3/js/buttons.html5.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.2.3/js/buttons.print.min.js"></script>
     <!-- Animate.css -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
     <!-- SheetJS (XLSX) -->
@@ -51,6 +50,19 @@
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
     <title>Laporan Penjualan Aksesoris - Melati Gold Shop</title>
     <style>
+      #penjualanTable tfoot tr {
+        background-color: #e3f2fd !important;
+        font-weight: bold;
+      }
+
+      #penjualanTable tfoot td {
+        border-top: 2px solid #1976d2;
+        vertical-align: middle;
+      }
+
+      .table-info {
+        --bs-table-bg: #e3f2fd;
+      }
       /* Loading indicator */
       #loadingIndicator {
         position: fixed;
@@ -317,36 +329,8 @@
                     <i class="fas fa-search me-1"></i>
                     Tampilkan
                   </button>
-                  <button type="button" class="btn btn-success" id="toggleSummaryBtn">
-                    <i class="fas fa-chart-pie me-1"></i>
-                    Summary Penjualan
-                  </button>
                 </div>
               </form>
-            </div>
-          </div>
-
-          <!-- Summary Card -->
-          <div class="card mb-4">
-            <div class="card-header">
-              <h2>
-                <i class="fas fa-chart-bar"></i>
-                Ringkasan Penjualan
-              </h2>
-            </div>
-            <div class="card-body">
-              <div class="row">
-                <div class="col-md-6">
-                  <div class="alert alert-info">
-                    <h5 class="alert-heading" id="totalTransactions">Total Transaksi: 0</h5>
-                  </div>
-                </div>
-                <div class="col-md-6">
-                  <div class="alert alert-success">
-                    <h5 class="alert-heading" id="totalRevenue">Total Pendapatan: Rp 0</h5>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -364,12 +348,11 @@
                   <thead>
                     <tr>
                       <th>Tanggal</th>
-                      <th>Sales</th>
                       <th>Jenis</th>
-                      <th>Barcode</th>
+                      <th>Kode</th>
                       <th>Nama Barang</th>
-                      <th>Jumlah</th>
-                      <th>Berat</th>
+                      <th>Pcs</th>
+                      <th>Gr</th>
                       <th>Kadar</th>
                       <th>Harga</th>
                       <th>Status</th>
@@ -379,6 +362,17 @@
                   <tbody>
                     <!-- Data will be populated by JavaScript -->
                   </tbody>
+                  <tfoot>
+                    <tr class="table-info fw-bold">
+                      <td colspan="4" class="text-end">TOTAL:</td>
+                      <td class="text-center"></td>
+                      <td class="text-center"></td>
+                      <td></td>
+                      <td class="text-end"></td>
+                      <td></td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>

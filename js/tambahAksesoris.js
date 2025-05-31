@@ -844,8 +844,7 @@ generateLaporanHTML() {
     </head>
     <body>
       <div class="header">
-        <h2>MELATI GOLD SHOP</h2>
-        <h3>JL. DIPONEGORO NO. 116</h3>
+        <h2>MELATI BAWAH</h2>
         <h2>LAPORAN PENAMBAHAN STOK</h2>
       </div>
       
