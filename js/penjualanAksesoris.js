@@ -521,7 +521,6 @@ const penjualanHandler = {
   },
 
   // Populate stock tables
-  // Perbaiki method populateStockTables untuk tidak menampilkan kolom stok
   populateStockTables() {
     const categories = {
       aksesoris: "#tableAksesoris",
@@ -1205,10 +1204,73 @@ const penjualanHandler = {
     }
   },
 
+  // Fungsi untuk menduplikat transaksi manual ke mutasiKode
+   async duplicateToMutasiKode(transactionData, transactionId) {
+    try {
+      // Hanya proses jika jenis penjualan adalah manual
+      if (transactionData.jenisPenjualan !== "manual" || !transactionData.items) {
+        return;
+      }
+
+      const jenisBarang = { C: "Cincin", K: "Kalung", L: "Liontin", A: "Anting", G: "Gelang", S: "Giwang" };
+      const duplicatePromises = [];
+
+      transactionData.items.forEach((item, index) => {
+        // Skip item tanpa kode atau kode kosong
+        if (!item.kodeText || item.kodeText === "-" || !item.kodeText.trim()) {
+          return;
+        }
+
+        const kode = item.kodeText.trim();
+        const prefix = kode.charAt(0).toUpperCase();
+
+        // Skip jika prefix tidak valid
+        if (!jenisBarang[prefix]) {
+          return;
+        }
+
+        // Data untuk mutasiKode
+        const mutasiKodeData = {
+          kode: kode,
+          namaBarang: item.nama || "Tidak ada nama",
+          kadar: item.kadar || "-",
+          berat: parseFloat(item.berat) || 0,
+          keterangan: item.keterangan || "",
+          hargaPerGram: parseFloat(item.hargaPerGram) || 0,
+          totalHarga: parseFloat(item.totalHarga) || 0,
+          tanggalInput: transactionData.tanggal,
+          sales: transactionData.sales || "",
+          penjualanId: transactionId,
+          isMutated: false,
+          tanggalMutasi: null,
+          mutasiKeterangan: "",
+          mutasiHistory: [],
+          timestamp: serverTimestamp(),
+          lastUpdated: serverTimestamp(),
+          jenisPrefix: prefix,
+          jenisNama: jenisBarang[prefix]
+        };
+
+        duplicatePromises.push(
+          addDoc(collection(firestore, "mutasiKode"), mutasiKodeData)
+        );
+      });
+
+      if (duplicatePromises.length > 0) {
+        await Promise.all(duplicatePromises);
+        console.log(`✅ Duplicated ${duplicatePromises.length} items to mutasiKode`);
+      }
+
+    } catch (error) {
+      console.error("❌ Error duplicating to mutasiKode:", error);
+      // Jangan throw error agar tidak mengganggu proses utama
+    }
+  },
+
   // Save transaction
   async saveTransaction() {
     try {
-      // Validate sales name
+      // Validasi sales name
       const salesName = $("#sales").val().trim();
       if (!salesName) {
         utils.showAlert("Nama sales harus diisi!");
@@ -1230,7 +1292,7 @@ const penjualanHandler = {
         return;
       }
 
-      // Validate payment
+      // Validasi pembayaran (kode yang sudah ada)...
       const paymentMethod = $("#metodeBayar").val();
       if (paymentMethod === "dp") {
         const nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "")) || 0;
@@ -1291,10 +1353,15 @@ const penjualanHandler = {
       // Save transaction
       const docRef = await addDoc(collection(firestore, "penjualanAksesoris"), transactionData);
 
-      // PERBAIKAN: Update stock untuk SEMUA metode pembayaran (termasuk free)
+      // Update stock
       await this.updateStock(salesType, items);
 
-      // Smart cache invalidation - hanya clear sales cache
+      // Duplikasi ke mutasiKode jika transaksi manual
+      if (transactionData.jenisPenjualan === "manual") {
+        await this.duplicateToMutasiKode(transactionData, docRef.id);
+      }
+
+      // Smart cache invalidation
       sharedCacheManager.invalidateRelated("sales");
 
       utils.showAlert("Transaksi berhasil disimpan!", "Sukses", "success");
@@ -1325,13 +1392,14 @@ const penjualanHandler = {
         $("#sales").focus();
         $("#printModal").off("hidden.bs.modal");
       });
+
     } catch (error) {
       console.error("Error saving transaction:", error);
       utils.showAlert("Terjadi kesalahan saat menyimpan transaksi: " + error.message, "Error", "error");
     } finally {
       utils.showLoading(false);
     }
-  },
+  },  
 
   // Collect items data based on sales type
   collectItemsData(salesType, tableSelector) {

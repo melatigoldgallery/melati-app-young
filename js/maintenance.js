@@ -948,7 +948,7 @@ class MaintenanceSystem {
   /**
    * Export collection to Excel file with caching
    */
-  async exportCollectionToExcel(collectionName, autoDownload = true) {
+  async exportCollectionToExcel(collectionName, autoDownload = true, customTitle = null) {
     try {
       this.logProgress(`Mengambil data dari ${collectionName}...`);
       
@@ -966,95 +966,232 @@ class MaintenanceSystem {
       } else {
         this.logProgress(`Data diambil dari cache: ${docs.length} dokumen`);
       }
-
+  
       if (docs.length === 0) {
         this.logProgress(`Tidak ada data di ${collectionName}`, 'warning');
+        this.hideLoading();
+        this.showAlert(`Tidak ada data di koleksi ${collectionName}`, 'warning');
         return;
       }
-
+  
       this.logProgress('Memproses data untuk Excel...');
-
+  
+      // Generate title
+      const title = customTitle || this.generateExportTitle(collectionName);
+      
       // Convert Firestore data to Excel format
       const excelData = docs.map((doc, index) => {
         const data = doc.data();
-        const processedData = { id: doc.id };
         
-        // Process each field
+        // Format khusus untuk penjualanAksesoris
+        if (collectionName === 'penjualanAksesoris') {
+          return {
+            tanggal: this.formatDate(data.timestamp?.toDate() || data.tanggal),
+            sales: data.sales || '',
+            jenisPenjualan: data.jenisPenjualan || '',
+            items: this.formatItems(data.items),
+            metodeBayar: data.metodeBayar || '',
+            totalHarga: data.totalHarga || 0
+          };
+        }
+        
+        // Format untuk koleksi lainnya
+        const processedData = {};
+        
         Object.keys(data).forEach(key => {
-            const value = data[key];
-            
-            // Handle Timestamp objects
-            if (value && typeof value.toDate === 'function') {
-              processedData[key] = this.formatDate(value.toDate());
-            }
-            // Handle arrays
-            else if (Array.isArray(value)) {
-              processedData[key] = JSON.stringify(value);
-            }
-            // Handle objects
-            else if (typeof value === 'object' && value !== null) {
-              processedData[key] = JSON.stringify(value);
-            }
-            // Handle primitives
-            else {
-              processedData[key] = value;
-            }
-          });
+          const value = data[key];
           
-          // Update progress during processing
-          if (index % 100 === 0) {
-            const progress = (index / docs.length) * 50; // 50% for processing
-            this.updateProgress(Math.round(progress));
+          if (value && typeof value.toDate === 'function') {
+            processedData[key] = this.formatDate(value.toDate());
+          } else if (Array.isArray(value)) {
+            processedData[key] = JSON.stringify(value);
+          } else if (typeof value === 'object' && value !== null) {
+            processedData[key] = JSON.stringify(value);
+          } else {
+            processedData[key] = value;
           }
-          
-          return processedData;
         });
-  
-        this.logProgress('Membuat file Excel...');
-        this.updateProgress(75);
-  
-        // Create workbook and worksheet
-        const workbook = XLSX.utils.book_new();
-        const worksheet = XLSX.utils.json_to_sheet(excelData);
         
-        // Auto-size columns
-        const colWidths = [];
-        if (excelData.length > 0) {
-          Object.keys(excelData[0]).forEach(key => {
-            const maxLength = Math.max(
-              key.length,
-              ...excelData.map(row => String(row[key] || '').length)
-            );
-            colWidths.push({ wch: Math.min(maxLength + 2, 50) });
-          });
+        if (index % 100 === 0) {
+          const progress = (index / docs.length) * 50;
+          this.updateProgress(Math.round(progress));
         }
-        worksheet['!cols'] = colWidths;
-  
-        // Add worksheet to workbook
-        XLSX.utils.book_append_sheet(workbook, worksheet, collectionName);
-  
-        this.updateProgress(90);
-  
-        if (autoDownload) {
-          // Generate filename with timestamp
-          const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-          const filename = `${collectionName}_${timestamp}.xlsx`;
-          
-          // Download file
-          XLSX.writeFile(workbook, filename);
-          this.logProgress(`File ${filename} berhasil didownload`);
-        }
-  
-        this.updateProgress(100);
-        this.logProgress(`Export ${collectionName} selesai (${docs.length} records)`);
-  
-        return workbook;
         
-      } catch (error) {
-        this.logProgress(`Error dalam exportCollectionToExcel: ${error.message}`, 'error');
-        throw error;
+        return processedData;
+      });
+  
+      this.logProgress('Membuat file Excel...');
+      this.updateProgress(75);
+  
+      // Create workbook and worksheet
+      const workbook = XLSX.utils.book_new();
+      
+      // Create worksheet dengan title
+      const worksheet = this.createWorksheetWithTitle(excelData, title);
+      
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(workbook, worksheet, this.getSheetName(collectionName));
+  
+      this.updateProgress(90);
+  
+      if (autoDownload) {
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        const filename = `${collectionName}_${timestamp}.xlsx`;
+        
+        XLSX.writeFile(workbook, filename);
+        this.logProgress(`File ${filename} berhasil didownload`);
       }
+  
+      this.updateProgress(100);
+      this.logProgress(`Export ${collectionName} selesai (${docs.length} records)`);
+  
+      setTimeout(() => {
+        this.hideLoading();
+        this.showAlert(`Export ${collectionName} berhasil! (${docs.length} records)`, 'success');
+      }, 500);
+  
+      return workbook;
+      
+    } catch (error) {
+      this.logProgress(`Error dalam exportCollectionToExcel: ${error.message}`, 'error');
+      this.hideLoading();
+      this.showAlert(`Gagal export ${collectionName}: ${error.message}`, 'error');
+      throw error;
     }
+  }
+  
+  /**
+   * Generate title untuk export berdasarkan collection dan bulan
+   */
+  generateExportTitle(collectionName) {
+    const currentDate = new Date();
+    const monthNames = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    
+    const currentMonth = monthNames[currentDate.getMonth()];
+    const currentYear = currentDate.getFullYear();
+    
+    const titles = {
+      'penjualanAksesoris': `Arsip Data Penjualan Bulan ${currentMonth} ${currentYear} - Melati Gold Shop`,
+      'stockAdditions': `Arsip Data Penambahan Stok Bulan ${currentMonth} ${currentYear} - Melati Gold Shop`,
+      'stokAksesorisTransaksi': `Arsip Data Transaksi Stok Bulan ${currentMonth} ${currentYear} - Melati Gold Shop`,
+      'stokAksesoris': `Arsip Data Stok Aksesoris Bulan ${currentMonth} ${currentYear} - Melati Gold Shop`
+    };
+    
+    return titles[collectionName] || `Arsip Data ${collectionName} Bulan ${currentMonth} ${currentYear} - Melati Gold Shop`;
+  }
+  
+  /**
+   * Create worksheet dengan title di bagian atas
+   */
+  createWorksheetWithTitle(data, title) {
+    if (data.length === 0) {
+      return XLSX.utils.json_to_sheet([]);
+    }
+    
+    // Create worksheet dari data
+    const worksheet = XLSX.utils.json_to_sheet(data, { origin: 'A4' });
+    
+    // Add title di baris pertama
+    XLSX.utils.sheet_add_aoa(worksheet, [[title]], { origin: 'A1' });
+    
+    // Add info export di baris kedua
+    const exportInfo = `Diekspor pada: ${this.formatDate(new Date())} | Total Records: ${data.length}`;
+    XLSX.utils.sheet_add_aoa(worksheet, [[exportInfo]], { origin: 'A2' });
+    
+    // Merge cells untuk title
+    if (!worksheet['!merges']) worksheet['!merges'] = [];
+    
+    const headerCols = Object.keys(data[0]).length;
+    worksheet['!merges'].push({
+      s: { r: 0, c: 0 }, // start
+      e: { r: 0, c: headerCols - 1 } // end
+    });
+    
+    worksheet['!merges'].push({
+      s: { r: 1, c: 0 },
+      e: { r: 1, c: headerCols - 1 }
+    });
+    
+    // Style untuk title
+    if (!worksheet['!rows']) worksheet['!rows'] = [];
+    worksheet['!rows'][0] = { hpt: 25 }; // height untuk title
+    worksheet['!rows'][1] = { hpt: 18 }; // height untuk info
+    worksheet['!rows'][2] = { hpt: 5 };  // empty row
+    
+    // Auto-size columns
+    const colWidths = [];
+    Object.keys(data[0]).forEach(key => {
+      const maxLength = Math.max(
+        key.length,
+        ...data.map(row => String(row[key] || '').length)
+      );
+      colWidths.push({ wch: Math.min(maxLength + 2, 50) });
+    });
+    worksheet['!cols'] = colWidths;
+    
+    return worksheet;
+  }
+  
+  /**
+   * Get sheet name berdasarkan collection
+   */
+  getSheetName(collectionName) {
+    const sheetNames = {
+      'penjualanAksesoris': 'Data Penjualan',
+      'stockAdditions': 'Penambahan Stok',
+      'stokAksesorisTransaksi': 'Transaksi Stok',
+      'stokAksesoris': 'Stok Aksesoris'
+    };
+    
+    return sheetNames[collectionName] || collectionName;
+  }
+  
+  /**
+   * Format items array untuk display yang readable
+   */
+  formatItems(items) {
+    if (!Array.isArray(items) || items.length === 0) {
+      return 'Tidak ada item';
+    }
+    
+    return items.map(item => {
+      const parts = [];
+      
+      if (item.nama) parts.push(`${item.nama}`);
+      if (item.kodeText && item.kodeText !== '-') parts.push(`[${item.kodeText}]`);
+      if (item.kadar) parts.push(`${item.kadar}`);
+      if (item.berat) parts.push(`${item.berat}g`);
+      if (item.totalHarga) parts.push(`Rp${item.totalHarga}`);
+      
+      return parts.join(' - ');
+    }).join(' | ');
+  }
+  
+  /**
+   * Format date to readable string
+   */
+  formatDate(date) {
+    if (!date) return '';
+    
+    try {
+      const d = date instanceof Date ? date : new Date(date);
+      if (isNaN(d.getTime())) return '';
+      
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      
+      return `${day}/${month}/${year} ${hours}:${minutes}`;
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return '';
+    }
+  }
   
     /**
      * Handle delete old data process with proper loading management
@@ -1815,13 +1952,5 @@ class MaintenanceSystem {
     }
   });
   
-  console.log('Maintenance system loaded successfully');
-  console.log('Available keyboard shortcuts:');
-  console.log('- Ctrl + Shift + A: Archive Data');
-  console.log('- Ctrl + Shift + S: Create Snapshot');
-  console.log('- Ctrl + Shift + E: Export All Data');
-  console.log('- Ctrl + Shift + R: Refresh Status');
-  console.log('Cache management: Automatic cleanup every 10 minutes');
-  console.log('Auto-refresh: Database status every 3 minutes (with cache)');
   
   
