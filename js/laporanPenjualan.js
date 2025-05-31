@@ -15,42 +15,20 @@ import {
 // Table configurations
 const tableConfigs = {
   all: {
-    columns: [
-      "Tanggal",
-      "Jenis",
-      "Kode Barang",
-      "Nama Barang",
-      "Jumlah",
-      "Berat",
-      "Kadar",
-      "Harga",
-      "Status",
-      "Keterangan",
-    ],
-    fields: ["tanggal", "jenis", "kode", "nama", "jumlah", "berat", "kadar", "harga", "status", "keterangan"],
+    columns: ["Tanggal", "Jenis", "Kode", "Nama Barang", "Pcs", "Gr", "Kadar", "Harga", "Status", "Keterangan"],
+    fields: ["tanggal", "jenis", "kode", "nama", "pcs", "gr", "kadar", "harga", "status", "keterangan"],
   },
   aksesoris: {
-    columns: ["Tanggal", "Jenis", "Kode Barang", "Nama Barang", "Jumlah", "Berat", "Kadar", "Harga", "Status"],
-    fields: ["tanggal", "jenis", "kode", "nama", "jumlah", "berat", "kadar", "harga", "status"],
+    columns: ["Tanggal", "Jenis", "Kode", "Nama Barang", "Pcs", "Gr", "Kadar", "Harga", "Status"],
+    fields: ["tanggal", "jenis", "kode", "nama", "pcs", "gr", "kadar", "harga", "status"],
   },
   kotak: {
-    columns: ["Tanggal", "Jenis", "Nama Barang", "Jumlah", "Harga", "Status"],
-    fields: ["tanggal", "jenis", "nama", "jumlah", "harga", "status"],
+    columns: ["Tanggal", "Jenis", "Nama Barang", "Pcs", "Harga", "Status"],
+    fields: ["tanggal", "jenis", "nama", "pcs", "harga", "status"],
   },
   manual: {
-    columns: [
-      "Tanggal",
-      "Jenis",
-      "Kode Barang",
-      "Nama Barang",
-      "Jumlah",
-      "Berat",
-      "Kadar",
-      "Harga",
-      "Status",
-      "Keterangan",
-    ],
-    fields: ["tanggal", "jenis", "kode", "nama", "jumlah", "berat", "kadar", "harga", "status", "keterangan"],
+    columns: ["Tanggal", "Jenis", "Kode", "Nama Barang", "Pcs", "Gr", "Kadar", "Harga", "Status", "Keterangan"],
+    fields: ["tanggal", "jenis", "kode", "nama", "pcs", "gr", "kadar", "harga", "status", "keterangan"],
   },
 };
 
@@ -97,8 +75,6 @@ const cacheManager = {
 const laporanPenjualanHandler = {
   salesData: [],
   filteredSalesData: [],
-  summaryData: [],
-  isSummaryMode: false,
   dataTable: null,
 
   // Utility functions
@@ -119,7 +95,6 @@ const laporanPenjualanHandler = {
     }
   },
 
-    
   // Load data with cache management
   async loadSalesData(forceRefresh = false) {
     try {
@@ -184,35 +159,65 @@ const laporanPenjualanHandler = {
         language: {
           url: "//cdn.datatables.net/plug-ins/1.10.25/i18n/Indonesian.json",
         },
+        footerCallback: function (row, data, start, end, display) {
+          let totalPcs = 0;
+          let totalBerat = 0;
+          let totalHarga = 0;
+          let hasValidBerat = false; // Flag untuk cek apakah ada berat valid
+        
+          data.forEach((row) => {
+            const jumlah = parseInt(row[4]) || 0;
+            const hargaStr = row[7].replace(/[^\d]/g, "") || "0";
+            const harga = parseInt(hargaStr) || 0;
+        
+            totalPcs += jumlah;
+            totalHarga += harga;
+        
+            // Cek jika kolom berat bukan "-" dan memiliki nilai
+            if (row[5] !== "-") {
+              const beratStr = row[5].replace(" gr", "").replace(",", ".") || "0";
+              const berat = parseFloat(beratStr) || 0;
+              if (berat > 0) {
+                totalBerat += berat;
+                hasValidBerat = true;
+              }
+            }
+          });
+        
+          const api = this.api();
+          $(api.column(4).footer()).html(totalPcs);
+          // Tampilkan total berat jika ada data dengan berat valid, jika tidak tampilkan "-"
+          $(api.column(5).footer()).html(hasValidBerat ? `${totalBerat.toFixed(2)} gr` : "-");
+          $(api.column(7).footer()).html(`Rp ${totalHarga.toLocaleString("id-ID")}`);
+        },
         dom: "Bfrtip", // Tetap gunakan "B" untuk buttons
         buttons: [
           {
             extend: "excel",
             text: '<i class="fas fa-file-excel"></i> Excel',
             className: "btn btn-success btn-sm",
-            title: "Laporan Penjualan Aksesoris",
+            title: "Laporan Penjualan Manual / Aksesoris / Kotak \n Melati Bawah",
             filename: function () {
               const startDate = document.getElementById("startDate").value || "semua";
               const endDate = document.getElementById("endDate").value || "semua";
-              return `Laporan_Penjualan_${startDate}_${endDate}`;
+              return `Laporan_Penjualan_Bawah_${startDate}_${endDate}`;
             },
           },
           {
             extend: "pdf",
             text: '<i class="fas fa-file-pdf"></i> PDF',
             className: "btn btn-danger btn-sm",
-            title: "Laporan Penjualan Aksesoris",
+            title: "Laporan Penjualan Manual / Aksesoris / Kotak \n Melati Bawah",
             filename: function () {
               const startDate = document.getElementById("startDate").value || "semua";
               const endDate = document.getElementById("endDate").value || "semua";
-              return `Laporan_Penjualan_${startDate}_${endDate}`;
+              return `Laporan_Penjualan_Bawah_${startDate}_${endDate}`;
             },
-            orientation: "landscape",
+            orientation: "potrait",
             pageSize: "A4",
           },
-          // Hapus tombol print dari sini
         ],
-        order: this.isSummaryMode ? [[2, "desc"]] : [[0, "desc"]],
+        order: [[0, "desc"]],
         autoWidth: false,
         scrollX: true,
         columnDefs: [{ targets: "_all", defaultContent: "-" }],
@@ -280,8 +285,6 @@ const laporanPenjualanHandler = {
     const salesType = document.getElementById("salesType").value;
     let configKey = salesType === "all" ? "manual" : salesType === "layanan" ? "manual" : salesType;
 
-    if (this.isSummaryMode) configKey = "summary";
-
     const config = tableConfigs[configKey];
     if (!config) return;
 
@@ -293,73 +296,75 @@ const laporanPenjualanHandler = {
 
   // Prepare data for DataTable
   prepareTableData() {
-  const salesType = document.getElementById("salesType").value;
-  const configKey = "manual"; // Tetap gunakan config manual tanpa kolom Sales
-  const config = tableConfigs[configKey];
-  if (!config) return [];
+    const salesType = document.getElementById("salesType").value;
+    const configKey = "manual";
+    const config = tableConfigs[configKey];
+    if (!config) return [];
 
-  const summaryMap = new Map();
+    const summaryMap = new Map();
 
-  this.filteredSalesData.forEach(transaction => {
-    const date = transaction.timestamp ? formatDate(transaction.timestamp.toDate()) : (transaction.tanggal || "-");
-    const jenisPenjualan = this.formatJenisPenjualan(transaction);
-    const status = this.getStatusBadge(transaction);
-    const keterangan = transaction.keterangan || "-";
+    this.filteredSalesData.forEach((transaction) => {
+      const date = transaction.timestamp ? formatDate(transaction.timestamp.toDate()) : transaction.tanggal || "-";
+      const jenisPenjualan = this.formatJenisPenjualan(transaction);
+      const status = this.getStatusBadge(transaction);
+      const keterangan = transaction.keterangan || "-";
 
-    if (!transaction.items) return;
+      if (!transaction.items) return;
 
-    transaction.items.forEach(item => {
-      const key = item.kodeText || item.barcode || "-";
-      const name = item.nama || "-";
-      const kadar = item.kadar || "-";
-      const berat = parseFloat(item.berat) || 0;
-      const jumlah = parseInt(item.jumlah) || 1;
-      let harga = parseInt(item.totalHarga) || 0;
+      transaction.items.forEach((item) => {
+        const key = item.kodeText || item.barcode || "-";
+        const name = item.nama || "-";
+        const kadar = item.kadar || "-";
+        const berat = parseFloat(item.berat) || 0;
+        const jumlah = parseInt(item.jumlah) || 1;
+        let harga = parseInt(item.totalHarga) || 0;
 
-      if (transaction.metodeBayar === "dp" && transaction.statusPembayaran === "DP") {
-        const prop = harga / transaction.totalHarga;
-        harga = Math.round(prop * transaction.sisaPembayaran);
-      } else if (transaction.metodeBayar === "free") {
-        harga = 0;
-      }
+        if (transaction.metodeBayar === "dp" && transaction.statusPembayaran === "DP") {
+          const prop = harga / transaction.totalHarga;
+          harga = Math.round(prop * transaction.sisaPembayaran);
+        } else if (transaction.metodeBayar === "free") {
+          harga = 0;
+        }
 
-      if (summaryMap.has(key)) {
-        const existing = summaryMap.get(key);
-        existing.jumlah += jumlah;
-        existing.berat += berat;
-        existing.harga += harga;
-      } else {
-        summaryMap.set(key, {
-          tanggal: date,
-          jenis: jenisPenjualan,
-          kode: key,
-          nama: name,
-          jumlah,
-          berat,
-          kadar,
-          harga,
-          status,
-          keterangan: item.keterangan || keterangan
-        });
-      }
+        if (summaryMap.has(key)) {
+          const existing = summaryMap.get(key);
+          existing.jumlah += jumlah;
+          existing.berat += berat;
+          existing.harga += harga;
+        } else {
+          summaryMap.set(key, {
+            tanggal: date,
+            jenis: jenisPenjualan,
+            kode: key,
+            nama: name,
+            jumlah,
+            berat,
+            kadar,
+            harga,
+            status,
+            keterangan: item.keterangan || keterangan,
+            jenisPenjualan: transaction.jenisPenjualan,
+          });
+        }
+      });
     });
-  });
 
-  return Array.from(summaryMap.values()).map(item => {
-    return [
-      item.tanggal,
-      item.jenis,
-      item.kode,
-      item.nama,
-      item.jumlah,
-      `${item.berat.toFixed(2)} gr`,
-      item.kadar,
-      `Rp ${item.harga.toLocaleString("id-ID")}`,
-      item.status,
-      item.keterangan
-    ];
-  });
-},
+    return Array.from(summaryMap.values()).map((item) => {
+      const beratDisplay = item.jenisPenjualan === "kotak" ? "-" : `${item.berat.toFixed(2)} gr`;
+      return [
+        item.tanggal,
+        item.jenis,
+        item.kode,
+        item.nama,
+        item.jumlah,
+        beratDisplay, // Gunakan beratDisplay yang sudah dimodifikasi
+        item.kadar,
+        `Rp ${item.harga.toLocaleString("id-ID")}`,
+        item.status,
+        item.keterangan,
+      ];
+    });
+  },
 
   getStatusBadge(transaction) {
     const status = transaction.statusPembayaran || "Lunas";
@@ -382,8 +387,6 @@ const laporanPenjualanHandler = {
       this.updateTableHeader();
       const tableData = this.prepareTableData();
       this.updateDataTable(tableData);
-      this.updateSummaryDisplay();
-      this.updateFooterSummary(); // ← Tambahan penting
     } catch (error) {
       console.error("Error rendering sales table:", error);
       this.showAlert("Terjadi kesalahan saat menampilkan data", "Error", "error");
@@ -444,36 +447,6 @@ const laporanPenjualanHandler = {
     } finally {
       this.showLoading(false);
     }
-  },
-
-  // Update summary display
-  updateSummaryDisplay() {
-    let totalRevenue = 0;
-    let totalTransactions = 0;
-
-    if (this.isSummaryMode && this.summaryData) {
-      totalRevenue = this.summaryData.reduce((sum, item) => sum + (item.totalHarga || 0), 0);
-      totalTransactions = this.summaryData.length;
-    } else if (this.filteredSalesData) {
-      totalTransactions = this.filteredSalesData.length;
-      this.filteredSalesData.forEach((transaction) => {
-        if (transaction.metodeBayar === "dp" && transaction.statusPembayaran === "DP") {
-          totalRevenue += transaction.sisaPembayaran || 0;
-        } else if (transaction.metodeBayar === "free") {
-          totalRevenue += 0;
-        } else {
-          totalRevenue += transaction.totalHarga || 0;
-        }
-      });
-    }
-
-    document.getElementById("totalTransactions").textContent = this.isSummaryMode
-      ? `Total Jenis Barang: ${totalTransactions}`
-      : `Total Transaksi: ${totalTransactions}`;
-
-    document.getElementById("totalRevenue").textContent = `Total Pendapatan: Rp ${parseInt(totalRevenue).toLocaleString(
-      "id-ID"
-    )}`;
   },
 
   updateFooterSummary() {
@@ -540,66 +513,6 @@ const laporanPenjualanHandler = {
     });
   },
 
-  // Generate summary data
-  generateSalesSummary() {
-    if (!this.filteredSalesData.length) return;
-
-    const summaryMap = new Map();
-
-    this.filteredSalesData.forEach((transaction) => {
-      if (!transaction.items || !transaction.items.length) return;
-
-      transaction.items.forEach((item) => {
-        const key = item.kodeText || "unknown";
-        const name = item.nama || "Tidak diketahui";
-        const quantity = parseInt(item.jumlah) || 1;
-
-        let itemTotalPrice = parseInt(item.totalHarga) || 0;
-
-        if (transaction.metodeBayar === "dp" && transaction.statusPembayaran === "DP") {
-          const proportion = itemTotalPrice / transaction.totalHarga;
-          itemTotalPrice = Math.round(proportion * transaction.sisaPembayaran);
-        } else if (transaction.metodeBayar === "free") {
-          itemTotalPrice = 0;
-        }
-
-        if (summaryMap.has(key)) {
-          const existingItem = summaryMap.get(key);
-          existingItem.jumlah += quantity;
-          existingItem.totalHarga += itemTotalPrice;
-        } else {
-          summaryMap.set(key, {
-            kode: key,
-            nama: name,
-            jumlah: quantity,
-            totalHarga: itemTotalPrice,
-          });
-        }
-      });
-    });
-
-    this.summaryData = Array.from(summaryMap.values());
-    this.summaryData.sort((a, b) => b.totalHarga - a.totalHarga);
-  },
-
-  // Toggle summary view
-  toggleSummaryView() {
-    this.isSummaryMode = !this.isSummaryMode;
-
-    const toggleBtn = document.getElementById("toggleSummaryBtn");
-    if (toggleBtn) {
-      toggleBtn.innerHTML = this.isSummaryMode
-        ? '<i class="fas fa-list me-1"></i> Detail Penjualan'
-        : '<i class="fas fa-chart-pie me-1"></i> Summary Penjualan';
-    }
-
-    if (this.isSummaryMode) {
-      this.generateSalesSummary();
-    }
-
-    this.renderSalesTable();
-  },
-
   // Initialize date pickers
   initDatePickers() {
     $(".datepicker").datepicker({
@@ -625,10 +538,6 @@ const laporanPenjualanHandler = {
       this.loadSalesData().then(() => {
         this.filterSalesData();
       });
-    });
-
-    document.getElementById("toggleSummaryBtn")?.addEventListener("click", () => {
-      this.toggleSummaryView();
     });
 
     document.getElementById("salesType")?.addEventListener("change", () => {

@@ -1090,7 +1090,7 @@ const laporanStokHandler = {
             exportOptions: {
               columns: ":visible",
             },
-            title: `Laporan Stok (${selectedDate})`,
+            title: `Laporan Stok Kotak & Aksesoris Melati Bawah (${selectedDate})`,
             customize: function (xlsx) {
               var sheet = xlsx.xl.worksheets["sheet1.xml"];
               $('row c[r^="C"]', sheet).attr("s", "55"); // Nama column - wider with wrap text
@@ -1104,7 +1104,7 @@ const laporanStokHandler = {
             exportOptions: {
               columns: ":visible",
             },
-            title: `Laporan Stok (${selectedDate})`,
+            title: `Laporan Stok Kotak & Aksesoris Melati Bawah\n(${selectedDate})`,
             customize: function (doc) {
               doc.defaultStyle.fontSize = 8;
               doc.styles.tableHeader.fontSize = 9;
@@ -1114,8 +1114,11 @@ const laporanStokHandler = {
               doc.styles.tableBodyOdd.alignment = "center";
               doc.content[1].table.body.forEach(function (row, rowIndex) {
                 row.forEach(function (cell, cellIndex) {
-                  if (cellIndex !== 2) {
-                    // Skip the name column (index 2)
+                  if (cellIndex === 2) {
+                    // Kolom nama (index 2) rata kiri
+                    cell.alignment = "left";
+                  } else if (cellIndex !== 2) {
+                    // Kolom lainnya tetap center
                     cell.alignment = "center";
                   }
                 });
