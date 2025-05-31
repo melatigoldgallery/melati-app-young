@@ -149,14 +149,14 @@ class DataPenjualanApp {
     // Load filter from URL or set default
     this.loadFilterFromURL();
 
-    // If no URL params, set default dates
+    // If no URL params, set default date
     const params = new URLSearchParams(window.location.search);
-    if (!params.get("startDate") && !params.get("endDate")) {
+    if (!params.get("date")) {
       this.setDefaultDates();
-    } else {
-      // Apply filter from URL
-      this.filterData();
     }
+
+    // Apply filter
+    this.filterData();
   }
 
   // Setup all event listeners
@@ -222,12 +222,12 @@ class DataPenjualanApp {
   // Setup auto filter functionality
   setupAutoFilter() {
     // Auto filter on date change
-    $("#filterTanggalMulai, #filterTanggalAkhir").on("changeDate", () => {
+    $("#filterTanggal").on("changeDate", () => {
       this.filterData();
     });
 
     // Auto filter on manual date input
-    $("#filterTanggalMulai, #filterTanggalAkhir").on("blur", () => {
+    $("#filterTanggal").on("blur", () => {
       this.filterData();
     });
 
@@ -241,26 +241,8 @@ class DataPenjualanApp {
   initDatePickers() {
     const today = new Date();
 
-    // Initialize start date picker
-    $("#filterTanggalMulai")
-      .datepicker({
-        format: "dd/mm/yyyy",
-        autoclose: true,
-        language: "id",
-        todayHighlight: true,
-        endDate: today, // Tidak bisa pilih tanggal masa depan
-      })
-      .on("changeDate", (e) => {
-        // Update end date picker constraint
-        const selectedDate = e.date;
-        $("#filterTanggalAkhir").datepicker("setStartDate", selectedDate);
-
-        // Trigger filter when date changes
-        setTimeout(() => this.filterData(), 100);
-      });
-
-    // Initialize end date picker
-    $("#filterTanggalAkhir")
+    // Initialize single date picker
+    $("#filterTanggal")
       .datepicker({
         format: "dd/mm/yyyy",
         autoclose: true,
@@ -274,7 +256,7 @@ class DataPenjualanApp {
       });
 
     // Manual input validation
-    $("#filterTanggalMulai, #filterTanggalAkhir").on("blur", (e) => {
+    $("#filterTanggal").on("blur", (e) => {
       const inputDate = utils.parseDate(e.target.value);
       if (inputDate && inputDate > today) {
         utils.showAlert("Tanggal tidak boleh melebihi hari ini", "Peringatan", "warning");
@@ -289,8 +271,7 @@ class DataPenjualanApp {
     const today = new Date();
     const todayFormatted = utils.formatDate(today);
 
-    document.getElementById("filterTanggalMulai").value = todayFormatted;
-    document.getElementById("filterTanggalAkhir").value = todayFormatted;
+    document.getElementById("filterTanggal").value = todayFormatted;
   }
 
   // Load sales data with caching
@@ -413,55 +394,56 @@ class DataPenjualanApp {
 
   // Filter data based on form inputs
   filterData() {
-    const filters = {
-      startDate: utils.parseDate(document.getElementById("filterTanggalMulai").value),
-      endDate: utils.parseDate(document.getElementById("filterTanggalAkhir").value),
-      jenis: document.getElementById("filterJenisPenjualan").value,
-      sales: document.getElementById("filterSales").value,
-    };
+  const filters = {
+    selectedDate: utils.parseDate(document.getElementById("filterTanggal").value),
+    jenis: document.getElementById("filterJenisPenjualan").value,
+    sales: document.getElementById("filterSales").value,
+  };
 
-    // Adjust end date to include full day
-    if (filters.endDate) {
-      filters.endDate.setHours(23, 59, 59, 999);
-    }
-
-    if (!filters.startDate && !filters.endDate) {
-      this.filteredData = [...this.salesData];
-    } else {
-      this.filteredData = this.salesData.filter((transaction) => {
-        const transactionDate = transaction.timestamp
-          ? transaction.timestamp.toDate()
-          : utils.parseDate(transaction.tanggal);
-
-        if (!transactionDate) return false;
-
-        // Date filter
-        if (filters.startDate && transactionDate < filters.startDate) return false;
-        if (filters.endDate && transactionDate > filters.endDate) return false;
-
-        // Jenis filter
-        if (filters.jenis !== "all" && transaction.jenisPenjualan !== filters.jenis) return false;
-
-        // Sales filter
-        if (filters.sales !== "all" && transaction.sales !== filters.sales) return false;
-
-        return true;
-      });
-    }
-
+  // PERBAIKAN: Jika tidak ada tanggal, tampilkan data kosong
+  if (!filters.selectedDate) {
+    this.filteredData = []; // UBAH dari [...this.salesData] ke []
     this.updateDataTable();
     this.updateSummary();
+    return; // Early return
   }
+
+  // Set tanggal ke awal dan akhir hari
+  const startOfDay = new Date(filters.selectedDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(filters.selectedDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  this.filteredData = this.salesData.filter((transaction) => {
+    const transactionDate = transaction.timestamp
+      ? transaction.timestamp.toDate()
+      : utils.parseDate(transaction.tanggal);
+
+    if (!transactionDate) return false;
+
+    // Date filter - hanya untuk hari yang dipilih
+    if (transactionDate < startOfDay || transactionDate > endOfDay) return false;
+
+    // Jenis filter
+    if (filters.jenis !== "all" && transaction.jenisPenjualan !== filters.jenis) return false;
+
+    // Sales filter
+    if (filters.sales !== "all" && transaction.sales !== filters.sales) return false;
+
+    return true;
+  });
+
+  this.updateDataTable();
+  this.updateSummary();
+  this.updateURLParams(filters);
+}
 
   // Update URL parameters to maintain filter state
   updateURLParams(filters) {
     const params = new URLSearchParams();
 
-    if (filters.startDate) {
-      params.set("startDate", document.getElementById("filterTanggalMulai").value);
-    }
-    if (filters.endDate) {
-      params.set("endDate", document.getElementById("filterTanggalAkhir").value);
+    if (filters.selectedDate) {
+      params.set("date", document.getElementById("filterTanggal").value);
     }
     if (filters.jenis !== "all") {
       params.set("jenis", filters.jenis);
@@ -479,11 +461,8 @@ class DataPenjualanApp {
   loadFilterFromURL() {
     const params = new URLSearchParams(window.location.search);
 
-    if (params.get("startDate")) {
-      document.getElementById("filterTanggalMulai").value = params.get("startDate");
-    }
-    if (params.get("endDate")) {
-      document.getElementById("filterTanggalAkhir").value = params.get("endDate");
+    if (params.get("date")) {
+      document.getElementById("filterTanggal").value = params.get("date");
     }
     if (params.get("jenis")) {
       document.getElementById("filterJenisPenjualan").value = params.get("jenis");
@@ -948,7 +927,7 @@ class DataPenjualanApp {
       <head>
         <title>Struk Kasir</title>
         <style>
-          body { font-family: 'Courier New', monospace; font-size: 12px; margin: 0; padding: 0; width: 80mm; }
+          body { font-family: Roboto; font-size: 12px; margin: 0; padding: 0; width: 80mm; }
           .receipt { margin: 0 auto; padding: 5mm; }
           .receipt h3, .receipt h4 { text-align: center; margin: 2mm 0; }
           .receipt hr { border-top: 1px dashed #000; }

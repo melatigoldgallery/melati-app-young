@@ -7,6 +7,7 @@ import {
   orderBy,
   doc,
   getDoc,
+  setDoc,
   Timestamp,
   serverTimestamp,
   limit,
@@ -153,61 +154,277 @@ const laporanStokHandler = {
     this.loadAndFilterStockData();
   },
 
+  async calculateDailyContinuity(selectedDate) {
+  try {
+    // 1. Hitung stok akhir sampai hari sebelumnya
+    const previousDate = new Date(selectedDate);
+    previousDate.setDate(previousDate.getDate() - 1);
+    previousDate.setHours(23, 59, 59, 999);
+
+    const previousStockMap = await this.calculateStockUntilDate(previousDate);
+
+    // 2. Hitung transaksi hari ini saja
+    const startOfDay = new Date(selectedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(selectedDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const todayTransactions = await this.getTransactionsForDate(startOfDay, endOfDay);
+
+    // 3. Gabungkan: stokAwal (dari kemarin) + transaksi hari ini = stokAkhir
+    this.filteredStockData = this.stockData.map(item => {
+      const kode = item.kode;
+      
+      // Stok awal = stok akhir kemarin
+      const stokAwal = previousStockMap.get(kode) || 0;
+      
+      // Transaksi hari ini
+      const todayTrans = todayTransactions.get(kode) || {
+        tambahStok: 0, laku: 0, free: 0, gantiLock: 0
+      };
+      
+      // Stok akhir = stok awal + tambah - keluar
+      const stokAkhir = Math.max(0, 
+        stokAwal + 
+        todayTrans.tambahStok - 
+        todayTrans.laku - 
+        todayTrans.free - 
+        todayTrans.gantiLock
+      );
+
+      return {
+        ...item,
+        stokAwal: stokAwal,           // INI YANG DIPERBAIKI!
+        tambahStok: todayTrans.tambahStok,
+        laku: todayTrans.laku,
+        free: todayTrans.free,
+        gantiLock: todayTrans.gantiLock,
+        stokAkhir: stokAkhir
+      };
+    });
+
+    // Tambahkan item yang ada di transaksi tapi tidak di master
+    todayTransactions.forEach((trans, kode) => {
+      const exists = this.filteredStockData.find(item => item.kode === kode);
+      if (!exists) {
+        const stokAwal = previousStockMap.get(kode) || 0;
+        const stokAkhir = Math.max(0, 
+          stokAwal + trans.tambahStok - trans.laku - trans.free - trans.gantiLock
+        );
+
+        this.filteredStockData.push({
+          kode: kode,
+          nama: trans.nama || "",
+          kategori: trans.kategori || "",
+          stokAwal: stokAwal,
+          tambahStok: trans.tambahStok,
+          laku: trans.laku,
+          free: trans.free,
+          gantiLock: trans.gantiLock,
+          stokAkhir: stokAkhir
+        });
+      }
+    });
+
+    // Sort data
+    this.filteredStockData.sort((a, b) => {
+      if (a.kategori !== b.kategori) {
+        return a.kategori === "kotak" ? -1 : 1;
+      }
+      return a.kode.localeCompare(b.kode);
+    });
+
+    console.log(`✅ Daily continuity calculated: ${this.filteredStockData.length} items`);
+    console.log(`📊 Sample: ${this.filteredStockData[0]?.kode} - Awal: ${this.filteredStockData[0]?.stokAwal}, Akhir: ${this.filteredStockData[0]?.stokAkhir}`);
+    
+  } catch (error) {
+    console.error("Error calculating daily continuity:", error);
+    throw error;
+  }
+},
+
+// Method helper: Hitung stok sampai tanggal tertentu
+async calculateStockUntilDate(endDate) {
+  const stockMap = new Map();
+  
+  try {
+    // Inisialisasi dengan stok awal = 0
+    this.stockData.forEach(item => {
+      stockMap.set(item.kode, 0);
+    });
+
+    // Cari snapshot bulan sebelumnya sebagai base
+    const prevMonth = new Date(endDate);
+    prevMonth.setMonth(prevMonth.getMonth() - 1);
+    const monthKey = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}`;
+    
+    const snapshotData = await this.loadStockFromSnapshot(monthKey);
+    
+    // Jika ada snapshot, gunakan sebagai base
+    if (snapshotData.size > 0) {
+      snapshotData.forEach((data, kode) => {
+        stockMap.set(kode, data.stokAkhir || 0);
+      });
+      console.log(`📦 Using snapshot base: ${snapshotData.size} items`);
+    }
+
+    // Hitung semua transaksi dari awal bulan sampai tanggal yang diminta
+    const startOfMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    const transactions = await this.getTransactionsForDate(startOfMonth, endDate);
+    
+    // Apply transaksi ke stok
+    transactions.forEach((trans, kode) => {
+      const currentStock = stockMap.get(kode) || 0;
+      const newStock = Math.max(0, 
+        currentStock + 
+        trans.tambahStok - 
+        trans.laku - 
+        trans.free - 
+        trans.gantiLock
+      );
+      stockMap.set(kode, newStock);
+    });
+
+    console.log(`📈 Stock calculated until ${formatDate(endDate)}: ${stockMap.size} items`);
+    return stockMap;
+    
+  } catch (error) {
+    console.error("Error calculating stock until date:", error);
+    return stockMap; // Return empty map as fallback
+  }
+},
+
+// Method helper: Dapatkan transaksi untuk rentang tanggal
+async getTransactionsForDate(startDate, endDate) {
+  const transactionMap = new Map();
+
+  try {
+    // Get stock transactions
+    const transQuery = query(
+      collection(firestore, "stokAksesorisTransaksi"),
+      where("timestamp", ">=", Timestamp.fromDate(startDate)),
+      where("timestamp", "<=", Timestamp.fromDate(endDate))
+    );
+
+    const transSnapshot = await getDocs(transQuery);
+
+    transSnapshot.forEach((doc) => {
+      const data = doc.data();
+      const kode = data.kode;
+
+      if (!kode) return;
+
+      if (!transactionMap.has(kode)) {
+        transactionMap.set(kode, {
+          tambahStok: 0,
+          laku: 0,
+          free: 0,
+          gantiLock: 0,
+          nama: data.nama || "",
+          kategori: data.kategori || "",
+        });
+      }
+
+      const trans = transactionMap.get(kode);
+      const jumlah = data.jumlah || 0;
+
+      switch (data.jenis) {
+        case "tambah":
+          trans.tambahStok += jumlah;
+          break;
+        case "laku":
+          trans.laku += jumlah;
+          break;
+        case "free":
+          trans.free += jumlah;
+          break;
+        case "gantiLock":
+          trans.gantiLock += jumlah;
+          break;
+      }
+    });
+
+    // Get stock additions
+    const addQuery = query(
+      collection(firestore, "stockAdditions"),
+      where("timestamp", ">=", Timestamp.fromDate(startDate)),
+      where("timestamp", "<=", Timestamp.fromDate(endDate))
+    );
+
+    const addSnapshot = await getDocs(addQuery);
+
+    addSnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (!data.items?.length) return;
+
+      data.items.forEach((item) => {
+        const kode = item.kodeText;
+        if (!kode) return;
+
+        if (!transactionMap.has(kode)) {
+          transactionMap.set(kode, {
+            tambahStok: 0,
+            laku: 0,
+            free: 0,
+            gantiLock: 0,
+            nama: item.nama || "",
+            kategori: "",
+          });
+        }
+
+        const trans = transactionMap.get(kode);
+        trans.tambahStok += parseInt(item.jumlah) || 0;
+      });
+    });
+
+    const dateRange = startDate.toDateString() === endDate.toDateString() 
+      ? formatDate(startDate) 
+      : `${formatDate(startDate)} - ${formatDate(endDate)}`;
+    
+    console.log(`📋 Transactions for ${dateRange}: ${transactionMap.size} items`);
+    return transactionMap;
+    
+  } catch (error) {
+    console.error("Error getting transactions for date:", error);
+    return new Map();
+  }
+},
+
   // Load and filter stock data
   async loadAndFilterStockData() {
-    try {
-      this.showLoading(true);
+  try {
+    this.showLoading(true);
 
-      // Get filter values
-      const startDateStr = document.getElementById("startDate").value;
-
-      // Validate date
-      if (!startDateStr) {
-        this.showError("Tanggal harus diisi");
-        this.showLoading(false);
-        return;
-      }
-
-      const startDate = parseDate(startDateStr);
-
-      if (!startDate) {
-        this.showError("Format tanggal tidak valid");
-        this.showLoading(false);
-        return;
-      }
-
-      // Check cache
-      const cacheKey = `stock_${startDateStr}_v2`;
-      if (this.cache[cacheKey] && this.cache[cacheKey].data) {
-        console.log("Using cached stock data");
-        this.filteredStockData = [...this.cache[cacheKey].data];
-        this.renderStockTable();
-        this.showLoading(false);
-        return;
-      }
-
-      // Load stock data
-      await this.loadStockData();
-
-      // Calculate stock continuity
-      await this.calculateStockContinuity(startDate);
-
-      // Cache the result
-      this.cache[cacheKey] = {
-        data: [...this.filteredStockData],
-        lastFetched: new Date().getTime(),
-      };
-
-      // Render table
-      this.renderStockTable();
-
+    const startDateStr = document.getElementById("startDate").value;
+    
+    if (!startDateStr) {
+      this.showError("Tanggal harus diisi");
       this.showLoading(false);
-    } catch (error) {
-      console.error("Error loading and filtering stock data:", error);
-      this.showError("Terjadi kesalahan saat memuat data: " + error.message);
-      this.showLoading(false);
+      return;
     }
-  },
+
+    const selectedDate = parseDate(startDateStr);
+    if (!selectedDate) {
+      this.showError("Format tanggal tidak valid");
+      this.showLoading(false);
+      return;
+    }
+
+    // Load stock data
+    await this.loadStockData();
+
+    // LOGIKA BARU: Hitung dengan kontinuitas harian
+    await this.calculateDailyContinuity(selectedDate);
+
+    this.renderStockTable();
+    this.showLoading(false);
+    
+  } catch (error) {
+    console.error("Error loading stock data:", error);
+    this.showError("Terjadi kesalahan saat memuat data: " + error.message);
+    this.showLoading(false);
+  }
+},
 
   // Load stock data
   async loadStockData() {
@@ -381,97 +598,6 @@ const laporanStokHandler = {
       return snapshotMap;
     } catch (error) {
       console.warn("No snapshot data found, using current stock");
-      return new Map();
-    }
-  },
-
-  // Get current month transactions only
-  async getCurrentMonthTransactions(startDate, endDate) {
-    const transactionMap = new Map();
-
-    try {
-      // Get stock transactions
-      const transQuery = query(
-        collection(firestore, "stokAksesorisTransaksi"),
-        where("timestamp", ">=", Timestamp.fromDate(startDate)),
-        where("timestamp", "<=", Timestamp.fromDate(endDate))
-      );
-
-      const transSnapshot = await getDocs(transQuery);
-
-      transSnapshot.forEach((doc) => {
-        const data = doc.data();
-        const kode = data.kode;
-
-        if (!kode) return;
-
-        if (!transactionMap.has(kode)) {
-          transactionMap.set(kode, {
-            tambahStok: 0,
-            laku: 0,
-            free: 0,
-            gantiLock: 0,
-            nama: data.nama || "",
-            kategori: data.kategori || "",
-          });
-        }
-
-        const trans = transactionMap.get(kode);
-        const jumlah = data.jumlah || 0;
-
-        switch (data.jenis) {
-          case "tambah":
-            trans.tambahStok += jumlah;
-            break;
-          case "laku":
-            trans.laku += jumlah;
-            break;
-          case "free":
-            trans.free += jumlah;
-            break;
-          case "gantiLock":
-            trans.gantiLock += jumlah;
-            break;
-        }
-      });
-
-      // Get stock additions
-      const addQuery = query(
-        collection(firestore, "stockAdditions"),
-        where("timestamp", ">=", Timestamp.fromDate(startDate)),
-        where("timestamp", "<=", Timestamp.fromDate(endDate))
-      );
-
-      const addSnapshot = await getDocs(addQuery);
-
-      addSnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (!data.items?.length) return;
-
-        data.items.forEach((item) => {
-          const kode = item.kodeText;
-          if (!kode) return;
-
-          if (!transactionMap.has(kode)) {
-            transactionMap.set(kode, {
-              tambahStok: 0,
-              laku: 0,
-              free: 0,
-              gantiLock: 0,
-              nama: item.nama || "",
-              kategori: "",
-            });
-          }
-
-          const trans = transactionMap.get(kode);
-          trans.tambahStok += parseInt(item.jumlah) || 0;
-        });
-      });
-
-      console.log(`Found transactions for ${transactionMap.size} items`);
-      return transactionMap;
-    } catch (error) {
-      console.error("Error getting transactions:", error);
       return new Map();
     }
   },
@@ -682,78 +808,6 @@ const laporanStokHandler = {
         startDate: new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1),
       };
     }
-  },
-
-  // Get transactions for current period
-  async getCurrentPeriodTransactions(startDate, endDate, initialStockData) {
-    const stockTransactionsRef = collection(firestore, "stokAksesorisTransaksi");
-    const transactionsQuery = query(
-      stockTransactionsRef,
-      where("timestamp", ">=", Timestamp.fromDate(startDate)),
-      where("timestamp", "<=", Timestamp.fromDate(endDate)),
-      orderBy("timestamp", "asc")
-    );
-
-    const transactionsSnapshot = await getDocs(transactionsQuery);
-    const stockByCode = {};
-
-    // Initialize with snapshot data if available
-    if (initialStockData.size > 0) {
-      initialStockData.forEach((data, kode) => {
-        stockByCode[kode] = {
-          before: {
-            stokAwal: data.stokAkhir,
-            tambahStok: 0,
-            laku: 0,
-            free: 0,
-            gantiLock: 0,
-          },
-          during: {
-            tambahStok: 0,
-            laku: 0,
-            free: 0,
-            gantiLock: 0,
-          },
-          nama: data.nama,
-          kategori: data.kategori,
-        };
-      });
-    }
-
-    // Process transactions
-    transactionsSnapshot.forEach((doc) => {
-      const transaction = doc.data();
-      const kode = transaction.kode;
-
-      if (!kode) return;
-
-      if (!stockByCode[kode]) {
-        stockByCode[kode] = {
-          before: { stokAwal: 0, tambahStok: 0, laku: 0, free: 0, gantiLock: 0 },
-          during: { tambahStok: 0, laku: 0, free: 0, gantiLock: 0 },
-          nama: transaction.nama || "",
-          kategori: transaction.kategori || "",
-        };
-      }
-
-      // All transactions in this period are "during"
-      switch (transaction.jenis) {
-        case "tambah":
-          stockByCode[kode].during.tambahStok += transaction.jumlah || 0;
-          break;
-        case "laku":
-          stockByCode[kode].during.laku += transaction.jumlah || 0;
-          break;
-        case "free":
-          stockByCode[kode].during.free += transaction.jumlah || 0;
-          break;
-        case "gantiLock":
-          stockByCode[kode].during.gantiLock += transaction.jumlah || 0;
-          break;
-      }
-    });
-
-    return stockByCode;
   },
 
   // Process stock additions
