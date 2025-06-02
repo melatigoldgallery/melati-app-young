@@ -1691,7 +1691,7 @@ const penjualanHandler = {
         <style>
           body {
             font-family: roboto;
-            font-size: 12px;
+            font-size: 14px;
             margin: 0;
             padding: 0;
             width: 80mm;

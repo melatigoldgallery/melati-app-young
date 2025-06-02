@@ -927,7 +927,7 @@ class DataPenjualanApp {
       <head>
         <title>Struk Kasir</title>
         <style>
-          body { font-family: Roboto; font-size: 12px; margin: 0; padding: 0; width: 80mm; }
+          body { font-family: Roboto; font-size: 14px; margin: 0; padding: 0; width: 80mm; }
           .receipt { margin: 0 auto; padding: 5mm; }
           .receipt h3, .receipt h4 { text-align: center; margin: 2mm 0; }
           .receipt hr { border-top: 1px dashed #000; }
