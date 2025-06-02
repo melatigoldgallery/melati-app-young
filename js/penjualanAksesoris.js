@@ -1691,7 +1691,7 @@ const penjualanHandler = {
         <style>
           body {
             font-family: roboto;
-            font-size: 12px;
+            font-size: 14px;
             margin: 0;
             padding: 0;
             width: 80mm;
@@ -1714,6 +1714,9 @@ const penjualanHandler = {
           .receipt th, .receipt td {
             text-align: left;
             padding: 1mm 2mm;
+          }
+          .receipt .tanggal {
+          margin-left: 10px
           }
           .text-center {
             text-align: center;
@@ -1741,7 +1744,7 @@ const penjualanHandler = {
           <h4>JL. DIPONEGORO NO. 116</h4>
           <h4>NOTA PENJUALAN ${transaction.salesType.toUpperCase()}</h4>
           <hr>
-          <p>Tanggal: ${transaction.tanggal}<br>Sales: ${transaction.sales}</p>
+          <p class="tanggal">Tanggal: ${transaction.tanggal}<br>Sales: ${transaction.sales}</p>
           <hr>
           <table>
             <tr>
