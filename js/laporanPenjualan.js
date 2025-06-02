@@ -196,7 +196,7 @@ const laporanPenjualanHandler = {
             extend: "excel",
             text: '<i class="fas fa-file-excel"></i> Excel',
             className: "btn btn-success btn-sm",
-            title: "Laporan Penjualan Manual / Aksesoris / Kotak \n Melati Bawah",
+            title: "Laporan Penjualan Manual / Aksesoris / Kotak \n Melati Atas",
             filename: function () {
               const startDate = document.getElementById("startDate").value || "semua";
               const endDate = document.getElementById("endDate").value || "semua";
@@ -207,7 +207,7 @@ const laporanPenjualanHandler = {
             extend: "pdf",
             text: '<i class="fas fa-file-pdf"></i> PDF',
             className: "btn btn-danger btn-sm",
-            title: "Laporan Penjualan Manual / Aksesoris / Kotak \n Melati Bawah",
+            title: "Laporan Penjualan Manual / Aksesoris / Kotak \n Melati Atas",
             filename: function () {
               const startDate = document.getElementById("startDate").value || "semua";
               const endDate = document.getElementById("endDate").value || "semua";

@@ -1173,7 +1173,7 @@ const laporanStokHandler = {
             exportOptions: {
               columns: ":visible",
             },
-            title: `Laporan Stok Kotak & Aksesoris Melati Bawah (${selectedDate})`,
+            title: `Laporan Stok Kotak & Aksesoris Melati Atas (${selectedDate})`,
             customize: function (xlsx) {
               var sheet = xlsx.xl.worksheets["sheet1.xml"];
               $('row c[r^="C"]', sheet).attr("s", "55"); // Nama column - wider with wrap text
@@ -1187,7 +1187,7 @@ const laporanStokHandler = {
             exportOptions: {
               columns: ":visible",
             },
-            title: `Laporan Stok Kotak & Aksesoris Melati Bawah\n(${selectedDate})`,
+            title: `Laporan Stok Kotak & Aksesoris Melati Atas\n(${selectedDate})`,
             customize: function (doc) {
               doc.defaultStyle.fontSize = 8;
               doc.styles.tableHeader.fontSize = 9;

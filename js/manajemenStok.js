@@ -509,9 +509,9 @@ document.getElementById('simpan-tambah-posting').addEventListener('click', funct
     bootstrap.Modal.getInstance(document.getElementById('tambahStokPostingModal')).hide();
 });
 
-// Add event listener for Batu Lepas add stock
-document.getElementById('simpan-tambah-batu').addEventListener('click', function() {
-    const type = document.getElementById('jenis-batu-tambah').value;
+// Event listener untuk tambah stok batu lepas
+document.getElementById('simpan-tambah-batu')?.addEventListener('click', function() {
+    const type = document.getElementById('jenis-barang-batu-tambah').value;
     const quantity = document.getElementById('jumlah-batu-tambah').value;
     const adder = document.getElementById('penambah-batu').value;
     const receiver = document.getElementById('penerima-batu').value;
@@ -521,17 +521,7 @@ document.getElementById('simpan-tambah-batu').addEventListener('click', function
         return;
     }
     
-    // Handle custom stone type
-    let stoneType = type;
-    if (type === 'LAINNYA') {
-        stoneType = document.getElementById('jenis-batu-lainnya').value;
-        if (!stoneType) {
-            alert('Silakan isi jenis batu lainnya!');
-            return;
-        }
-    }
-    
-    addStock('batu-lepas', stoneType, quantity, adder, receiver);
+    addStock('batu-lepas', type, quantity, adder, receiver);
     
     // Reset form and close modal
     document.getElementById('tambahStokBatuLepasForm').reset();
@@ -619,15 +609,28 @@ document.getElementById('simpan-kurang-posting').addEventListener('click', funct
     });
 });
 
-// Add event listener for Batu Lepas reduce stock
-document.getElementById('simpan-kurang-batu').addEventListener('click', function() {
-    const type = document.getElementById('jenis-batu-kurang').value;
+// Event listener untuk kurangi stok batu lepas  
+document.getElementById('simpan-kurang-batu')?.addEventListener('click', function() {
+    const type = document.getElementById('jenis-barang-batu-kurang').value;
     const quantity = document.getElementById('jumlah-batu-kurang').value;
     const reducer = document.getElementById('pengurang-batu').value;
     const notes = document.getElementById('keterangan-batu').value;
     
     if (!type || !quantity || !reducer || !notes) {
         alert('Semua field harus diisi!');
+        return;
+    }
+    
+    // Validasi stok untuk batu lepas - cek apakah item ada dan stok mencukupi
+    if (stockData['batu-lepas'] && stockData['batu-lepas'][type]) {
+        const currentStock = stockData['batu-lepas'][type].quantity;
+        if (parseInt(quantity) > currentStock) {
+            alert(`Stok ${type} tidak mencukupi! Stok saat ini: ${currentStock}`);
+            return;
+        }
+    } else {
+        // Jika item belum ada di batu-lepas, berarti stok 0
+        alert(`Stok ${type} tidak tersedia di Batu Lepas!`);
         return;
     }
     
@@ -702,34 +705,6 @@ document.getElementById('jenis-batu-tambah')?.addEventListener('change', functio
     }
 });
 
-// Populate batu lepas dropdown for reduce stock
-async function populateBatuLepasDropdown() {
-    const dropdown = document.getElementById('jenis-batu-kurang');
-    if (!dropdown) return;
-    
-    // Clear existing options except the first one
-    while (dropdown.options.length > 1) {
-        dropdown.remove(1);
-    }
-    
-    // Ensure we have the latest data
-    await fetchStockData();
-    
-    if (stockData['batu-lepas']) {
-        // Get all stone types with quantity > 0
-        const stoneTypes = Object.keys(stockData['batu-lepas'])
-            .filter(type => stockData['batu-lepas'][type].quantity > 0);
-        
-        // Add options to dropdown
-        stoneTypes.forEach(type => {
-            const option = document.createElement('option');
-            option.value = type;
-            option.textContent = `${type} (${stockData['batu-lepas'][type].quantity})`;
-            dropdown.appendChild(option);
-        });
-    }
-}
-
 // Schedule daily cleanup of old history with improved logic
 function scheduleHistoryCleanup() {
     // Check if we already ran cleanup today
@@ -760,10 +735,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // Populate tables with data (from cache or Firestore)
         await populateTables();
-        
-        // Populate batu lepas dropdown
-        await populateBatuLepasDropdown();
-        
+                
         // Setup real-time listener for collaborative editing
         setupRealtimeListener();
         
@@ -777,7 +749,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 // Force refresh from Firestore
                 lastFetchTime = null;
                 await populateTables();
-                await populateBatuLepasDropdown();
                 alert('Data stok berhasil diperbarui.');
             });
         }
