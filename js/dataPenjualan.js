@@ -933,6 +933,7 @@ class DataPenjualanApp {
           .receipt hr { border-top: 1px dashed #000; }
           .receipt table { width: 100%; border-collapse: collapse; }
           .receipt th, .receipt td { text-align: left; padding: 1mm 2mm; }
+          .receipt .tanggal { margin-left: 10px }
           .text-center { text-align: center; }
           .text-right { text-align: right; }
           .keterangan { font-style: italic; font-size: 10px; margin-top: 2mm; border-top: 1px dotted #000; padding-top: 2mm; }
@@ -945,7 +946,7 @@ class DataPenjualanApp {
           <h4>JL. DIPONEGORO NO. 116</h4>
           <h4>NOTA PENJUALAN ${salesType.toUpperCase()}</h4>
           <hr>
-          <p>Tanggal: ${tanggal}<br>Sales: ${transaction.sales || "-"}</p>
+          <p class="tanggal">Tanggal: ${tanggal}<br>Sales: ${transaction.sales || "-"}</p>
           <hr>
           <table>
             <tr>
