@@ -40,13 +40,6 @@ function addNewRow() {
         <option value="22K">22K</option>
       </select>
     </td>
-    <td>
-      <select name="asalToko" class="form-select form-select-sm" required>
-        <option value="" disabled selected>Pilih</option>
-        <option value="Toko Melati">Toko Melati</option>
-        <option value="Luar Toko">Luar Toko</option>
-      </select>
-    </td>
     <td><input type="text" name="namaBarang" class="form-control form-control-sm" placeholder="Nama Barang" required></td>
     <td>
       <select name="kondisiBarang" class="form-select form-select-sm" required>
@@ -134,20 +127,18 @@ function calculateBuyback(e) {
   rows.forEach((row) => {
     const namaBarangInput = row.querySelector('input[name="namaBarang"]');
     const kadar = row.querySelector("[name='kadar']").value;
-    const asalToko = row.querySelector("[name='asalToko']").value;
     const namaBarang = row.querySelector("[name='namaBarang']")?.value || "";
     const kondisiBarang = row.querySelector("[name='kondisiBarang']").value;
     const hargaBeli = parseFloat(row.querySelector("[name='hargaBeli']").value);
     const hargaHariIni = parseFloat(row.querySelector("[name='hargaHariIni']").value);
 
-    if (!kadar || !asalToko || !kondisiBarang || isNaN(hargaBeli) || isNaN(hargaHariIni)) {
+    if (!kadar || !kondisiBarang || isNaN(hargaBeli) || isNaN(hargaHariIni)) {
       isValid = false;
       return;
     }
 
     items.push({
       kadar,
-      asalToko,
       namaBarang,
       kondisiBarang,
       hargaBeli,
@@ -158,6 +149,9 @@ function calculateBuyback(e) {
   if (!isValid) {
     showAlert("Mohon lengkapi semua field yang diperlukan", "danger");
     return;
+    
+  const results = calculateBuybackPrice(items);
+  showResults(results);
   }
 
   // Calculate buyback price
@@ -175,50 +169,32 @@ function calculateBuybackPrice(items) {
     let buybackPercentage = 0;
     let buybackPrice = 0;
 
-    // Bandingkan harga per gram saat beli dengan harga per gram saat ini
-    const hargaPerGramBeli = item.hargaBeli; // Asumsikan ini sudah dalam format per gram
-    const hargaPerGramHariIni = item.hargaHariIni; // Asumsikan ini sudah dalam format per gram
-
-    if (hargaPerGramBeli <= hargaPerGramHariIni) {
-      // Kasus 1: Harga beli lebih rendah dari harga hari ini
-      // Gunakan logika perhitungan yang sudah ada berdasarkan kondisi dan asal toko
-      if (item.asalToko === "Toko Melati") {
-        // For items from Melati store, use the calculateMelatiPersentase function
-        const persentaseBeli = (item.hargaBeli / item.hargaHariIni) * 100;
-        buybackPercentage = calculateMelatiPersentase(item.kondisiBarang, persentaseBeli);
-      } else {
-        // For items from other stores, use the calculateLuarTokoPersentase function
-        buybackPercentage = calculateLuarTokoPersentase(item.kondisiBarang);
-      }
-
-      // Calculate buyback price based on current price and percentage
+    if (item.hargaBeli <= item.hargaHariIni) {
+      // Hitung persentase beli terhadap harga hari ini
+      const persentaseBeli = (item.hargaBeli / item.hargaHariIni) * 100;
+      
+      // Gunakan helper function calculatePersentase
+      buybackPercentage = calculatePersentase(parseInt(item.kondisiBarang), persentaseBeli);
       buybackPrice = (item.hargaHariIni * buybackPercentage) / 100;
-
-      // Terapkan aturan pembulatan
       buybackPrice = roundBuybackPrice(buybackPrice);
 
-      // Jika harga penerimaan setelah dihitung lebih rendah dari harga beli,
-      // maka gunakan harga beli
       if (buybackPrice < item.hargaBeli) {
         buybackPrice = item.hargaBeli;
       }
     } else {
-      // Kasus 2: Harga beli lebih tinggi dari harga hari ini
-      // Gunakan harga hari ini tanpa pembulatan
       buybackPrice = item.hargaHariIni;
     }
 
-    // Calculate price difference
     const priceDifference = buybackPrice - item.hargaBeli;
     const percentageDifference = ((priceDifference / item.hargaBeli) * 100).toFixed(2);
 
     results.push({
       ...item,
-      buybackPercentage: parseFloat(buybackPercentage.toFixed(2)), // Format to 2 decimal places
+      buybackPercentage: parseFloat(buybackPercentage.toFixed(2)),
       buybackPrice,
       priceDifference,
       percentageDifference,
-      isHigherPurchasePrice: hargaPerGramBeli > hargaPerGramHariIni, // Flag untuk UI
+      isHigherPurchasePrice: item.hargaBeli > item.hargaHariIni,
     });
   });
 
@@ -240,7 +216,7 @@ function roundBuybackPrice(price) {
 }
 
 // New helper functions for calculating percentages
-function calculateMelatiPersentase(kondisiBarang, persentaseBeli) {
+function calculatePersentase(kondisiBarang, persentaseBeli) {
   if (persentaseBeli >= 95) {
     const persentaseMap = {
       1: 98,
@@ -286,15 +262,6 @@ function calculateMelatiPersentase(kondisiBarang, persentaseBeli) {
   }
 }
 
-function calculateLuarTokoPersentase(kondisiBarang) {
-  const persentaseMap = {
-    1: 72,
-    2: 70,
-    3: 65,
-  };
-  return persentaseMap[kondisiBarang] || 60;
-}
-
 // Show results in modal
 function showResults(results) {
   const modalBody = document.getElementById("modalMessage");
@@ -309,10 +276,6 @@ function showResults(results) {
     const conditionText =
       result.kondisiBarang === "1" ? "(K1)" : result.kondisiBarang === "2" ? "(K2)" : "(K3)";
 
-    const priceStatus = result.priceDifference >= 0 ? "text-success" : "text-danger";
-    const priceIcon = result.priceDifference >= 0 ? "fa-arrow-up" : "fa-arrow-down";
-
-    // Tambahkan notifikasi khusus jika harga beli lebih tinggi
     let specialNotice = "";
     if (result.isHigherPurchasePrice) {
       specialNotice = `
@@ -323,18 +286,18 @@ function showResults(results) {
         </div>
       `;
     }
+    
     const namaBarang = result.namaBarang || "Perhiasan";
     content += `
     <div class="result-item">
-      <h5 class="fw-bold mb-3">Item #${index + 1}: Perhiasan </h5>
+      <h5 class="fw-bold mb-3">Item #${index + 1}: ${namaBarang}</h5>
       ${specialNotice}
       <div class="row mb-2">
         <div class="col-md-6">
-          <p class="mb-1"><strong>Nama Barang:</strong> ${namaBarang}</p>
           <p class="mb-1"><strong>Kadar:</strong> ${result.kadar}</p>
+          <p class="mb-1"><strong>Kondisi:</strong> ${conditionText}</p>
         </div>
         <div class="col-md-6">
-          <p class="mb-1"><strong>Asal Toko:</strong> ${result.asalToko}</p>
           <p class="mb-1"><strong>Persentase Buyback:</strong> ${result.buybackPercentage}%</p>
         </div>
       </div>
@@ -349,7 +312,6 @@ function showResults(results) {
   `;
   });
 
-  // Add timestamp
   const now = new Date();
   content += `
   <div class="text-end text-muted mt-3">
@@ -364,8 +326,6 @@ function showResults(results) {
 `;
 
   modalBody.innerHTML = content;
-
-  // Show modal
   const resultModal = new bootstrap.Modal(document.getElementById("resultModal"));
   resultModal.show();
 }

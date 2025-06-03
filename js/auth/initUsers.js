@@ -1,60 +1,64 @@
 import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
 import app from '../configFirebase.js';
+
 const db = getDatabase(app);
+
+// Updated authorized users sesuai requirement
 const authorizedUsers = {
-    'adminyoung': {
-      password: 'admin',
-      role: 'admin'
-    },
-    'operator': {
-      password: 'operator123',
-      role: 'operator'
-    }
+  'adminyoung': {
+    password: 'admin',
+    role: 'admin'
+  },
+  'supervisor': {
+    password: 'svmlt116',
+    role: 'supervisor'
+  }
 };
 
 export async function initializeUsers() {
-  const db = getDatabase();
   const usersRef = ref(db, 'authorized_users');
   
-  // Check if users already exist
-  const snapshot = await get(usersRef);
-  if (!snapshot.exists()) {
-      // Only initialize if no users exist
-      await set(usersRef, authorizedUsers);
+  try {
+    // Force update Firebase dengan data yang benar
+    await set(usersRef, authorizedUsers);
+    console.log('Users updated in Firebase:', authorizedUsers);
+    return true;
+  } catch (error) {
+    console.error('Initialize users error:', error);
+    return false;
   }
-  return true;
 }
+
 export async function loginUser(username, password) {
   try {
-    const db = getDatabase();
+    console.log('Login attempt:', { username, password });
+    
     const usersRef = ref(db, 'authorized_users');
+    
+    // Force update Firebase data first
+    await set(usersRef, authorizedUsers);
+    
+    // Then get the updated data
     const snapshot = await get(usersRef);
     
-    if (!snapshot.exists()) {
-      // Initialize users if they don't exist
-      await initializeUsers();
-      // Fetch again after initialization
-      const newSnapshot = await get(usersRef);
-      const users = newSnapshot.val();
-      
-      if (users[username] && users[username].password === password) {
-        return {
-          success: true,
-          role: users[username].role,
-          username: username
-        };
-      }
-    } else {
-      const users = snapshot.val();
-      if (users[username] && users[username].password === password) {
-        return {
-          success: true,
-          role: users[username].role,
-          username: username
-        };
-      }
+    let users = authorizedUsers; // fallback to local users
+    
+    if (snapshot.exists()) {
+      users = snapshot.val();
+      console.log('Users from Firebase:', users);
     }
     
+    // Check credentials
+    if (users[username] && users[username].password === password) {
+      console.log('Login successful for:', username);
+      return {
+        success: true,
+        role: users[username].role,
+        username: username
+      };
+    }
+    
+    console.log('Login failed - credentials mismatch');
     return {
       success: false,
       message: 'Username atau password salah'
@@ -62,6 +66,18 @@ export async function loginUser(username, password) {
     
   } catch (error) {
     console.error('Login error:', error);
+    
+    // Fallback to local authentication if Firebase fails
+    console.log('Using fallback authentication');
+    const user = authorizedUsers[username];
+    if (user && user.password === password) {
+      return {
+        success: true,
+        username: username,
+        role: user.role
+      };
+    }
+    
     return {
       success: false,
       message: 'Terjadi kesalahan saat login. Silakan coba lagi.'
