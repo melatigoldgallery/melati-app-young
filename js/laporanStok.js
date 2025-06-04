@@ -254,7 +254,7 @@ const laporanStokHandler = {
     const refreshBtn = document.getElementById("refreshStockBtn");
     if (refreshBtn) {
       refreshBtn.addEventListener("click", () => {
-        this.forceRefreshData();
+        this.refreshAllData();
       });
     }
   },
@@ -267,30 +267,33 @@ const laporanStokHandler = {
   },
 
   // Force refresh data
-  forceRefreshData() {
-    if (confirm("Apakah Anda yakin ingin menyegarkan data dari server?")) {
+   async refreshAllData() {
+    try {
+      this.showLoading(true);
+      
+      // Clear all cache
+      stockCache.clear();
+      stockCacheMeta.clear();
+      localStorage.removeItem('stockCache');
+      localStorage.removeItem('stockCacheMeta');
+      
+      // Force reload all data
+      await this.loadStockData(true);
+      
+      // Reload current view if date is selected
       const startDateStr = document.getElementById("startDate").value;
-      if (!startDateStr) {
-        this.showError("Tanggal harus diisi");
-        return;
+      if (startDateStr) {
+        await this.loadAndFilterStockData(true);
       }
       
-      const selectedDate = parseDate(startDateStr);
-      if (!selectedDate) {
-        this.showError("Format tanggal tidak valid");
-        return;
-      }
+      this.showSuccess("Data berhasil diperbarui dari server");
+      console.log("All stock data refreshed successfully");
       
-      // Clear cache for this date
-      const cacheKey = `stock_${startDateStr}`;
-      stockCache.delete(cacheKey);
-      stockCacheMeta.delete(cacheKey);
-      saveStockCacheToStorage();
-      
-      // Reload data
-      this.loadAndFilterStockData(true);
-      
-      this.showSuccess("Data sedang disegarkan dari server...");
+    } catch (error) {
+      console.error("Error refreshing all data:", error);
+      this.showError("Gagal memperbarui data: " + error.message);
+    } finally {
+      this.showLoading(false);
     }
   },
 
@@ -1589,7 +1592,7 @@ const laporanStokHandler = {
             exportOptions: {
               columns: ":visible",
             },
-            title: `Laporan Stok Kotak & Aksesoris Melati Atas (${selectedDate})`,
+            title: `Laporan Stok Kotak & Aksesoris Melati Bawah (${selectedDate})`,
             customize: function (xlsx) {
               var sheet = xlsx.xl.worksheets["sheet1.xml"];
               $('row c[r^="C"]', sheet).attr("s", "55"); // Nama column - wider with wrap text
@@ -1603,7 +1606,7 @@ const laporanStokHandler = {
             exportOptions: {
               columns: ":visible",
             },
-            title: `Laporan Stok Kotak & Aksesoris Melati Atas\n(${selectedDate})`,
+            title: `Laporan Stok Kotak & Aksesoris Melati Bawah\n(${selectedDate})`,
             customize: function (doc) {
               doc.defaultStyle.fontSize = 8;
               doc.styles.tableHeader.fontSize = 9;
