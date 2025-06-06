@@ -1125,7 +1125,7 @@ class DataPenjualanApp {
       <head>
         <title>Struk Kasir</title>
         <style>
-          body { font-family: Roboto; font-size: 14px; margin: 0; padding: 0; width: 80mm; }
+          body { font-family: consolas; font-size: 14px; margin: 0; padding: 0; width: 80mm; }
           .receipt { margin: 0 auto; padding: 5mm; }
           .receipt h3, .receipt h4 { text-align: center; margin: 2mm 0; }
           .receipt hr { border-top: 1px dashed #000; }
@@ -1134,7 +1134,7 @@ class DataPenjualanApp {
           .tanggal {margin-left: 10px}
           .text-center { text-align: center; }
           .text-right { text-align: right; }
-          .keterangan { font-style: italic; font-size: 10px; margin-top: 2mm; border-top: 1px dotted #000; padding-top: 2mm; }
+          .keterangan { font-style: italic; font-size: 14px; margin-top: 2mm; border-top: 1px dotted #000; padding-top: 2mm; }
           .payment-info { margin-top: 2mm; border-top: 1px dotted #000; padding-top: 2mm; }
         </style>
       </head>

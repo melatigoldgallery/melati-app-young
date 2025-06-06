@@ -1686,7 +1686,7 @@ const penjualanHandler = {
         <title>Struk Kasir</title>
         <style>
           body {
-            font-family: roboto;
+            font-family: consolas;
             font-size: 14px;
             margin: 0;
             padding: 0;
@@ -1722,7 +1722,7 @@ const penjualanHandler = {
           }
           .keterangan {
             font-style: italic;
-            font-size: 10px;
+            font-size: 14px;
             margin-top: 2mm;
             border-top: 1px dotted #000;
             padding-top: 2mm;
@@ -1845,7 +1845,7 @@ const penjualanHandler = {
     const printWindow = window.open("", "_blank");
 
     if (!printWindow) {
-      
+      utils.showAlert("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak.", "Error", "error");
       return;
     }
 
@@ -1897,6 +1897,7 @@ const penjualanHandler = {
           margin-left: 0.5cm;
           margin-right: 3cm;
         }
+        .keterangan-spacer { height: 1.6cm; }
         .item-details {
           display: flex;
           flex-wrap: wrap;
@@ -1954,13 +1955,18 @@ const penjualanHandler = {
       }
     });
 
-    // Tampilkan keterangan setelah semua item-data (jika ada)
+    // Tampilkan keterangan atau spacer untuk menjaga posisi total-row
     if (hasKeterangan && transaction.salesType === "manual") {
       invoiceHTML += `
       <div class="keterangan">
         <strong>Keterangan:</strong><br>
         ${keteranganText.trim()}
       </div>
+    `;
+    } else {
+      // Tambahkan spacer jika tidak ada keterangan untuk menjaga posisi total-row
+      invoiceHTML += `
+      <div class="keterangan-spacer"></div>
     `;
     }
 
