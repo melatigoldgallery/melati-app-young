@@ -850,13 +850,6 @@ async function deleteSelectedKodes() {
       return;
     }
 
-    const confirmed = await showConfirm(
-      "Apakah Anda yakin ingin menghapus kode yang dipilih? Tindakan ini tidak dapat dibatalkan.",
-      "Konfirmasi Penghapusan"
-    );
-
-    if (!confirmed) return;
-
     const selectedIds = Array.from(selectedKodes.mutated);
     const selectedItems = kodeData.mutated.filter((item) => selectedIds.includes(item.id));
 
@@ -865,33 +858,109 @@ async function deleteSelectedKodes() {
       return;
     }
 
+    // Tampilkan modal validasi
+    showValidasiHapusModal(selectedItems);
+
+  } catch (error) {
+    console.error("Error in deleteSelectedKodes:", error);
+    showAlert("Terjadi kesalahan: " + error.message, "Error", "error");
+  }
+}
+
+// Tambahkan fungsi baru untuk menampilkan modal validasi
+function showValidasiHapusModal(selectedItems) {
+  // Reset form
+  $("#validasiHapusForm")[0].reset();
+  $("#validasiError").addClass("d-none");
+  
+  // Update jumlah kode yang akan dihapus
+  $("#jumlahKodeHapus").text(selectedItems.length);
+  
+  // Simpan data yang akan dihapus untuk digunakan nanti
+  window.pendingDeleteItems = selectedItems;
+  
+  // Tampilkan modal
+  $("#modalValidasiHapus").modal("show");
+}
+
+// Tambahkan fungsi validasi kredensial
+async function validateCredentials(userId, password) {
+  try {
+    const validCredentials = {
+      "input": "input116",
+      "manager": "manager123",
+      "supervisor": "super123"
+    };
+    
+    // Cek apakah user ID dan password valid
+    if (validCredentials[userId] && validCredentials[userId] === password) {
+      return { success: true };
+    }
+    
+    // Atau bisa juga validasi dengan current user session
+    const currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
+    if (currentUser.username === userId && currentUser.password === password) {
+      return { success: true };
+    }
+    
+    return { 
+      success: false, 
+      message: "User ID atau Password tidak valid" 
+    };
+    
+  } catch (error) {
+    console.error("Error validating credentials:", error);
+    return { 
+      success: false, 
+      message: "Terjadi kesalahan saat validasi" 
+    };
+  }
+}
+
+// Tambahkan fungsi untuk melakukan penghapusan setelah validasi berhasil
+async function executeDelete(selectedItems) {
+  try {
     Swal.fire({
       title: "Memproses Penghapusan",
-      text: "Mohon tunggu...",
+      text: `Menghapus ${selectedItems.length} kode...`,
       allowOutsideClick: false,
       didOpen: () => {
         Swal.showLoading();
       },
     });
 
-    for (const item of selectedItems) {
+    // Hapus setiap item
+    const deletePromises = selectedItems.map(async (item) => {
       const mutasiKodeRef = doc(firestore, "mutasiKode", item.id);
       await deleteDoc(mutasiKodeRef);
-    }
+      return item.kode;
+    });
 
+    await Promise.all(deletePromises);
+
+    // Reset selections
     selectedKodes.mutated = new Set();
+    updateButtonStatus("mutated");
+    $("#selectAllMutated").prop("checked", false);
 
     // Clear cache setelah delete
     clearAllCache();
 
+    // Tutup modal dan tampilkan success
+    $("#modalValidasiHapus").modal("hide");
+    
     Swal.fire({
-      title: "Berhasil",
+      title: "Berhasil!",
       text: `${selectedItems.length} kode berhasil dihapus`,
       icon: "success",
       confirmButtonText: "OK",
+    }).then(() => {
+      // Refresh data
+      loadKodeData(true);
     });
+
   } catch (error) {
-    console.error("Error deleting kodes:", error);
+    console.error("Error executing delete:", error);
     Swal.fire({
       title: "Error",
       text: `Gagal menghapus kode: ${error.message}`,
@@ -1292,6 +1361,63 @@ function initializeEventHandlers() {
     }
   });
 
+  // Event handler untuk toggle password visibility
+  $("#togglePasswordValidasi").on("click", function() {
+    const passwordInput = $("#validasiPassword");
+    const eyeIcon = $("#eyeIconValidasi");
+    
+    if (passwordInput.attr("type") === "password") {
+      passwordInput.attr("type", "text");
+      eyeIcon.removeClass("fa-eye").addClass("fa-eye-slash");
+    } else {
+      passwordInput.attr("type", "password");
+      eyeIcon.removeClass("fa-eye-slash").addClass("fa-eye");
+    }
+  });
+
+  // Event handler untuk form validasi hapus
+  $("#validasiHapusForm").on("submit", async function(e) {
+    e.preventDefault();
+    
+    const userId = $("#validasiUserId").val().trim();
+    const password = $("#validasiPassword").val();
+    
+    if (!userId || !password) {
+      showValidasiError("User ID dan Password harus diisi");
+      return;
+    }
+    
+    // Disable tombol sementara
+    $("#btnKonfirmasiHapus").prop("disabled", true).html('<i class="fas fa-spinner fa-spin me-2"></i>Memvalidasi...');
+    
+    try {
+      const validation = await validateCredentials(userId, password);
+      
+      if (validation.success) {
+        // Validasi berhasil, lakukan penghapusan
+        const selectedItems = window.pendingDeleteItems || [];
+        if (selectedItems.length > 0) {
+          await executeDelete(selectedItems);
+        }
+      } else {
+        showValidasiError(validation.message);
+      }
+    } catch (error) {
+      console.error("Validation error:", error);
+      showValidasiError("Terjadi kesalahan saat validasi");
+    } finally {
+      // Enable tombol kembali
+      $("#btnKonfirmasiHapus").prop("disabled", false).html('<i class="fas fa-trash me-2"></i>Konfirmasi Hapus');
+    }
+  });
+
+  // Reset error saat modal ditutup
+  $("#modalValidasiHapus").on("hidden.bs.modal", function() {
+    $("#validasiError").addClass("d-none");
+    $("#validasiHapusForm")[0].reset();
+    window.pendingDeleteItems = null;
+  });
+
   $("#selectAllActive").off('change').on("change", function() {
     const isChecked = $(this).is(":checked");
     console.log(`Select all active: ${isChecked}`);
@@ -1332,6 +1458,17 @@ function initializeEventHandlers() {
       unsubscribeListener();
     }
   });
+}
+
+// Tambahkan fungsi helper untuk menampilkan error validasi
+function showValidasiError(message) {
+  $("#validasiErrorText").text(message);
+  $("#validasiError").removeClass("d-none");
+  
+  // Auto hide error setelah 5 detik
+  setTimeout(() => {
+    $("#validasiError").addClass("d-none");
+  }, 5000);
 }
 
 // Initialize page dengan cache loading
