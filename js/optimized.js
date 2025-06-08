@@ -15,13 +15,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 import { firestore } from "./configFirebase.js";
 
-// 📦 Caching Logic for Stock Report Module - UPDATED
-const CACHE_KEY_STOCK = 'cachedStockData';
+// 📦 Caching Logic for Stock Report Module
+const CACHE_KEY_STOCK = "cachedStockData";
 const CACHE_EXPIRATION_STOCK = 5 * 60 * 1000; // 5 minutes
 const CACHE_TTL_STANDARD = 60 * 60 * 1000; // 1 hour
 const CACHE_TTL_TODAY = 5 * 60 * 1000; // 5 minutes for today's data
 
-// NEW: Cache strategy constants
 const CACHE_TTL_TODAY_DATA = 0; // Data hari ini tidak di-cache, selalu fresh
 const CACHE_TTL_MASTER_DATA = 24 * 60 * 60 * 1000; // Master data cache 24 jam
 const CACHE_TTL_SNAPSHOT = 24 * 60 * 60 * 1000; // Snapshot cache 24 jam
@@ -35,35 +34,35 @@ function saveStockCacheToStorage() {
   try {
     const cacheData = {};
     const metaData = {};
-    
+
     stockCache.forEach((value, key) => {
       cacheData[key] = value;
     });
-    
+
     stockCacheMeta.forEach((value, key) => {
       metaData[key] = value;
     });
-    
-    localStorage.setItem('stockCache', JSON.stringify(cacheData));
-    localStorage.setItem('stockCacheMeta', JSON.stringify(metaData));
+
+    localStorage.setItem("stockCache", JSON.stringify(cacheData));
+    localStorage.setItem("stockCacheMeta", JSON.stringify(metaData));
   } catch (error) {
-    console.warn('Failed to save stock cache to localStorage:', error);
+    console.warn("Failed to save stock cache to localStorage:", error);
   }
 }
 
 // Load stock cache from localStorage
 function loadStockCacheFromStorage() {
   try {
-    const cacheData = localStorage.getItem('stockCache');
-    const metaData = localStorage.getItem('stockCacheMeta');
-    
+    const cacheData = localStorage.getItem("stockCache");
+    const metaData = localStorage.getItem("stockCacheMeta");
+
     if (cacheData) {
       const parsed = JSON.parse(cacheData);
       Object.entries(parsed).forEach(([key, value]) => {
         stockCache.set(key, value);
       });
     }
-    
+
     if (metaData) {
       const parsed = JSON.parse(metaData);
       Object.entries(parsed).forEach(([key, value]) => {
@@ -71,7 +70,7 @@ function loadStockCacheFromStorage() {
       });
     }
   } catch (error) {
-    console.warn('Failed to load stock cache from localStorage:', error);
+    console.warn("Failed to load stock cache from localStorage:", error);
   }
 }
 
@@ -79,18 +78,18 @@ function loadStockCacheFromStorage() {
 function shouldUpdateStockCache(cacheKey) {
   const timestamp = stockCacheMeta.get(cacheKey);
   if (!timestamp) return true;
-  
+
   const now = Date.now();
   const lastUpdate = parseInt(timestamp);
-  
+
   // If cache key includes today, use shorter TTL
   const today = getLocalDateString();
   if (cacheKey.includes(today)) {
-    return (now - lastUpdate) > CACHE_TTL_TODAY;
+    return now - lastUpdate > CACHE_TTL_TODAY;
   }
-  
+
   // For historical data, use standard TTL
-  return (now - lastUpdate) > CACHE_TTL_STANDARD;
+  return now - lastUpdate > CACHE_TTL_STANDARD;
 }
 
 // Update cache timestamp
@@ -103,8 +102,8 @@ function updateStockCacheTimestamp(cacheKey) {
 function getLocalDateString() {
   const now = new Date();
   const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
@@ -123,15 +122,15 @@ const parseDate = (dateString) => {
 
 function formatDate(date) {
   if (!date) return "";
-  
+
   try {
     const d = date instanceof Date ? date : new Date(date);
     if (isNaN(d.getTime())) return "";
-    
+
     const day = String(d.getDate()).padStart(2, "0");
     const month = String(d.getMonth() + 1).padStart(2, "0");
     const year = d.getFullYear();
-    
+
     return `${day}/${month}/${year}`;
   } catch (error) {
     console.error("Error formatting date:", error);
@@ -147,29 +146,27 @@ const laporanStokHandler = {
   transactionCache: new Map(),
   lastTransactionUpdate: 0,
 
-  // MODIFIED: Initialize the module with auto-load
+  // Initialize the module
   init() {
     // Load cache from localStorage
     loadStockCacheFromStorage();
-    
+
     this.initDatePickers();
     this.attachEventListeners();
     this.setDefaultDates();
     this.initDataTable();
-    
-    // NEW: Auto-load data hari ini saat halaman dibuka
+    this.prepareEmptyTable();
+
+    // AUTO-LOAD: Langsung tampilkan data hari ini saat halaman dibuka
     this.autoLoadTodayData();
-    
-    // NEW: Setup auto-refresh saat focus kembali ke tab
-    this.setupFocusRefresh();
-    
-    // Clean up cache periodically dengan strategi baru
+
+    // Clean up cache periodically
     setInterval(() => {
-      this.cleanupCacheSmart();
+      this.cleanupCache();
     }, 5 * 60 * 1000); // Clean up every 5 minutes
   },
 
-  // NEW: Method untuk auto-load data hari ini
+  // BARU: Method untuk auto-load data hari ini
   async autoLoadTodayData() {
     try {
       console.log("🚀 Auto-loading today's data...");
@@ -188,16 +185,16 @@ const laporanStokHandler = {
     } catch (error) {
       console.error("❌ Error auto-loading today's data:", error);
       this.showLoading(false);
-      this.prepareEmptyTable();
       // Jangan tampilkan error ke user, biarkan mereka klik manual jika perlu
     }
   },
 
-  // NEW: Smart loading untuk data hari ini
+  // BARU: Smart loading untuk data hari ini
   async loadTodayDataSmart() {
     const today = new Date();
+    const todayStr = getLocalDateString();
     
-    // Load master data dengan cache 24 jam (efisien)
+    // Load master data dengan cache (efisien)
     await this.loadMasterDataCached();
     
     // Load data hari ini tanpa cache (selalu fresh)
@@ -208,507 +205,6 @@ const laporanStokHandler = {
     
     // Show fresh data indicator
     this.showFreshDataIndicator();
-  },
-
-  // NEW: Load master data dengan cache 24 jam
-  async loadMasterDataCached() {
-    const masterDataCacheKey = 'stockMasterData';
-    const kodeAksesorisCacheKey = 'kodeAksesorisData';
-    
-    // Check cache dengan TTL 24 jam untuk master data
-    const shouldRefreshMaster = !stockCache.has(masterDataCacheKey) || 
-      this.shouldUpdateMasterCache(masterDataCacheKey);
-    const shouldRefreshKode = !stockCache.has(kodeAksesorisCacheKey) || 
-      this.shouldUpdateMasterCache(kodeAksesorisCacheKey);
-    
-    if (!shouldRefreshMaster && !shouldRefreshKode) {
-      console.log("📦 Using cached master data (24h cache)");
-      this.stockData = stockCache.get(masterDataCacheKey) || [];
-      
-      // Merge dengan kode aksesoris
-      const cachedKodeData = stockCache.get(kodeAksesorisCacheKey) || [];
-      cachedKodeData.forEach(item => {
-        const existingIndex = this.stockData.findIndex(stockItem => stockItem.kode === item.kode);
-        if (existingIndex === -1) {
-          this.stockData.push(item);
-        } else {
-          this.stockData[existingIndex].kategori = item.kategori;
-        }
-      });
-      return;
-    }
-    
-    // Load fresh master data jika cache expired
-    console.log("🔄 Loading fresh master data...");
-    await this.loadStockDataFresh();
-  },
-
-  // NEW: Check master data cache dengan TTL 24 jam
-  shouldUpdateMasterCache(cacheKey) {
-    const timestamp = stockCacheMeta.get(cacheKey);
-    if (!timestamp) return true;
-    
-    const now = Date.now();
-    const lastUpdate = parseInt(timestamp);
-    
-    return (now - lastUpdate) > CACHE_TTL_MASTER_DATA;
-  },
-
-  // NEW: Load stock data fresh (untuk master data)
-  async loadStockDataFresh() {
-    try {
-      // Load current stock
-      const stockSnapshot = await getDocs(collection(firestore, "stokAksesoris"));
-      this.stockData = [];
-
-      stockSnapshot.forEach((doc) => {
-        this.stockData.push({ id: doc.id, ...doc.data() });
-      });
-
-      // Load all kode aksesoris for complete list
-      await this.loadAllKodeAksesorisFresh();
-
-      // Cache master data dengan TTL 24 jam
-      stockCache.set('stockMasterData', [...this.stockData]);
-      stockCacheMeta.set('stockMasterData', Date.now());
-      saveStockCacheToStorage();
-
-      console.log(`📦 Loaded ${this.stockData.length} stock items (cached for 24h)`);
-    } catch (error) {
-      console.error("Error loading fresh stock data:", error);
-      
-      // Try to use cache as fallback
-      if (stockCache.has('stockMasterData')) {
-        console.log("Using cached stock master data as fallback");
-        this.stockData = stockCache.get('stockMasterData');
-      } else {
-        throw error;
-      }
-    }
-  },
-
-  // NEW: Load all kode aksesoris fresh
-  async loadAllKodeAksesorisFresh() {
-    try {
-      const kodeAksesorisData = [];
-      
-      // Get kotak data
-      const kotakSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "kotak"));
-
-      // Get aksesoris data
-      const aksesorisSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "aksesoris"));
-
-      // Process kotak data
-      kotakSnapshot.forEach((doc) => {
-        const data = doc.data();
-        const existingIndex = this.stockData.findIndex((item) => item.kode === data.text);
-
-        const kodeItem = {
-          id: null,
-          kode: data.text,
-          nama: data.nama,
-          kategori: "kotak",
-          stokAwal: 0,
-          tambahStok: 0,
-          laku: 0,
-          free: 0,
-          gantiLock: 0,
-          stokAkhir: 0,
-          lastUpdate: new Date(),
-        };
-
-        if (existingIndex === -1) {
-          this.stockData.push(kodeItem);
-        } else {
-          this.stockData[existingIndex].kategori = "kotak";
-        }
-        
-        kodeAksesorisData.push(kodeItem);
-      });
-
-      // Process aksesoris data
-      aksesorisSnapshot.forEach((doc) => {
-        const data = doc.data();
-        const existingIndex = this.stockData.findIndex((item) => item.kode === data.text);
-
-        const kodeItem = {
-          id: null,
-          kode: data.text,
-          nama: data.nama,
-          kategori: "aksesoris",
-          stokAwal: 0,
-          tambahStok: 0,
-          laku: 0,
-          free: 0,
-          gantiLock: 0,
-          stokAkhir: 0,
-          lastUpdate: new Date(),
-        };
-
-        if (existingIndex === -1) {
-          this.stockData.push(kodeItem);
-        } else {
-          this.stockData[existingIndex].kategori = "aksesoris";
-        }
-        
-        kodeAksesorisData.push(kodeItem);
-      });
-      
-      // Cache kode aksesoris data dengan TTL 24 jam
-      stockCache.set('kodeAksesorisData', kodeAksesorisData);
-      stockCacheMeta.set('kodeAksesorisData', Date.now());
-      saveStockCacheToStorage();
-      
-    } catch (error) {
-      console.error("Error loading fresh kode aksesoris:", error);
-      
-      // Try to use cache as fallback
-      if (stockCache.has('kodeAksesorisData')) {
-        console.log("Using cached kode aksesoris data as fallback");
-        const cachedKodeData = stockCache.get('kodeAksesorisData');
-        
-        cachedKodeData.forEach(item => {
-          const existingIndex = this.stockData.findIndex(stockItem => stockItem.kode === item.kode);
-          if (existingIndex === -1) {
-            this.stockData.push(item);
-          } else {
-            this.stockData[existingIndex].kategori = item.kategori;
-          }
-        });
-      } else {
-        throw error;
-      }
-    }
-  },
-
-  // NEW: Calculate daily continuity tanpa cache untuk data hari ini
-  async calculateDailyContinuityFresh(selectedDate) {
-    try {
-      console.log(`🔄 Loading FRESH data for: ${formatDate(selectedDate)}`);
-      
-      // 1. Hitung stok akhir sampai hari sebelumnya (gunakan cache untuk snapshot)
-      const previousDate = new Date(selectedDate);
-      previousDate.setDate(previousDate.getDate() - 1);
-      previousDate.setHours(23, 59, 59, 999);
-
-      const baseSnapshot = await this.getSnapshotAsBaseCached(selectedDate);
-      const previousStockMap = await this.calculateStockFromBaseCached(baseSnapshot, previousDate, selectedDate);
-
-      // 2. Hitung transaksi hari ini TANPA CACHE (selalu fresh)
-      const startOfDay = new Date(selectedDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(selectedDate);
-            endOfDay.setHours(23, 59, 59, 999);
-
-      const todayTransactions = await this.getTransactionsForDateFresh(startOfDay, endOfDay);
-
-      // 3. Gabungkan hasil
-      this.filteredStockData = this.stockData.map((item) => {
-        const kode = item.kode;
-        const stokAwal = previousStockMap.get(kode) || 0;
-        const todayTrans = todayTransactions.get(kode) || {
-          tambahStok: 0,
-          laku: 0,
-          free: 0,
-          gantiLock: 0,
-        };
-
-        const stokAkhir = Math.max(
-          0,
-          stokAwal + todayTrans.tambahStok - todayTrans.laku - todayTrans.free - todayTrans.gantiLock
-        );
-
-        return {
-          ...item,
-          stokAwal: stokAwal,
-          tambahStok: todayTrans.tambahStok,
-          laku: todayTrans.laku,
-          free: todayTrans.free,
-          gantiLock: todayTrans.gantiLock,
-          stokAkhir: stokAkhir,
-        };
-      });
-
-      // Tambahkan item yang ada di transaksi tapi tidak di master
-      todayTransactions.forEach((trans, kode) => {
-        const exists = this.filteredStockData.find((item) => item.kode === kode);
-        if (!exists) {
-          const stokAwal = previousStockMap.get(kode) || 0;
-          const stokAkhir = Math.max(0, stokAwal + trans.tambahStok - trans.laku - trans.free - trans.gantiLock);
-
-          this.filteredStockData.push({
-            kode: kode,
-            nama: trans.nama || "",
-            kategori: trans.kategori || "",
-            stokAwal: stokAwal,
-            tambahStok: trans.tambahStok,
-            laku: trans.laku,
-            free: trans.free,
-            gantiLock: trans.gantiLock,
-            stokAkhir: stokAkhir,
-          });
-        }
-      });
-
-      // Sort data
-      this.filteredStockData.sort((a, b) => {
-        if (a.kategori !== b.kategori) {
-          return a.kategori === "kotak" ? -1 : 1;
-        }
-        return a.kode.localeCompare(b.kode);
-      });
-
-      console.log(`✅ Fresh daily data calculated: ${this.filteredStockData.length} items`);
-    } catch (error) {
-      console.error("Error calculating fresh daily continuity:", error);
-      throw error;
-    }
-  },
-
-  // NEW: Get snapshot dengan cache 24 jam
-  async getSnapshotAsBaseCached(selectedDate) {
-    const snapshotCacheKey = `snapshot_${formatDate(selectedDate).replace(/\//g, '-')}`;
-    
-    // Check cache dengan TTL 24 jam untuk snapshot
-    if (stockCache.has(snapshotCacheKey) && !this.shouldUpdateSnapshotCache(snapshotCacheKey)) {
-      console.log(`📦 Using cached snapshot data for ${formatDate(selectedDate)}`);
-      return stockCache.get(snapshotCacheKey);
-    }
-    
-    // Load fresh snapshot
-    const snapshot = await this.getSnapshotAsBase(selectedDate);
-    
-    // Cache dengan TTL 24 jam
-    stockCache.set(snapshotCacheKey, snapshot);
-    stockCacheMeta.set(snapshotCacheKey, Date.now());
-    saveStockCacheToStorage();
-    
-    return snapshot;
-  },
-
-  // NEW: Check snapshot cache dengan TTL 24 jam
-  shouldUpdateSnapshotCache(cacheKey) {
-    const timestamp = stockCacheMeta.get(cacheKey);
-    if (!timestamp) return true;
-    
-    const now = Date.now();
-    const lastUpdate = parseInt(timestamp);
-    
-    return (now - lastUpdate) > CACHE_TTL_SNAPSHOT;
-  },
-
-  // NEW: Calculate stock from base dengan cache
-  async calculateStockFromBaseCached(baseSnapshot, endDate, selectedDate) {
-    const cacheKey = `stockFromBase_${formatDate(endDate).replace(/\//g, '-')}`;
-    
-    // Check cache untuk historical calculation
-    if (stockCache.has(cacheKey) && !this.shouldUpdateSnapshotCache(cacheKey)) {
-      console.log(`📦 Using cached stock calculation for ${formatDate(endDate)}`);
-      return stockCache.get(cacheKey);
-    }
-    
-    // Calculate fresh
-    const stockMap = await this.calculateStockFromBase(baseSnapshot, endDate, selectedDate);
-    
-    // Cache hasil
-    stockCache.set(cacheKey, stockMap);
-    stockCacheMeta.set(cacheKey, Date.now());
-    saveStockCacheToStorage();
-    
-    return stockMap;
-  },
-
-  // NEW: Get transactions tanpa cache untuk data hari ini
-  async getTransactionsForDateFresh(startDate, endDate) {
-    const transactionMap = new Map();
-    
-    console.log(`🔄 Loading FRESH transactions for ${formatDate(startDate)} - ${formatDate(endDate)}`);
-
-    try {
-      // Get stock transactions (FRESH - no cache)
-      const transQuery = query(
-        collection(firestore, "stokAksesorisTransaksi"),
-        where("timestamp", ">=", Timestamp.fromDate(startDate)),
-        where("timestamp", "<=", Timestamp.fromDate(endDate))
-      );
-
-      const transSnapshot = await getDocs(transQuery);
-
-      transSnapshot.forEach((doc) => {
-        const data = doc.data();
-        const kode = data.kode;
-
-        if (!kode) return;
-
-        if (!transactionMap.has(kode)) {
-          transactionMap.set(kode, {
-            tambahStok: 0,
-            laku: 0,
-            free: 0,
-            gantiLock: 0,
-            nama: data.nama || "",
-            kategori: data.kategori || "",
-          });
-        }
-
-        const trans = transactionMap.get(kode);
-        const jumlah = data.jumlah || 0;
-
-        switch (data.jenis) {
-          case "tambah":
-            trans.tambahStok += jumlah;
-            break;
-          case "laku":
-            trans.laku += jumlah;
-            break;
-          case "free":
-            trans.free += jumlah;
-            break;
-          case "gantiLock":
-            trans.gantiLock += jumlah;
-            break;
-        }
-      });
-
-      // Get stock additions (FRESH - no cache)
-      const addQuery = query(
-        collection(firestore, "stockAdditions"),
-        where("timestamp", ">=", Timestamp.fromDate(startDate)),
-        where("timestamp", "<=", Timestamp.fromDate(endDate))
-      );
-
-      const addSnapshot = await getDocs(addQuery);
-
-      addSnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (!data.items?.length) return;
-
-        data.items.forEach((item) => {
-          const kode = item.kodeText;
-          if (!kode) return;
-
-          if (!transactionMap.has(kode)) {
-            transactionMap.set(kode, {
-              tambahStok: 0,
-              laku: 0,
-              free: 0,
-              gantiLock: 0,
-              nama: item.nama || "",
-              kategori: "",
-            });
-          }
-
-          const trans = transactionMap.get(kode);
-          trans.tambahStok += parseInt(item.jumlah) || 0;
-        });
-      });
-
-      console.log(`✅ Fresh transactions loaded: ${transactionMap.size} items`);
-      return transactionMap;
-    } catch (error) {
-      console.error("Error getting fresh transactions:", error);
-      return new Map();
-    }
-  },
-
-  // NEW: Setup auto-refresh saat focus kembali ke tab
-  setupFocusRefresh() {
-    let isHidden = false;
-    
-    // Detect when tab becomes hidden
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        isHidden = true;
-      } else if (isHidden) {
-        // Tab menjadi visible lagi, refresh data hari ini
-        isHidden = false;
-        console.log("👁️ Tab visible again, refreshing today's data...");
-        this.refreshTodayDataQuietly();
-      }
-    });
-    
-    // Detect window focus
-    window.addEventListener('focus', () => {
-      if (isHidden) {
-        console.log("🎯 Window focused, refreshing today's data...");
-        this.refreshTodayDataQuietly();
-        isHidden = false;
-      }
-    });
-  },
-
-  // NEW: Refresh data hari ini secara quiet (tanpa loading indicator)
-  async refreshTodayDataQuietly() {
-    try {
-      const startDateStr = document.getElementById("startDate").value;
-      if (!startDateStr) return;
-      
-      const selectedDate = parseDate(startDateStr);
-      const today = getLocalDateString();
-      const selectedDateStr = formatDate(selectedDate).replace(/\//g, '-');
-      
-      // Hanya refresh jika yang ditampilkan adalah data hari ini
-      if (selectedDateStr === today.replace(/-/g, '-')) {
-        await this.loadTodayDataSmart();
-        this.showQuietRefreshIndicator();
-      }
-    } catch (error) {
-      console.warn("Error in quiet refresh:", error);
-    }
-  },
-
-  // NEW: Show indicator untuk quiet refresh
-  showQuietRefreshIndicator() {
-    const indicator = document.createElement('div');
-    indicator.className = 'alert alert-success alert-dismissible fade show position-fixed';
-    indicator.style.cssText = `
-      top: 20px;
-      right: 20px;
-      z-index: 1050;
-      min-width: 300px;
-      opacity: 0.9;
-    `;
-    indicator.innerHTML = `
-      <i class="fas fa-sync-alt me-2"></i>
-      Data hari ini telah diperbarui
-      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-    
-    document.body.appendChild(indicator);
-    
-    // Auto remove after 3 seconds
-    setTimeout(() => {
-      if (indicator.parentNode) {
-        indicator.remove();
-      }
-    }, 3000);
-  },
-
-  // NEW: Show fresh data indicator
-  showFreshDataIndicator() {
-    let indicator = document.getElementById('freshDataIndicator');
-    
-    if (!indicator) {
-      indicator = document.createElement('div');
-      indicator.id = 'freshDataIndicator';
-      indicator.className = 'alert alert-success mb-2';
-      
-      const tableContainer = document.querySelector('#stockTable').parentElement;
-      tableContainer.insertBefore(indicator, tableContainer.firstChild);
-    }
-    
-    const now = new Date();
-    const timeText = now.toLocaleTimeString('id-ID', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-    
-    indicator.innerHTML = `
-      <i class="fas fa-check-circle me-2"></i>
-      Data terbaru hari ini (diperbarui: ${timeText})
-    `;
-    indicator.style.display = 'block';
   },
 
   // Initialize date pickers
@@ -801,12 +297,12 @@ const laporanStokHandler = {
         this.resetFilters();
       });
     }
-    
-    // MODIFIED: Smart refresh button
+
+    // Force refresh button
     const refreshBtn = document.getElementById("refreshStockBtn");
     if (refreshBtn) {
       refreshBtn.addEventListener("click", () => {
-        this.smartRefreshData();
+        this.refreshAllData();
       });
     }
   },
@@ -815,188 +311,71 @@ const laporanStokHandler = {
   resetFilters() {
     const today = new Date();
     document.getElementById("startDate").value = formatDate(today);
-    this.autoLoadTodayData(); // Load today's data after reset
+    this.loadAndFilterStockData();
   },
 
-  // NEW: Smart refresh - hanya refresh data yang sedang ditampilkan
-  async smartRefreshData() {
+  // Force refresh data
+  async refreshAllData() {
     try {
       this.showLoading(true);
-      
+
+      // Clear all cache
+      stockCache.clear();
+      stockCacheMeta.clear();
+      localStorage.removeItem("stockCache");
+      localStorage.removeItem("stockCacheMeta");
+
+      // Force reload all data
+      await this.loadStockData(true);
+
+      // Reload current view if date is selected
       const startDateStr = document.getElementById("startDate").value;
-      if (!startDateStr) {
-        this.showError("Pilih tanggal terlebih dahulu");
-        this.showLoading(false);
-        return;
+      if (startDateStr) {
+        await this.loadAndFilterStockData(true);
       }
 
-      const today = getLocalDateString();
-      const selectedDateStr = formatDate(selectedDate).replace(/\//g, '-');
-      
-      // Jika data hari ini, hanya refresh data hari ini
-      if (selectedDateStr === today.replace(/-/g, '-')) {
-        console.log("🔄 Smart refresh: Today's data only...");
-        
-        // Clear cache untuk data hari ini saja
-        const todayKeys = Array.from(stockCache.keys()).filter(key => 
-          key.includes(today.replace(/-/g, '-')) || key.includes('trans_')
-        );
-        
-        todayKeys.forEach(key => {
-          stockCache.delete(key);
-          stockCacheMeta.delete(key);
-        });
-        
-        await this.loadTodayDataSmart();
-        this.showSuccess("Data hari ini berhasil diperbarui");
-        
-      } else {
-        // Untuk data historis, gunakan method lama dengan cache terbatas
-        console.log("🔄 Smart refresh: Historical data...");
-        
-        // Clear cache untuk tanggal yang dipilih saja
-        const dateKeys = Array.from(stockCache.keys()).filter(key => 
-          key.includes(selectedDateStr)
-        );
-        
-        dateKeys.forEach(key => {
-          stockCache.delete(key);
-          stockCacheMeta.delete(key);
-        });
-        
-        await this.loadAndFilterStockDataHistorical(selectedDate);
-        this.showSuccess("Data berhasil diperbarui");
-      }
-      
+      this.showSuccess("Data berhasil diperbarui dari server");
+      console.log("All stock data refreshed successfully");
     } catch (error) {
-      console.error("Error in smart refresh:", error);
+      console.error("Error refreshing all data:", error);
       this.showError("Gagal memperbarui data: " + error.message);
     } finally {
       this.showLoading(false);
     }
   },
 
-  // NEW: Load historical data dengan cache
-  async loadAndFilterStockDataHistorical(selectedDate) {
-    try {
-      // Load master data dengan cache
-      await this.loadMasterDataCached();
-      
-      // Calculate dengan cache untuk data historis
-      await this.calculateDailyContinuity(selectedDate);
-      
-      this.renderStockTable();
-      
-    } catch (error) {
-      console.error("Error loading historical data:", error);
-      
-      // Try fallback dengan cache
-      const dateStr = formatDate(selectedDate).replace(/\//g, '-');
-      const cacheKey = `stock_${dateStr}`;
-      
-      if (stockCache.has(cacheKey)) {
-        console.log("Using cached stock data as fallback due to error");
-        this.filteredStockData = stockCache.get(cacheKey);
-        this.renderStockTable();
-        this.showError("Terjadi kesalahan saat mengambil data terbaru. Menggunakan data cache.");
-        this.showCacheIndicator(true, 'fallback');
-      } else {
-        throw error;
-      }
-    }
-  },
-
-  // MODIFIED: Load and filter stock data dengan deteksi hari ini
-  async loadAndFilterStockData(forceRefresh = false) {
-    try {
-      this.showLoading(true);
-
-      const startDateStr = document.getElementById("startDate").value;
-
-      if (!startDateStr) {
-        this.showError("Tanggal harus diisi");
-        this.showLoading(false);
-        return;
-      }
-
-      const selectedDate = parseDate(startDateStr);
-      if (!selectedDate) {
-        this.showError("Format tanggal tidak valid");
-        this.showLoading(false);
-        return;
-      }
-
-      const today = getLocalDateString();
-      const selectedDateStr = formatDate(selectedDate).replace(/\//g, '-');
-      const isToday = selectedDateStr === today.replace(/-/g, '-');
-      
-      if (isToday) {
-        // Untuk data hari ini, gunakan method yang lebih efisien
-        console.log("📅 Loading today's data with smart caching...");
-        await this.loadTodayDataSmart();
-      } else {
-        // Untuk data historis, gunakan method dengan cache
-        console.log("📅 Loading historical data with cache...");
-        await this.loadAndFilterStockDataHistorical(selectedDate);
-      }
-
-      this.showLoading(false);
-    } catch (error) {
-      console.error("Error loading stock data:", error);
-      
-      // Try fallback dengan cache
-      const startDateStr = document.getElementById("startDate").value;
-      const selectedDate = parseDate(startDateStr);
-      const dateStr = formatDate(selectedDate).replace(/\//g, '-');
-      const cacheKey = `stock_${dateStr}`;
-      
-      if (stockCache.has(cacheKey)) {
-        console.log("Using cached stock data as fallback due to error");
-        this.filteredStockData = stockCache.get(cacheKey);
-        this.renderStockTable();
-        this.showError("Terjadi kesalahan saat mengambil data terbaru. Menggunakan data cache.");
-        this.showCacheIndicator(true, 'fallback');
-      } else {
-        this.showError("Terjadi kesalahan saat memuat data: " + error.message);
-      }
-      
-      this.showLoading(false);
-    }
-  },
-
-  // EXISTING: Calculate daily continuity (untuk data historis dengan cache)
   async calculateDailyContinuity(selectedDate) {
     try {
       // Create cache key
-      const dateStr = formatDate(selectedDate).replace(/\//g, '-');
+      const dateStr = formatDate(selectedDate).replace(/\//g, "-");
       const cacheKey = `stock_${dateStr}`;
-      
-      // Check if we should use cache (untuk data historis)
-      const includesCurrentDay = dateStr === getLocalDateString().replace(/-/g, '-');
+
+      // Check if we should use cache
+      const includesCurrentDay = dateStr === getLocalDateString().replace(/-/g, "-");
       const shouldRefresh = includesCurrentDay || !stockCache.has(cacheKey) || shouldUpdateStockCache(cacheKey);
-      
+
       if (!shouldRefresh) {
         console.log(`Using cached stock data for ${dateStr}`);
         this.filteredStockData = stockCache.get(cacheKey);
-        
+
         // Show cache indicator
         this.showCacheIndicator(true);
         return;
       }
-      
+
       // Hide cache indicator
       this.showCacheIndicator(false);
-      
+
       // 1. Hitung stok akhir sampai hari sebelumnya menggunakan sistem prioritas
       const previousDate = new Date(selectedDate);
       previousDate.setDate(previousDate.getDate() - 1);
       previousDate.setHours(23, 59, 59, 999);
 
-      // Gunakan sistem prioritas snapshot dengan cache
-      const baseSnapshot = await this.getSnapshotAsBaseCached(selectedDate);
-      const previousStockMap = await this.calculateStockFromBaseCached(baseSnapshot, previousDate, selectedDate);
+      // Gunakan sistem prioritas snapshot
+      const baseSnapshot = await this.getSnapshotAsBase(selectedDate);
+      const previousStockMap = await this.calculateStockFromBase(baseSnapshot, previousDate, selectedDate);
 
-      // 2. Hitung transaksi hari ini dengan cache untuk data historis
+      // 2. Hitung transaksi hari ini saja
       const startOfDay = new Date(selectedDate);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(selectedDate);
@@ -1065,25 +444,23 @@ const laporanStokHandler = {
         return a.kode.localeCompare(b.kode);
       });
 
-      // Save to cache (hanya untuk data historis)
-      if (!includesCurrentDay) {
-        stockCache.set(cacheKey, [...this.filteredStockData]);
-        updateStockCacheTimestamp(cacheKey);
-      }
+      // Save to cache
+      stockCache.set(cacheKey, [...this.filteredStockData]);
+      updateStockCacheTimestamp(cacheKey);
 
       console.log(`✅ Daily continuity calculated: ${this.filteredStockData.length} items`);
     } catch (error) {
       console.error("Error calculating daily continuity:", error);
-      
+
       // Try to use cache as fallback
-      const dateStr = formatDate(selectedDate).replace(/\//g, '-');
+      const dateStr = formatDate(selectedDate).replace(/\//g, "-");
       const cacheKey = `stock_${dateStr}`;
-      
+
       if (stockCache.has(cacheKey)) {
         console.log("Using cached data as fallback due to error");
         this.filteredStockData = stockCache.get(cacheKey);
         this.showError("Terjadi kesalahan saat mengambil data terbaru. Menggunakan data cache.");
-        this.showCacheIndicator(true, 'fallback');
+        this.showCacheIndicator(true, "fallback");
       } else {
         throw error;
       }
@@ -1091,42 +468,42 @@ const laporanStokHandler = {
   },
 
   // Show/hide cache indicator
-  showCacheIndicator(show, type = 'normal') {
-    let indicator = document.getElementById('stockCacheIndicator');
-    
+  showCacheIndicator(show, type = "normal") {
+    let indicator = document.getElementById("stockCacheIndicator");
+
     if (show && !indicator) {
       // Create indicator if it doesn't exist
-      indicator = document.createElement('div');
-      indicator.id = 'stockCacheIndicator';
-      indicator.className = 'alert alert-info mb-2';
-      
-      const tableContainer = document.querySelector('#stockTable').parentElement;
+      indicator = document.createElement("div");
+      indicator.id = "stockCacheIndicator";
+      indicator.className = "alert alert-info mb-2";
+
+      const tableContainer = document.querySelector("#stockTable").parentElement;
       tableContainer.insertBefore(indicator, tableContainer.firstChild);
     }
-    
+
     if (indicator) {
       if (show) {
         const now = new Date();
-        const timeText = now.toLocaleTimeString('id-ID', {
-          hour: '2-digit',
-          minute: '2-digit'
+        const timeText = now.toLocaleTimeString("id-ID", {
+          hour: "2-digit",
+          minute: "2-digit",
         });
-        
-        if (type === 'fallback') {
+
+        if (type === "fallback") {
           indicator.innerHTML = '<i class="fas fa-database me-2"></i>Menggunakan data cache (fallback)';
-          indicator.className = 'alert alert-warning mb-2';
+          indicator.className = "alert alert-warning mb-2";
         } else {
           indicator.innerHTML = `<i class="fas fa-database me-2"></i>Menggunakan data cache (${timeText})`;
-          indicator.className = 'alert alert-info mb-2';
+          indicator.className = "alert alert-info mb-2";
         }
-        indicator.style.display = 'block';
+        indicator.style.display = "block";
       } else {
-        indicator.style.display = 'none';
+        indicator.style.display = "none";
       }
     }
   },
 
-  // EXISTING: Fungsi helper: Hitung stok dari base snapshot
+  // Fungsi helper: Hitung stok dari base snapshot
   async calculateStockFromBase(baseSnapshot, endDate, selectedDate) {
     const stockMap = new Map();
 
@@ -1177,15 +554,15 @@ const laporanStokHandler = {
     }
   },
 
-  // EXISTING: Method helper: Dapatkan transaksi untuk rentang tanggal dengan cache
+  // Method helper: Dapatkan transaksi untuk rentang tanggal dengan cache
   async getTransactionsForDate(startDate, endDate) {
     const transactionMap = new Map();
-    
+
     // Create cache key for transactions
-    const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
+    const startDateStr = startDate.toISOString().split("T")[0];
+    const endDateStr = endDate.toISOString().split("T")[0];
     const transCacheKey = `trans_${startDateStr}_${endDateStr}`;
-    
+
     // Check cache first
     if (stockCache.has(transCacheKey) && !shouldUpdateStockCache(transCacheKey)) {
       console.log(`Using cached transaction data for ${startDateStr} to ${endDateStr}`);
@@ -1284,21 +661,79 @@ const laporanStokHandler = {
       return transactionMap;
     } catch (error) {
       console.error("Error getting transactions for date:", error);
-      
+
       // Try to use cached data as fallback
       if (stockCache.has(transCacheKey)) {
         console.log("Using cached transaction data as fallback");
         return stockCache.get(transCacheKey);
       }
-      
+
       return new Map();
     }
   },
 
-  // EXISTING: Load stock data with cache (kept for backward compatibility)
+  // Load and filter stock data
+  async loadAndFilterStockData(forceRefresh = false) {
+    try {
+      this.showLoading(true);
+
+      const startDateStr = document.getElementById("startDate").value;
+
+      if (!startDateStr) {
+        this.showError("Tanggal harus diisi");
+        this.showLoading(false);
+        return;
+      }
+
+      const selectedDate = parseDate(startDateStr);
+      if (!selectedDate) {
+        this.showError("Format tanggal tidak valid");
+        this.showLoading(false);
+        return;
+      }
+
+      // Check if today's data - always refresh if includes current day
+      const today = getLocalDateString();
+      const selectedDateStr = formatDate(selectedDate).replace(/\//g, "-");
+      const includesCurrentDay = selectedDateStr === today.replace(/-/g, "-");
+
+      forceRefresh = forceRefresh || includesCurrentDay;
+
+      // Load stock data with cache
+      await this.loadStockData(forceRefresh);
+
+      // Calculate with continuity using cache
+      await this.calculateDailyContinuity(selectedDate);
+
+      this.renderStockTable();
+      this.showLoading(false);
+    } catch (error) {
+      console.error("Error loading stock data:", error);
+
+      // Try to use cache as fallback
+      const startDateStr = document.getElementById("startDate").value;
+      const selectedDate = parseDate(startDateStr);
+      const dateStr = formatDate(selectedDate).replace(/\//g, "-");
+      const cacheKey = `stock_${dateStr}`;
+
+      if (stockCache.has(cacheKey)) {
+        console.log("Using cached stock data as fallback due to error");
+        this.filteredStockData = stockCache.get(cacheKey);
+        this.renderStockTable();
+        this.showError("Terjadi kesalahan saat mengambil data terbaru. Menggunakan data cache.");
+        this.showCacheIndicator(true, "fallback");
+      } else {
+        this.showError("Terjadi kesalahan saat memuat data: " + error.message);
+      }
+
+      this.showLoading(false);
+    }
+  },
+
+  // Load stock data with cache
   async loadStockData(forceRefresh = false) {
-    const stockDataCacheKey = 'stockMasterData';
-    
+    const stockDataCacheKey = "stockMasterData";
+
     // Check cache first
     if (!forceRefresh && stockCache.has(stockDataCacheKey) && !shouldUpdateStockCache(stockDataCacheKey)) {
       console.log("Using cached stock master data");
@@ -1325,7 +760,7 @@ const laporanStokHandler = {
       console.log(`Loaded ${this.stockData.length} stock items`);
     } catch (error) {
       console.error("Error loading stock data:", error);
-      
+
       // Try to use cache as fallback
       if (stockCache.has(stockDataCacheKey)) {
         console.log("Using cached stock master data as fallback");
@@ -1336,31 +771,31 @@ const laporanStokHandler = {
     }
   },
 
-  // EXISTING: Load all kode aksesoris with cache
+  // Load all kode aksesoris with cache
   async loadAllKodeAksesoris(forceRefresh = false) {
-    const kodeAksesorisCacheKey = 'kodeAksesorisData';
-    
+    const kodeAksesorisCacheKey = "kodeAksesorisData";
+
     // Check cache first
     if (!forceRefresh && stockCache.has(kodeAksesorisCacheKey) && !shouldUpdateStockCache(kodeAksesorisCacheKey)) {
       console.log("Using cached kode aksesoris data");
       const cachedKodeData = stockCache.get(kodeAksesorisCacheKey);
-      
+
       // Merge with existing stock data
-      cachedKodeData.forEach(item => {
-        const existingIndex = this.stockData.findIndex(stockItem => stockItem.kode === item.kode);
+      cachedKodeData.forEach((item) => {
+        const existingIndex = this.stockData.findIndex((stockItem) => stockItem.kode === item.kode);
         if (existingIndex === -1) {
           this.stockData.push(item);
         } else {
           this.stockData[existingIndex].kategori = item.kategori;
         }
       });
-      
+
       return;
     }
 
     try {
       const kodeAksesorisData = [];
-      
+
       // Get kotak data
       const kotakSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "kotak"));
 
@@ -1391,7 +826,7 @@ const laporanStokHandler = {
         } else {
           this.stockData[existingIndex].kategori = "kotak";
         }
-        
+
         kodeAksesorisData.push(kodeItem);
       });
 
@@ -1419,24 +854,23 @@ const laporanStokHandler = {
         } else {
           this.stockData[existingIndex].kategori = "aksesoris";
         }
-        
+
         kodeAksesorisData.push(kodeItem);
       });
-      
+
       // Cache the kode aksesoris data
       stockCache.set(kodeAksesorisCacheKey, kodeAksesorisData);
       updateStockCacheTimestamp(kodeAksesorisCacheKey);
-      
     } catch (error) {
       console.error("Error loading kode aksesoris:", error);
-      
+
       // Try to use cache as fallback
       if (stockCache.has(kodeAksesorisCacheKey)) {
         console.log("Using cached kode aksesoris data as fallback");
         const cachedKodeData = stockCache.get(kodeAksesorisCacheKey);
-        
-        cachedKodeData.forEach(item => {
-          const existingIndex = this.stockData.findIndex(stockItem => stockItem.kode === item.kode);
+
+        cachedKodeData.forEach((item) => {
+          const existingIndex = this.stockData.findIndex((stockItem) => stockItem.kode === item.kode);
           if (existingIndex === -1) {
             this.stockData.push(item);
           } else {
@@ -1449,7 +883,7 @@ const laporanStokHandler = {
     }
   },
 
-  // EXISTING: Calculate stock continuity (kept for backward compatibility)
+  // Calculate stock continuity
   async calculateStockContinuity(selectedDate) {
     try {
       const endOfSelectedDate = new Date(selectedDate);
@@ -1471,26 +905,26 @@ const laporanStokHandler = {
     }
   },
 
-  // EXISTING: Get snapshot data as base stock with cache
+  // Get snapshot data as base stock with cache
   async getSnapshotAsBase(selectedDate) {
     try {
       console.log(`🎯 Getting snapshot base for: ${formatDate(selectedDate)}`);
-      
-      const snapshotCacheKey = `snapshot_${formatDate(selectedDate).replace(/\//g, '-')}`;
-      
+
+      const snapshotCacheKey = `snapshot_${formatDate(selectedDate).replace(/\//g, "-")}`;
+
       // Check cache first
       if (stockCache.has(snapshotCacheKey) && !shouldUpdateStockCache(snapshotCacheKey)) {
         console.log(`Using cached snapshot data for ${formatDate(selectedDate)}`);
         return stockCache.get(snapshotCacheKey);
       }
-      
+
       // Priority 1: Daily snapshot (hari sebelumnya)
       const previousDate = new Date(selectedDate);
       previousDate.setDate(previousDate.getDate() - 1);
-      
+
       console.log(`🔍 Checking daily snapshot for previous day: ${formatDate(previousDate)}`);
       const dailySnapshot = await this.getDailySnapshot(previousDate);
-      
+
       if (dailySnapshot && dailySnapshot.size > 0) {
         console.log(`📅 Using daily snapshot: ${formatDate(previousDate)} (${dailySnapshot.size} items)`);
         // Cache the result
@@ -1498,11 +932,11 @@ const laporanStokHandler = {
         updateStockCacheTimestamp(snapshotCacheKey);
         return dailySnapshot;
       }
-      
+
       // Priority 2: Cek juga snapshot hari yang sama (untuk kasus khusus)
       console.log(`🔍 Checking daily snapshot for same day: ${formatDate(selectedDate)}`);
       const sameDaySnapshot = await this.getDailySnapshot(selectedDate);
-      
+
       if (sameDaySnapshot && sameDaySnapshot.size > 0) {
         console.log(`📅 Using same-day snapshot: ${formatDate(selectedDate)} (${sameDaySnapshot.size} items)`);
         // Cache the result
@@ -1510,21 +944,26 @@ const laporanStokHandler = {
         updateStockCacheTimestamp(snapshotCacheKey);
         return sameDaySnapshot;
       }
-      
+
       // Priority 3: Monthly snapshot (bulan sebelumnya)
       console.log(`🔍 Checking monthly snapshot...`);
       const monthlySnapshot = await this.getMonthlySnapshot(selectedDate);
-      
+
       if (monthlySnapshot && monthlySnapshot.size > 0) {
         const prevMonth = new Date(selectedDate);
         prevMonth.setMonth(prevMonth.getMonth() - 1);
-        console.log(`📊 Using monthly snapshot: ${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")} (${monthlySnapshot.size} items)`);
+        console.log(
+          `📊 Using monthly snapshot: ${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(
+            2,
+            "0"
+          )} (${monthlySnapshot.size} items)`
+        );
         // Cache the result
         stockCache.set(snapshotCacheKey, monthlySnapshot);
         updateStockCacheTimestamp(snapshotCacheKey);
         return monthlySnapshot;
       }
-      
+
       // Priority 4: Empty base (start from zero)
       console.log("⚠️ No snapshot found, starting from zero");
       const emptySnapshot = new Map();
@@ -1532,43 +971,39 @@ const laporanStokHandler = {
       stockCache.set(snapshotCacheKey, emptySnapshot);
       updateStockCacheTimestamp(snapshotCacheKey);
       return emptySnapshot;
-      
     } catch (error) {
       console.error("Error getting snapshot base:", error);
-      
+
       // Try to use cache as fallback
-      const snapshotCacheKey = `snapshot_${formatDate(selectedDate).replace(/\//g, '-')}`;
+      const snapshotCacheKey = `snapshot_${formatDate(selectedDate).replace(/\//g, "-")}`;
       if (stockCache.has(snapshotCacheKey)) {
         console.log("Using cached snapshot data as fallback");
         return stockCache.get(snapshotCacheKey);
       }
-      
+
       return new Map();
     }
   },
 
-  // EXISTING: Fungsi baru: Ambil daily snapshot dengan cache
+  // Fungsi baru: Ambil daily snapshot dengan cache
   async getDailySnapshot(date) {
     try {
       const dateKey = formatDate(date);
-      const dailySnapshotCacheKey = `daily_snapshot_${dateKey.replace(/\//g, '-')}`;
-      
+      const dailySnapshotCacheKey = `daily_snapshot_${dateKey.replace(/\//g, "-")}`;
+
       // Check cache first
       if (stockCache.has(dailySnapshotCacheKey) && !shouldUpdateStockCache(dailySnapshotCacheKey)) {
         console.log(`Using cached daily snapshot for ${dateKey}`);
         return stockCache.get(dailySnapshotCacheKey);
       }
-      
+
       console.log(`🔍 Looking for daily snapshot: ${dateKey}`);
-      
+
       // Gunakan query berdasarkan field 'date' bukan document ID
-      const dailySnapshotQuery = query(
-        collection(firestore, "dailyStockSnapshot"),
-        where("date", "==", dateKey)
-      );
-      
+      const dailySnapshotQuery = query(collection(firestore, "dailyStockSnapshot"), where("date", "==", dateKey));
+
       const querySnapshot = await getDocs(dailySnapshotQuery);
-      
+
       if (querySnapshot.empty) {
         console.log(`❌ Daily snapshot not found for: ${dateKey}`);
         // Cache the null result to avoid repeated queries
@@ -1576,19 +1011,19 @@ const laporanStokHandler = {
         updateStockCacheTimestamp(dailySnapshotCacheKey);
         return null;
       }
-      
+
       // Ambil document pertama (seharusnya hanya ada satu)
       const doc = querySnapshot.docs[0];
       const data = doc.data();
-      
+
       console.log(`✅ Daily snapshot found for: ${dateKey}`, {
         docId: doc.id,
         totalItems: data.totalItems || 0,
-        stockDataLength: data.stockData?.length || 0
+        stockDataLength: data.stockData?.length || 0,
       });
-      
+
       const snapshotMap = new Map();
-      
+
       // Convert array to Map
       if (data.stockData && Array.isArray(data.stockData)) {
         data.stockData.forEach((item, index) => {
@@ -1598,20 +1033,20 @@ const laporanStokHandler = {
               nama: item.nama || "",
               kategori: item.kategori || "",
             });
-            
+
             // Log beberapa item pertama untuk debug
             if (index < 3) {
               console.log(`📦 Item ${index}: ${item.kode} = ${item.stokAkhir}`);
             }
           }
         });
-        
+
         console.log(`📊 Daily snapshot loaded: ${snapshotMap.size} items`);
-        
+
         // Cache the result
         stockCache.set(dailySnapshotCacheKey, snapshotMap);
         updateStockCacheTimestamp(dailySnapshotCacheKey);
-        
+
         return snapshotMap;
       } else {
         console.log(`⚠️ No stockData array in snapshot: ${dateKey}`);
@@ -1620,30 +1055,29 @@ const laporanStokHandler = {
         updateStockCacheTimestamp(dailySnapshotCacheKey);
         return null;
       }
-      
     } catch (error) {
       console.error("Error loading daily snapshot:", error);
-      
+
       // Try to use cache as fallback
       const dateKey = formatDate(date);
-      const dailySnapshotCacheKey = `daily_snapshot_${dateKey.replace(/\//g, '-')}`;
+      const dailySnapshotCacheKey = `daily_snapshot_${dateKey.replace(/\//g, "-")}`;
       if (stockCache.has(dailySnapshotCacheKey)) {
         console.log("Using cached daily snapshot as fallback");
         return stockCache.get(dailySnapshotCacheKey);
       }
-      
+
       return null;
     }
   },
 
-  // EXISTING: Fungsi baru: Ambil monthly snapshot dengan cache
+  // Fungsi baru: Ambil monthly snapshot dengan cache
   async getMonthlySnapshot(selectedDate) {
     try {
       const prevMonth = new Date(selectedDate);
       prevMonth.setMonth(prevMonth.getMonth() - 1);
       const monthKey = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}`;
       const monthlySnapshotCacheKey = `monthly_snapshot_${monthKey}`;
-      
+
       // Check cache first
       if (stockCache.has(monthlySnapshotCacheKey) && !shouldUpdateStockCache(monthlySnapshotCacheKey)) {
         console.log(`Using cached monthly snapshot for ${monthKey}`);
@@ -1671,23 +1105,23 @@ const laporanStokHandler = {
       return snapshotMap;
     } catch (error) {
       console.error("Error loading monthly snapshot:", error);
-      
+
       // Try to use cache as fallback
       const prevMonth = new Date(selectedDate);
       prevMonth.setMonth(prevMonth.getMonth() - 1);
       const monthKey = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}`;
       const monthlySnapshotCacheKey = `monthly_snapshot_${monthKey}`;
-      
+
       if (stockCache.has(monthlySnapshotCacheKey)) {
         console.log("Using cached monthly snapshot as fallback");
         return stockCache.get(monthlySnapshotCacheKey);
       }
-      
+
       return new Map();
     }
   },
 
-  // EXISTING: Merge snapshot with current transactions
+  // Merge snapshot with current transactions
   mergeSnapshotWithTransactions(snapshotData, transactions) {
     const resultMap = new Map();
 
@@ -1763,7 +1197,7 @@ const laporanStokHandler = {
     this.usedSnapshotFlag = snapshotData.size > 0;
   },
 
-  // EXISTING: Fallback method using original calculation
+  // Fallback method using original calculation
   async calculateStockContinuityFallback(selectedDate) {
     try {
       const previousDay = new Date(selectedDate);
@@ -1851,7 +1285,7 @@ const laporanStokHandler = {
     }
   },
 
-  // EXISTING: Process stock additions
+  // Process stock additions
   async processStockAdditions(startDate, endDate, stockByCode) {
     const stockAddRef = collection(firestore, "stockAdditions");
     const stockAddQuery = query(
@@ -1886,7 +1320,7 @@ const laporanStokHandler = {
     });
   },
 
-  // EXISTING: Calculate final stock data
+  // Calculate final stock data
   calculateFinalStockData(stockByCode, usedSnapshot) {
     // Store snapshot usage flag for UI indicator
     this.usedSnapshotFlag = usedSnapshot;
@@ -1935,7 +1369,7 @@ const laporanStokHandler = {
     });
   },
 
-  // EXISTING: Tambahkan method untuk menghitung transaksi ganti lock
+  // Tambahkan method untuk menghitung transaksi ganti lock
   async calculateStockMovements(kode, startDate, endDate) {
     try {
       const movements = {
@@ -1946,8 +1380,10 @@ const laporanStokHandler = {
       };
 
       // Create cache key for movements
-      const movementsCacheKey = `movements_${kode}_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}`;
-      
+      const movementsCacheKey = `movements_${kode}_${startDate.toISOString().split("T")[0]}_${
+        endDate.toISOString().split("T")[0]
+      }`;
+
       // Check cache first
       if (stockCache.has(movementsCacheKey) && !shouldUpdateStockCache(movementsCacheKey)) {
         return stockCache.get(movementsCacheKey);
@@ -1991,13 +1427,15 @@ const laporanStokHandler = {
       return movements;
     } catch (error) {
       console.error("Error calculating stock movements:", error);
-      
+
       // Try to use cache as fallback
-      const movementsCacheKey = `movements_${kode}_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}`;
+      const movementsCacheKey = `movements_${kode}_${startDate.toISOString().split("T")[0]}_${
+        endDate.toISOString().split("T")[0]
+      }`;
       if (stockCache.has(movementsCacheKey)) {
         return stockCache.get(movementsCacheKey);
       }
-      
+
       return {
         tambahStok: 0,
         laku: 0,
@@ -2007,7 +1445,7 @@ const laporanStokHandler = {
     }
   },
 
-  // EXISTING: Perbaiki method untuk menampilkan data dengan kolom ganti lock
+  // Perbaiki method untuk menampilkan data dengan kolom ganti lock
   async displayStockData(stockData, selectedDate) {
     const tableBody = $("#stockTable tbody");
     tableBody.empty();
@@ -2051,7 +1489,7 @@ const laporanStokHandler = {
     }
   },
 
-  // EXISTING: Render stock table
+  // Render stock table
   renderStockTable() {
     try {
       // Check if table exists
@@ -2294,7 +1732,7 @@ const laporanStokHandler = {
     }
   },
 
-  // EXISTING: Add data source indicator
+  // Add data source indicator
   addDataSourceIndicator(usedSnapshot = false) {
     try {
       const tableContainer =
@@ -2319,7 +1757,7 @@ const laporanStokHandler = {
     }
   },
 
-  // EXISTING: Add category headers
+  // Add category headers
   addCategoryHeaders(kotakItems, aksesorisItems, otherItems) {
     // Add container for category headers above the table
     const tableContainer = document.querySelector("#stockTable_wrapper");
@@ -2432,7 +1870,7 @@ const laporanStokHandler = {
     });
   },
 
-  // EXISTING: Show loading indicator
+  // Show loading indicator
   showLoading(isLoading) {
     const loadingIndicator = document.getElementById("loadingIndicator");
     if (loadingIndicator) {
@@ -2440,7 +1878,7 @@ const laporanStokHandler = {
     }
   },
 
-  // EXISTING: Show error message
+  // Show error message
   showError(message) {
     if (typeof Swal !== "undefined") {
       Swal.fire({
@@ -2457,7 +1895,7 @@ const laporanStokHandler = {
     }
   },
 
-  // EXISTING: Show success message
+  // Show success message
   showSuccess(message) {
     if (typeof Swal !== "undefined") {
       Swal.fire({
@@ -2479,21 +1917,21 @@ const laporanStokHandler = {
     }
   },
 
-  // EXISTING: Clean up cache
+  // Clean up cache
   cleanupCache() {
     const now = Date.now();
     const cacheExpiry = 30 * 60 * 1000; // 30 minutes
 
     // Clean up expired cache entries
     const keysToDelete = [];
-    
+
     stockCacheMeta.forEach((timestamp, key) => {
       if (now - timestamp > cacheExpiry) {
         keysToDelete.push(key);
       }
     });
 
-    keysToDelete.forEach(key => {
+    keysToDelete.forEach((key) => {
       stockCache.delete(key);
       stockCacheMeta.delete(key);
       console.log(`Cleaning up expired cache for ${key}`);
@@ -2523,979 +1961,9 @@ const laporanStokHandler = {
     // Save updated cache to localStorage
     saveStockCacheToStorage();
   },
-
-  // NEW: Load master data dengan cache yang lebih efisien
-  async loadMasterDataCached() {
-    const masterDataCacheKey = 'masterStockData';
-    
-    // Check cache first dengan TTL yang lebih panjang untuk master data
-    if (stockCache.has(masterDataCacheKey)) {
-      const timestamp = stockCacheMeta.get(masterDataCacheKey);
-      const now = Date.now();
-      const masterDataTTL = 60 * 60 * 1000; // 1 hour untuk master data
-      
-      if (timestamp && (now - timestamp) < masterDataTTL) {
-        console.log("Using cached master stock data");
-        this.stockData = stockCache.get(masterDataCacheKey);
-        return;
-      }
-    }
-
-    try {
-      console.log("Loading fresh master stock data...");
-      
-      // Load current stock
-      const stockSnapshot = await getDocs(collection(firestore, "stokAksesoris"));
-      this.stockData = [];
-
-      stockSnapshot.forEach((doc) => {
-        this.stockData.push({ id: doc.id, ...doc.data() });
-      });
-
-      // Load all kode aksesoris for complete list
-      await this.loadAllKodeAksesorisCached();
-
-      // Cache the master data dengan timestamp
-      stockCache.set(masterDataCacheKey, [...this.stockData]);
-      stockCacheMeta.set(masterDataCacheKey, Date.now());
-      saveStockCacheToStorage();
-
-      console.log(`✅ Master data loaded: ${this.stockData.length} items`);
-    } catch (error) {
-      console.error("Error loading master stock data:", error);
-      
-      // Try to use cache as fallback
-      if (stockCache.has(masterDataCacheKey)) {
-        console.log("Using cached master stock data as fallback");
-        this.stockData = stockCache.get(masterDataCacheKey);
-      } else {
-        throw error;
-      }
-    }
-  },
-
-  // NEW: Load kode aksesoris dengan cache yang lebih efisien
-  async loadAllKodeAksesorisCached() {
-    const kodeAksesorisCacheKey = 'kodeAksesorisDataCached';
-    
-    // Check cache first dengan TTL yang lebih panjang
-    if (stockCache.has(kodeAksesorisCacheKey)) {
-      const timestamp = stockCacheMeta.get(kodeAksesorisCacheKey);
-      const now = Date.now();
-      const kodeDataTTL = 2 * 60 * 60 * 1000; // 2 hours untuk kode data
-      
-      if (timestamp && (now - timestamp) < kodeDataTTL) {
-        console.log("Using cached kode aksesoris data");
-        const cachedKodeData = stockCache.get(kodeAksesorisCacheKey);
-        
-        // Merge with existing stock data
-        cachedKodeData.forEach(item => {
-          const existingIndex = this.stockData.findIndex(stockItem => stockItem.kode === item.kode);
-          if (existingIndex === -1) {
-            this.stockData.push(item);
-          } else {
-            this.stockData[existingIndex].kategori = item.kategori;
-          }
-        });
-        
-        return;
-      }
-    }
-
-    try {
-      console.log("Loading fresh kode aksesoris data...");
-      const kodeAksesorisData = [];
-      
-      // Get kotak data
-      const kotakSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "kotak"));
-
-      // Get aksesoris data
-      const aksesorisSnapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "aksesoris"));
-
-      // Process kotak data
-      kotakSnapshot.forEach((doc) => {
-        const data = doc.data();
-        const existingIndex = this.stockData.findIndex((item) => item.kode === data.text);
-
-        const kodeItem = {
-          id: null,
-          kode: data.text,
-          nama: data.nama,
-          kategori: "kotak",
-          stokAwal: 0,
-          tambahStok: 0,
-          laku: 0,
-          free: 0,
-          gantiLock: 0,
-          stokAkhir: 0,
-          lastUpdate: new Date(),
-        };
-
-        if (existingIndex === -1) {
-          this.stockData.push(kodeItem);
-        } else {
-          this.stockData[existingIndex].kategori = "kotak";
-        }
-        
-        kodeAksesorisData.push(kodeItem);
-      });
-
-      // Process aksesoris data
-      aksesorisSnapshot.forEach((doc) => {
-        const data = doc.data();
-        const existingIndex = this.stockData.findIndex((item) => item.kode === data.text);
-
-        const kodeItem = {
-          id: null,
-          kode: data.text,
-          nama: data.nama,
-          kategori: "aksesoris",
-          stokAwal: 0,
-          tambahStok: 0,
-          laku: 0,
-          free: 0,
-          gantiLock: 0,
-          stokAkhir: 0,
-          lastUpdate: new Date(),
-        };
-
-        if (existingIndex === -1) {
-          this.stockData.push(kodeItem);
-        } else {
-          this.stockData[existingIndex].kategori = "aksesoris";
-        }
-        
-        kodeAksesorisData.push(kodeItem);
-      });
-      
-      // Cache the kode aksesoris data dengan timestamp
-      stockCache.set(kodeAksesorisCacheKey, kodeAksesorisData);
-      stockCacheMeta.set(kodeAksesorisCacheKey, Date.now());
-      saveStockCacheToStorage();
-      
-      console.log(`✅ Kode aksesoris loaded: ${kodeAksesorisData.length} items`);
-      
-    } catch (error) {
-      console.error("Error loading kode aksesoris:", error);
-      
-      // Try to use cache as fallback
-      if (stockCache.has(kodeAksesorisCacheKey)) {
-        console.log("Using cached kode aksesoris data as fallback");
-        const cachedKodeData = stockCache.get(kodeAksesorisCacheKey);
-        
-        cachedKodeData.forEach(item => {
-          const existingIndex = this.stockData.findIndex(stockItem => stockItem.kode === item.kode);
-          if (existingIndex === -1) {
-            this.stockData.push(item);
-          } else {
-            this.stockData[existingIndex].kategori = item.kategori;
-          }
-        });
-      } else {
-        throw error;
-      }
-    }
-  },
-
-  // NEW: Get snapshot dengan cache yang lebih efisien
-  async getSnapshotAsBaseCached(selectedDate) {
-    try {
-      console.log(`🎯 Getting cached snapshot base for: ${formatDate(selectedDate)}`);
-      
-      const snapshotCacheKey = `snapshot_cached_${formatDate(selectedDate).replace(/\//g, '-')}`;
-      
-      // Check cache first dengan TTL yang sesuai
-      if (stockCache.has(snapshotCacheKey)) {
-        const timestamp = stockCacheMeta.get(snapshotCacheKey);
-        const now = Date.now();
-        const snapshotTTL = 30 * 60 * 1000; // 30 minutes untuk snapshot
-        
-        if (timestamp && (now - timestamp) < snapshotTTL) {
-          console.log(`Using cached snapshot data for ${formatDate(selectedDate)}`);
-          return stockCache.get(snapshotCacheKey);
-        }
-      }
-      
-      // Load fresh snapshot data
-      const snapshotData = await this.getSnapshotAsBase(selectedDate);
-      
-      // Cache dengan timestamp
-      stockCache.set(snapshotCacheKey, snapshotData);
-      stockCacheMeta.set(snapshotCacheKey, Date.now());
-      saveStockCacheToStorage();
-      
-      return snapshotData;
-      
-    } catch (error) {
-      console.error("Error getting cached snapshot base:", error);
-      
-      // Try to use cache as fallback
-      const snapshotCacheKey = `snapshot_cached_${formatDate(selectedDate).replace(/\//g, '-')}`;
-      if (stockCache.has(snapshotCacheKey)) {
-        console.log("Using cached snapshot data as fallback");
-        return stockCache.get(snapshotCacheKey);
-      }
-      
-      return new Map();
-    }
-  },
-
-  // NEW: Calculate stock from base dengan cache
-  async calculateStockFromBaseCached(baseSnapshot, endDate, selectedDate) {
-    const stockMap = new Map();
-
-    try {
-      // Create cache key untuk calculation
-      const calcCacheKey = `calc_${formatDate(selectedDate).replace(/\//g, '-')}_${formatDate(endDate).replace(/\//g, '-')}`;
-      
-      // Check cache first
-      if (stockCache.has(calcCacheKey)) {
-        const timestamp = stockCacheMeta.get(calcCacheKey);
-        const now = Date.now();
-        const calcTTL = 15 * 60 * 1000; // 15 minutes untuk calculation
-        
-        if (timestamp && (now - timestamp) < calcTTL) {
-          console.log(`Using cached calculation for ${formatDate(selectedDate)}`);
-          return stockCache.get(calcCacheKey);
-        }
-      }
-
-      // Inisialisasi dengan base snapshot
-      baseSnapshot.forEach((data, kode) => {
-        stockMap.set(kode, data.stokAwal || 0);
-      });
-
-      // Inisialisasi item yang tidak ada di snapshot
-      this.stockData.forEach((item) => {
-        if (!stockMap.has(item.kode)) {
-          stockMap.set(item.kode, 0);
-        }
-      });
-
-      // Tentukan start date untuk kalkulasi transaksi
-      let startDate;
-
-      if (baseSnapshot.size > 0) {
-        // Jika ada snapshot, hitung dari hari setelah snapshot
-        const snapshotDate = new Date(selectedDate);
-        snapshotDate.setDate(snapshotDate.getDate() - 1);
-        startDate = new Date(snapshotDate);
-        startDate.setHours(0, 0, 0, 0);
-      } else {
-        // Jika tidak ada snapshot, hitung dari awal bulan
-        startDate = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
-      }
-
-      // Hitung transaksi dari start date sampai end date
-      if (startDate <= endDate) {
-        const transactions = await this.getTransactionsForDateCached(startDate, endDate);
-
-        // Apply transaksi ke stok
-        transactions.forEach((trans, kode) => {
-          const currentStock = stockMap.get(kode) || 0;
-          const newStock = Math.max(0, currentStock + trans.tambahStok - trans.laku - trans.free - trans.gantiLock);
-          stockMap.set(kode, newStock);
-        });
-      }
-
-      // Cache the calculation result
-      stockCache.set(calcCacheKey, stockMap);
-      stockCacheMeta.set(calcCacheKey, Date.now());
-      saveStockCacheToStorage();
-
-      console.log(`📈 Stock calculated from base until ${formatDate(endDate)}: ${stockMap.size} items`);
-      return stockMap;
-    } catch (error) {
-      console.error("Error calculating stock from base cached:", error);
-      
-      // Try to use cache as fallback
-      const calcCacheKey = `calc_${formatDate(selectedDate).replace(/\//g, '-')}_${formatDate(endDate).replace(/\//g, '-')}`;
-      if (stockCache.has(calcCacheKey)) {
-        console.log("Using cached calculation as fallback");
-        return stockCache.get(calcCacheKey);
-      }
-      
-      return stockMap;
-    }
-  },
-
-  // NEW: Get transactions dengan cache yang lebih efisien
-  async getTransactionsForDateCached(startDate, endDate) {
-    const transactionMap = new Map();
-    
-    // Create cache key for transactions
-    const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
-    const transCacheKey = `trans_cached_${startDateStr}_${endDateStr}`;
-    
-    // Check cache first dengan TTL yang sesuai
-    if (stockCache.has(transCacheKey)) {
-      const timestamp = stockCacheMeta.get(transCacheKey);
-      const now = Date.now();
-      
-      // TTL berbeda untuk data hari ini vs historical
-      const today = new Date().toISOString().split('T')[0];
-      const isToday = endDateStr === today;
-      const transTTL = isToday ? 5 * 60 * 1000 : 60 * 60 * 1000; // 5 min untuk hari ini, 1 jam untuk historical
-      
-      if (timestamp && (now - timestamp) < transTTL) {
-        console.log(`Using cached transaction data for ${startDateStr} to ${endDateStr}`);
-        return stockCache.get(transCacheKey);
-      }
-    }
-
-    try {
-      console.log(`Loading fresh transaction data for ${startDateStr} to ${endDateStr}...`);
-      
-      // Get stock transactions
-      const transQuery = query(
-        collection(firestore, "stokAksesorisTransaksi"),
-        where("timestamp", ">=", Timestamp.fromDate(startDate)),
-        where("timestamp", "<=", Timestamp.fromDate(endDate))
-      );
-
-      const transSnapshot = await getDocs(transQuery);
-
-      transSnapshot.forEach((doc) => {
-        const data = doc.data();
-        const kode = data.kode;
-
-        if (!kode) return;
-
-        if (!transactionMap.has(kode)) {
-          transactionMap.set(kode, {
-            tambahStok: 0,
-            laku: 0,
-            free: 0,
-            gantiLock: 0,
-            nama: data.nama || "",
-            kategori: data.kategori || "",
-          });
-        }
-
-        const trans = transactionMap.get(kode);
-        const jumlah = data.jumlah || 0;
-
-        switch (data.jenis) {
-          case "tambah":
-            trans.tambahStok += jumlah;
-            break;
-          case "laku":
-            trans.laku += jumlah;
-            break;
-          case "free":
-            trans.free += jumlah;
-            break;
-          case "gantiLock":
-            trans.gantiLock += jumlah;
-            break;
-        }
-      });
-
-      // Get stock additions
-      const addQuery = query(
-        collection(firestore, "stockAdditions"),
-        where("timestamp", ">=", Timestamp.fromDate(startDate)),
-        where("timestamp", "<=", Timestamp.fromDate(endDate))
-      );
-
-      const addSnapshot = await getDocs(addQuery);
-
-      addSnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (!data.items?.length) return;
-
-        data.items.forEach((item) => {
-          const kode = item.kodeText;
-          if (!kode) return;
-
-          if (!transactionMap.has(kode)) {
-            transactionMap.set(kode, {
-              tambahStok: 0,
-              laku: 0,
-              free: 0,
-              gantiLock: 0,
-              nama: item.nama || "",
-              kategori: "",
-            });
-          }
-
-          const trans = transactionMap.get(kode);
-          trans.tambahStok += parseInt(item.jumlah) || 0;
-        });
-      });
-
-      // Cache the transaction data dengan timestamp
-      stockCache.set(transCacheKey, transactionMap);
-      stockCacheMeta.set(transCacheKey, Date.now());
-      saveStockCacheToStorage();
-
-      const dateRange =
-        startDate.toDateString() === endDate.toDateString()
-          ? formatDate(startDate)
-          : `${formatDate(startDate)} - ${formatDate(endDate)}`;
-
-      console.log(`📋 Transactions for ${dateRange}: ${transactionMap.size} items`);
-      return transactionMap;
-    } catch (error) {
-      console.error("Error getting cached transactions for date:", error);
-      
-      // Try to use cached data as fallback
-      if (stockCache.has(transCacheKey)) {
-        console.log("Using cached transaction data as fallback");
-        return stockCache.get(transCacheKey);
-      }
-      
-      return new Map();
-    }
-  },
-
-  // NEW: Optimized daily continuity calculation
-  async calculateDailyContinuityCached(selectedDate) {
-    try {
-      // Create cache key
-      const dateStr = formatDate(selectedDate).replace(/\//g, '-');
-      const cacheKey = `stock_cached_${dateStr}`;
-      
-      // Check if we should use cache
-      const includesCurrentDay = dateStr === getLocalDateString().replace(/-/g, '-');
-      
-      // Check cache first dengan TTL yang sesuai
-      if (stockCache.has(cacheKey)) {
-        const timestamp = stockCacheMeta.get(cacheKey);
-        const now = Date.now();
-        const stockTTL = includesCurrentDay ? 5 * 60 * 1000 : 30 * 60 * 1000; // 5 min untuk hari ini, 30 min untuk historical
-        
-        if (timestamp && (now - timestamp) < stockTTL) {
-          console.log(`Using cached stock data for ${dateStr}`);
-          this.filteredStockData = stockCache.get(cacheKey);
-          this.showCacheIndicator(true);
-          return;
-        }
-      }
-      
-      // Hide cache indicator
-      this.showCacheIndicator(false);
-      
-      console.log(`Calculating fresh daily continuity for ${dateStr}...`);
-      
-      // 1. Hitung stok akhir sampai hari sebelumnya menggunakan sistem prioritas
-      const previousDate = new Date(selectedDate);
-      previousDate.setDate(previousDate.getDate() - 1);
-      previousDate.setHours(23, 59, 59, 999);
-
-      // Gunakan sistem prioritas snapshot dengan cache
-      const baseSnapshot = await this.getSnapshotAsBaseCached(selectedDate);
-      const previousStockMap = await this.calculateStockFromBaseCached(baseSnapshot, previousDate, selectedDate);
-
-      // 2. Hitung transaksi hari ini saja
-      const startOfDay = new Date(selectedDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(selectedDate);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      const todayTransactions = await this.getTransactionsForDateCached(startOfDay, endOfDay);
-
-      // 3. Gabungkan: stokAwal (dari snapshot/kalkulasi) + transaksi hari ini = stokAkhir
-      this.filteredStockData = this.stockData.map((item) => {
-        const kode = item.kode;
-
-        // Stok awal = stok akhir kemarin (dari snapshot atau kalkulasi)
-        const stokAwal = previousStockMap.get(kode) || 0;
-
-        // Transaksi hari ini
-        const todayTrans = todayTransactions.get(kode) || {
-          tambahStok: 0,
-          laku: 0,
-          free: 0,
-          gantiLock: 0,
-        };
-
-        // Stok akhir = stok awal + tambah - keluar
-        const stokAkhir = Math.max(
-          0,
-          stokAwal + todayTrans.tambahStok - todayTrans.laku - todayTrans.free - todayTrans.gantiLock
-        );
-
-        return {
-          ...item,
-          stokAwal: stokAwal,
-          tambahStok: todayTrans.tambahStok,
-          laku: todayTrans.laku,
-          free: todayTrans.free,
-          gantiLock: todayTrans.gantiLock,
-          stokAkhir: stokAkhir,
-        };
-      });
-
-      // Tambahkan item yang ada di transaksi tapi tidak di master
-      todayTransactions.forEach((trans, kode) => {
-        const exists = this.filteredStockData.find((item) => item.kode === kode);
-        if (!exists) {
-          const stokAwal = previousStockMap.get(kode) || 0;
-          const stokAkhir = Math.max(0, stokAwal + trans.tambahStok - trans.laku - trans.free - trans.gantiLock);
-
-          this.filteredStockData.push({
-            kode: kode,
-            nama: trans.nama || "",
-            kategori: trans.kategori || "",
-            stokAwal: stokAwal,
-            tambahStok: trans.tambahStok,
-            laku: trans.laku,
-            free: trans.free,
-            gantiLock: trans.gantiLock,
-            stokAkhir: stokAkhir,
-          });
-        }
-      });
-
-      // Sort data
-      this.filteredStockData.sort((a, b) => {
-        if (a.kategori !== b.kategori) {
-          return a.kategori === "kotak" ? -1 : 1;
-        }
-        return a.kode.localeCompare(b.kode);
-      });
-
-      // Save to cache dengan timestamp
-      stockCache.set(cacheKey, [...this.filteredStockData]);
-      stockCacheMeta.set(cacheKey, Date.now());
-      saveStockCacheToStorage();
-
-      console.log(`✅ Daily continuity calculated: ${this.filteredStockData.length} items`);
-    } catch (error) {
-      console.error("Error calculating cached daily continuity:", error);
-      
-      // Try to use cache as fallback
-      const dateStr = formatDate(selectedDate).replace(/\//g, '-');
-      const cacheKey = `stock_cached_${dateStr}`;
-      
-      if (stockCache.has(cacheKey)) {
-        console.log("Using cached data as fallback due to error");
-        this.filteredStockData = stockCache.get(cacheKey);
-        this.showError("Terjadi kesalahan saat mengambil data terbaru. Menggunakan data cache.");
-        this.showCacheIndicator(true, 'fallback');
-      } else {
-        throw error;
-      }
-    }
-  },
-
-  // NEW: Enhanced cache management
-  getCacheStats() {
-    const stats = {
-      totalEntries: stockCache.size,
-      totalSize: 0,
-      oldestEntry: null,
-      newestEntry: null,
-      categories: {
-        stock: 0,
-        transactions: 0,
-        snapshots: 0,
-        calculations: 0,
-        master: 0
-      }
-    };
-
-    // Calculate cache statistics
-    stockCache.forEach((value, key) => {
-      // Estimate size (rough calculation)
-      stats.totalSize += JSON.stringify(value).length;
-      
-      // Categorize cache entries
-      if (key.startsWith('stock_')) {
-        stats.categories.stock++;
-      } else if (key.startsWith('trans_')) {
-        stats.categories.transactions++;
-      } else if (key.startsWith('snapshot_')) {
-        stats.categories.snapshots++;
-      } else if (key.startsWith('calc_')) {
-        stats.categories.calculations++;
-      } else if (key.includes('master') || key.includes('kode')) {
-        stats.categories.master++;
-      }
-    });
-
-    // Find oldest and newest entries
-    let oldestTime = Date.now();
-    let newestTime = 0;
-
-    stockCacheMeta.forEach((timestamp, key) => {
-      if (timestamp < oldestTime) {
-        oldestTime = timestamp;
-        stats.oldestEntry = { key, timestamp };
-      }
-      if (timestamp > newestTime) {
-        newestTime = timestamp;
-        stats.newestEntry = { key, timestamp };
-      }
-    });
-
-    return stats;
-  },
-
-  // NEW: Advanced cache cleanup
-  advancedCleanupCache() {
-    const now = Date.now();
-    const stats = this.getCacheStats();
-    
-    console.log('Cache stats before cleanup:', stats);
-
-    // Different TTL for different types of data
-    const ttlConfig = {
-      stock: 30 * 60 * 1000,      // 30 minutes for stock data
-      transactions: 60 * 60 * 1000, // 1 hour for transactions
-      snapshots: 2 * 60 * 60 * 1000, // 2 hours for snapshots
-      calculations: 15 * 60 * 1000,  // 15 minutes for calculations
-      master: 4 * 60 * 60 * 1000     // 4 hours for master data
-    };
-
-    const keysToDelete = [];
-    
-    stockCacheMeta.forEach((timestamp, key) => {
-      let ttl = 30 * 60 * 1000; // default 30 minutes
-      
-      // Determine TTL based on key type
-      if (key.startsWith('stock_')) {
-        ttl = ttlConfig.stock;
-      } else if (key.startsWith('trans_')) {
-        ttl = ttlConfig.transactions;
-      } else if (key.startsWith('snapshot_')) {
-        ttl = ttlConfig.snapshots;
-      } else if (key.startsWith('calc_')) {
-        ttl = ttlConfig.calculations;
-      } else if (key.includes('master') || key.includes('kode')) {
-        ttl = ttlConfig.master;
-      }
-      
-      // Check if expired
-      if (now - timestamp > ttl) {
-        keysToDelete.push(key);
-      }
-    });
-
-    // Clean up expired entries
-    keysToDelete.forEach(key => {
-      stockCache.delete(key);
-      stockCacheMeta.delete(key);
-      console.log(`Advanced cleanup: removed expired cache for ${key}`);
-    });
-
-    // Limit cache size (keep most recent entries)
-    const maxCacheEntries = 100;
-    const remainingKeys = Array.from(stockCache.keys());
-
-    if (remainingKeys.length > maxCacheEntries) {
-      // Sort by timestamp (oldest first)
-      const sortedKeys = remainingKeys.sort((a, b) => {
-        const timestampA = stockCacheMeta.get(a) || 0;
-        const timestampB = stockCacheMeta.get(b) || 0;
-        return timestampA - timestampB;
-      });
-
-      // Remove oldest entries
-      const keysToRemove = sortedKeys.slice(0, remainingKeys.length - maxCacheEntries);
-      keysToRemove.forEach((key) => {
-        stockCache.delete(key);
-        stockCacheMeta.delete(key);
-        console.log(`Advanced cleanup: removed excess cache for ${key}`);
-      });
-    }
-
-    // Save updated cache
-    saveStockCacheToStorage();
-    
-    const newStats = this.getCacheStats();
-    console.log('Cache stats after cleanup:', newStats);
-    
-    return {
-      before: stats,
-      after: newStats,
-      deletedEntries: keysToDelete.length
-    };
-  },
-
-  // NEW: Cache warming - preload commonly used data
-  async warmCache() {
-    try {
-      console.log('🔥 Starting cache warming...');
-      
-      // Warm master data
-      await this.loadMasterDataCached();
-      
-      // Warm today's data
-      const today = new Date();
-      await this.calculateDailyContinuityCached(today);
-      
-      // Warm yesterday's data
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      await this.calculateDailyContinuityCached(yesterday);
-      
-      console.log('🔥 Cache warming completed');
-      
-    } catch (error) {
-      console.warn('Cache warming failed:', error);
-    }
-  },
-
-  // NEW: Enhanced load and filter with better caching
-  async loadAndFilterStockDataCached(forceRefresh = false) {
-    try {
-      this.showLoading(true);
-
-      const startDateStr = document.getElementById("startDate").value;
-
-      if (!startDateStr) {
-        this.showError("Tanggal harus diisi");
-        this.showLoading(false);
-        return;
-      }
-
-      const selectedDate = parseDate(startDateStr);
-      if (!selectedDate) {
-        this.showError("Format tanggal tidak valid");
-        this.showLoading(false);
-        return;
-      }
-
-      // Check if today's data - always refresh if includes current day
-      const today = getLocalDateString();
-      const selectedDateStr = formatDate(selectedDate).replace(/\//g, '-');
-      const includesCurrentDay = selectedDateStr === today.replace(/-/g, '-');
-      
-      forceRefresh = forceRefresh || includesCurrentDay;
-
-      // Load master data with enhanced caching
-      if (forceRefresh) {
-        await this.loadStockData(true);
-      } else {
-        await this.loadMasterDataCached();
-      }
-
-      // Calculate with enhanced caching
-      if (forceRefresh) {
-        await this.calculateDailyContinuity(selectedDate);
-      } else {
-        await this.calculateDailyContinuityCached(selectedDate);
-      }
-
-      this.renderStockTable();
-      this.showLoading(false);
-      
-      // Perform advanced cleanup after successful load
-      this.advancedCleanupCache();
-      
-    } catch (error) {
-      console.error("Error loading cached stock data:", error);
-      
-      // Try to use cache as fallback
-      const startDateStr = document.getElementById("startDate").value;
-      const selectedDate = parseDate(startDateStr);
-      const dateStr = formatDate(selectedDate).replace(/\//g, '-');
-      const cacheKey = `stock_cached_${dateStr}`;
-      
-      if (stockCache.has(cacheKey)) {
-        console.log("Using cached stock data as fallback due to error");
-        this.filteredStockData = stockCache.get(cacheKey);
-        this.renderStockTable();
-        this.showError("Terjadi kesalahan saat mengambil data terbaru. Menggunakan data cache.");
-        this.showCacheIndicator(true, 'fallback');
-      } else {
-        this.showError("Terjadi kesalahan saat memuat data: " + error.message);
-      }
-      
-      this.showLoading(false);
-    }
-  },
-
-  // NEW: Performance monitoring
-  startPerformanceMonitoring() {
-    this.performanceMetrics = {
-      loadTimes: [],
-      cacheHits: 0,
-      cacheMisses: 0,
-      errors: 0
-    };
-    
-    // Monitor cache performance
-    const originalGet = stockCache.get.bind(stockCache);
-    stockCache.get = (key) => {
-      const result = originalGet(key);
-      if (result !== undefined) {
-        this.performanceMetrics.cacheHits++;
-      } else {
-        this.performanceMetrics.cacheMisses++;
-      }
-      return result;
-    };
-  },
-
-  // NEW: Get performance report
-  getPerformanceReport() {
-    const cacheStats = this.getCacheStats();
-    const hitRate = this.performanceMetrics.cacheHits / 
-                   (this.performanceMetrics.cacheHits + this.performanceMetrics.cacheMisses) * 100;
-    
-    return {
-      cache: cacheStats,
-      performance: {
-        ...this.performanceMetrics,
-        cacheHitRate: hitRate.toFixed(2) + '%',
-        averageLoadTime: this.performanceMetrics.loadTimes.length > 0 
-          ? (this.performanceMetrics.loadTimes.reduce((a, b) => a + b, 0) / this.performanceMetrics.loadTimes.length).toFixed(2) + 'ms'
-          : 'N/A'
-      }
-    };
-  },
-
-  // MODIFIED: Enhanced init with cache warming and performance monitoring
-  async init() {
-    try {
-      // Load cache from localStorage
-      loadStockCacheFromStorage();
-      
-      // Start performance monitoring
-      this.startPerformanceMonitoring();
-      
-      this.initDatePickers();
-      this.attachEventListeners();
-      this.setDefaultDates();
-      this.initDataTable();
-      this.prepareEmptyTable();
-      
-      // Warm cache in background
-      setTimeout(() => {
-        this.warmCache();
-      }, 1000);
-      
-      // Enhanced cleanup with different intervals for different data types
-      setInterval(() => {
-        this.advancedCleanupCache();
-      }, 10 * 60 * 1000); // Clean up every 10 minutes
-      
-      // Performance report every hour
-      setInterval(() => {
-        const report = this.getPerformanceReport();
-        console.log('📊 Performance Report:', report);
-      }, 60 * 60 * 1000);
-      
-    } catch (error) {
-      console.error('Error initializing stock report handler:', error);
-    }
-  },
-
-  // MODIFIED: Enhanced attach event listeners
-  attachEventListeners() {
-    // Filter button - use cached version
-    const filterBtn = document.getElementById("filterStockBtn");
-    if (filterBtn) {
-      filterBtn.addEventListener("click", () => {
-        const startTime = performance.now();
-        this.loadAndFilterStockDataCached().finally(() => {
-          const endTime = performance.now();
-          this.performanceMetrics.loadTimes.push(endTime - startTime);
-        });
-      });
-    }
-
-    // Reset filter button
-    const resetBtn = document.getElementById("resetStockFilterBtn");
-    if (resetBtn) {
-      resetBtn.addEventListener("click", () => {
-        this.resetFilters();
-      });
-    }
-    
-    // Force refresh button
-    const refreshBtn = document.getElementById("refreshStockBtn");
-    if (refreshBtn) {
-      refreshBtn.addEventListener("click", () => {
-        this.refreshAllData();
-      });
-    }
-
-    // NEW: Add cache management buttons (for debugging/admin)
-    if (window.location.hostname === 'localhost' || window.location.search.includes('debug=true')) {
-      this.addDebugButtons();
-    }
-  },
-
-  // NEW: Add debug buttons for cache management
-  addDebugButtons() {
-    const debugContainer = document.createElement('div');
-    debugContainer.className = 'debug-container mt-2';
-    debugContainer.innerHTML = `
-      <div class="btn-group" role="group">
-        <button type="button" class="btn btn-outline-info btn-sm" id="cacheStatsBtn">
-          <i class="fas fa-chart-bar me-1"></i>Cache Stats
-        </button>
-        <button type="button" class="btn btn-outline-warning btn-sm" id="clearCacheBtn">
-          <i class="fas fa-trash me-1"></i>Clear Cache
-        </button>
-        <button type="button" class="btn btn-outline-success btn-sm" id="warmCacheBtn">
-          <i class="fas fa-fire me-1"></i>Warm Cache
-        </button>
-      </div>
-    `;
-
-    const filterCard = document.querySelector('.card .card-body');
-    if (filterCard) {
-      filterCard.appendChild(debugContainer);
-
-      // Add event listeners for debug buttons
-      document.getElementById('cacheStatsBtn').addEventListener('click', () => {
-        const report = this.getPerformanceReport();
-        console.log('📊 Cache & Performance Report:', report);
-        
-        if (typeof Swal !== 'undefined') {
-          Swal.fire({
-            title: 'Cache Statistics',
-            html: `
-              <div class="text-start">
-                <h6>Cache Info:</h6>
-                <ul>
-                  <li>Total Entries: ${report.cache.totalEntries}</li>
-                  <li>Estimated Size: ${(report.cache.totalSize / 1024).toFixed(2)} KB</li>
-                  <li>Stock Data: ${report.cache.categories.stock}</li>
-                  <li>Transactions: ${report.cache.categories.transactions}</li>
-                  <li>Snapshots: ${report.cache.categories.snapshots}</li>
-                </ul>
-                <h6>Performance:</h6>
-                <ul>
-                  <li>Cache Hit Rate: ${report.performance.cacheHitRate}</li>
-                  <li>Average Load Time: ${report.performance.averageLoadTime}</li>
-                  <li>Errors: ${report.performance.errors}</li>
-                </ul>
-              </div>
-            `,
-            icon: 'info'
-          });
-        }
-      });
-
-      document.getElementById('clearCacheBtn').addEventListener('click', () => {
-        if (confirm('Are you sure you want to clear all cache?')) {
-          stockCache.clear();
-          stockCacheMeta.clear();
-          localStorage.removeItem('stockCache');
-          localStorage.removeItem('stockCacheMeta');
-          this.showSuccess('Cache cleared successfully');
-        }
-      });
-
-      document.getElementById('warmCacheBtn').addEventListener('click', () => {
-        this.warmCache().then(() => {
-          this.showSuccess('Cache warming completed');
-        }).catch(error => {
-          this.showError('Cache warming failed: ' + error.message);
-        });
-      });
-    }
-  }
 };
 
-// EXISTING: Helper function to show loading indicator
+// Helper function to show loading indicator
 function showLoading(show) {
   const loadingElement = document.getElementById("loadingIndicator");
   if (loadingElement) {
@@ -3503,7 +1971,7 @@ function showLoading(show) {
   }
 }
 
-// EXISTING: Helper function to show alerts
+// Helper function to show alerts
 function showAlert(message, title = "Informasi", type = "info") {
   if (typeof Swal !== "undefined") {
     return Swal.fire({
@@ -3519,17 +1987,11 @@ function showAlert(message, title = "Informasi", type = "info") {
   }
 }
 
-// EXISTING: Initialize when document is ready
+// Initialize when document is ready
 document.addEventListener("DOMContentLoaded", function () {
   // Initialize the handler
   laporanStokHandler.init();
 });
 
-// EXISTING: Export the handler for potential use in other modules
+// Export the handler for potential use in other modules
 export default laporanStokHandler;
-
-
-
-
-
-
