@@ -1,4 +1,4 @@
-import { firestore } from "./configFirebase.js";
+import { firestore } from "../js/configFirebase.js";
 import {
   collection,
   getDocs,
@@ -10,109 +10,133 @@ import {
   orderBy,
   Timestamp,
   serverTimestamp,
-  onSnapshot,
-  limit,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
 const VERIFICATION_PASSWORD = "smlt116";
 
-// Optimized cache manager - no TTL, real-time updates
+// Improved cache management dengan TTL yang lebih efisien
 const cacheManager = {
   prefix: "melati_sales_",
-  cache: new Map(),
+  defaultTTL: 60 * 60 * 1000, // 1 jam untuk data historis
+  todayTTL: 5 * 60 * 1000,    // 5 menit untuk data hari ini
 
-  set(key, data) {
-    this.cache.set(this.prefix + key, {
-      data: data,
+  set(key, data, ttl = null) {
+    // Tentukan TTL berdasarkan apakah data mencakup hari ini
+    const actualTTL = ttl || (this.isToday(key) ? this.todayTTL : this.defaultTTL);
+    
+    const item = {
+      data,
       timestamp: Date.now(),
-    });
-    this.saveToStorage();
+      ttl: actualTTL,
+      version: Date.now() // Untuk versioning
+    };
+    
+    try {
+      localStorage.setItem(this.prefix + key, JSON.stringify(item));
+      // Simpan metadata terpisah untuk tracking
+      localStorage.setItem(this.prefix + key + "_meta", Date.now().toString());
+    } catch (error) {
+      console.warn("Cache storage failed, clearing old cache:", error);
+      this.clearOldCache();
+      try {
+        localStorage.setItem(this.prefix + key, JSON.stringify(item));
+        localStorage.setItem(this.prefix + key + "_meta", Date.now().toString());
+      } catch (retryError) {
+        console.error("Cache storage failed after cleanup:", retryError);
+      }
+    }
   },
 
   get(key) {
-    const item = this.cache.get(this.prefix + key);
-    return item ? item.data : null;
-  },
+    try {
+      const item = JSON.parse(localStorage.getItem(this.prefix + key));
+      if (!item) return null;
 
-  has(key) {
-    return this.cache.has(this.prefix + key);
+      const now = Date.now();
+      const age = now - item.timestamp;
+      
+      // Cek apakah cache masih valid
+      if (age > item.ttl) {
+        this.remove(key);
+        return null;
+      }
+
+      // Untuk data hari ini, cek juga apakah ada update terbaru
+      if (this.isToday(key)) {
+        const lastUpdate = localStorage.getItem("lastSalesUpdate");
+        if (lastUpdate && parseInt(lastUpdate) > item.timestamp) {
+          this.remove(key);
+          return null;
+        }
+      }
+
+      return item.data;
+    } catch (error) {
+      console.error("Cache get error:", error);
+      this.remove(key);
+      return null;
+    }
   },
 
   remove(key) {
-    this.cache.delete(this.prefix + key);
-    this.saveToStorage();
+    localStorage.removeItem(this.prefix + key);
+    localStorage.removeItem(this.prefix + key + "_meta");
   },
 
   clear() {
-    this.cache.clear();
-    this.clearStorage();
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith(this.prefix))
+      .forEach((key) => localStorage.removeItem(key));
   },
 
-  // Update specific transaction in cache
-  updateTransaction(transactionId, updatedData) {
-    const salesData = this.get("salesData");
-    if (salesData && Array.isArray(salesData)) {
-      const index = salesData.findIndex((item) => item.id === transactionId);
-      if (index !== -1) {
-        salesData[index] = { ...salesData[index], ...updatedData };
-        this.set("salesData", salesData);
-        return true;
-      }
-    }
-    return false;
+  // Cek apakah key mencakup data hari ini
+  isToday(key) {
+    const today = new Date().toISOString().split('T')[0];
+    return key.includes(today) || key === "salesData";
   },
 
-  // Remove specific transaction from cache
-  removeTransaction(transactionId) {
-    const salesData = this.get("salesData");
-    if (salesData && Array.isArray(salesData)) {
-      const filtered = salesData.filter((item) => item.id !== transactionId);
-      this.set("salesData", filtered);
-      return true;
-    }
-    return false;
-  },
-
-  // Add new transaction to cache
-  addTransaction(newTransaction) {
-    const salesData = this.get("salesData") || [];
-    salesData.unshift(newTransaction); // Add to beginning (newest first)
-    this.set("salesData", salesData);
-  },
-
-  saveToStorage() {
-    try {
-      const cacheData = {};
-      this.cache.forEach((value, key) => {
-        cacheData[key] = value;
+  // Bersihkan cache lama untuk menghemat storage
+  clearOldCache() {
+    const now = Date.now();
+    const maxAge = 24 * 60 * 60 * 1000; // 24 jam
+    
+    Object.keys(localStorage)
+      .filter(key => key.startsWith(this.prefix) && key.endsWith("_meta"))
+      .forEach(metaKey => {
+        try {
+          const timestamp = parseInt(localStorage.getItem(metaKey));
+          if (now - timestamp > maxAge) {
+            const dataKey = metaKey.replace("_meta", "");
+            localStorage.removeItem(dataKey);
+            localStorage.removeItem(metaKey);
+          }
+        } catch (error) {
+          localStorage.removeItem(metaKey);
+        }
       });
-      localStorage.setItem("optimizedSalesCache", JSON.stringify(cacheData));
-    } catch (error) {
-      console.warn("Failed to save cache:", error);
-    }
   },
 
-  loadFromStorage() {
-    try {
-      const stored = localStorage.getItem("optimizedSalesCache");
-      if (stored) {
-        const cacheData = JSON.parse(stored);
-        Object.entries(cacheData).forEach(([key, value]) => {
-          this.cache.set(key, value);
-        });
-        console.log(`💾 Loaded cache: ${this.cache.size} entries`);
-      }
-    } catch (error) {
-      console.warn("Failed to load cache:", error);
-    }
+  // Cek apakah cache perlu diupdate
+  shouldUpdate(key) {
+    const metaKey = this.prefix + key + "_meta";
+    const timestamp = localStorage.getItem(metaKey);
+    
+    if (!timestamp) return true;
+    
+    const now = Date.now();
+    const lastUpdate = parseInt(timestamp);
+    const ttl = this.isToday(key) ? this.todayTTL : this.defaultTTL;
+    
+    return (now - lastUpdate) > ttl;
   },
 
-  clearStorage() {
-    localStorage.removeItem("optimizedSalesCache");
-  },
+  // Update timestamp untuk cache invalidation
+  updateTimestamp(key) {
+    localStorage.setItem(this.prefix + key + "_meta", Date.now().toString());
+  }
 };
 
-// Utility functions
+// Utility functions (tetap sama)
 const utils = {
   showAlert: (message, title = "Informasi", type = "info") =>
     Swal.fire({ title, text: message, icon: type, confirmButtonText: "OK", confirmButtonColor: "#0d6efd" }),
@@ -124,74 +148,24 @@ const utils = {
 
   formatDate: (date) => {
     if (!date) return "-";
-    
     try {
-      let dateObj = null;
-      
-      // Handle Firestore Timestamp
-      if (date && typeof date.toDate === 'function') {
-        dateObj = date.toDate();
-      }
-      // Handle Date object
-      else if (date instanceof Date) {
-        dateObj = date;
-      }
-      // Handle timestamp number
-      else if (typeof date === 'number') {
-        dateObj = new Date(date);
-      }
-      // Handle string
-      else if (typeof date === 'string') {
-        dateObj = new Date(date);
-      }
-      // Handle object with seconds (Firestore timestamp format)
-      else if (date && typeof date === 'object' && date.seconds) {
-        dateObj = new Date(date.seconds * 1000);
-      }
-      
-      // Validate the date
-      if (!dateObj || isNaN(dateObj.getTime())) {
-        console.warn('Invalid date object:', date);
-        return "-";
-      }
-      
-      const day = String(dateObj.getDate()).padStart(2, "0");
-      const month = String(dateObj.getMonth() + 1).padStart(2, "0");
-      const year = dateObj.getFullYear();
-      
-      return `${day}/${month}/${year}`;
-    } catch (error) {
-      console.error('Error formatting date:', date, error);
+      const d = date.toDate ? date.toDate() : date instanceof Date ? date : new Date(date);
+      return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+    } catch {
       return "-";
     }
   },
 
-  // ✅ PERBAIKAN: Parse date dengan validasi yang lebih ketat
-  parseDate: (dateString) => {
+parseDate: (dateString) => {
     if (!dateString) return null;
     
     try {
       // Jika sudah berupa Date object
       if (dateString instanceof Date) {
-        return isNaN(dateString.getTime()) ? null : dateString;
+        return dateString;
       }
       
-      // Handle Firestore Timestamp
-      if (dateString && typeof dateString.toDate === 'function') {
-        try {
-          return dateString.toDate();
-        } catch (error) {
-          console.warn('Error converting Firestore timestamp:', error);
-          return null;
-        }
-      }
-      
-      // Handle object with seconds (Firestore timestamp format)
-      if (dateString && typeof dateString === 'object' && dateString.seconds) {
-        return new Date(dateString.seconds * 1000);
-      }
-      
-      // Handle string dengan format dd/mm/yyyy
+      // Jika berupa string dengan format dd/mm/yyyy
       if (typeof dateString === 'string') {
         const parts = dateString.split("/");
         if (parts.length === 3) {
@@ -208,16 +182,20 @@ const utils = {
             }
           }
         }
-        
-        // Fallback: coba parse langsung
-        const parsedDate = new Date(dateString);
-        return isNaN(parsedDate.getTime()) ? null : parsedDate;
       }
       
-      // Handle number (timestamp)
+      // Jika berupa number (timestamp)
       if (typeof dateString === 'number') {
         const date = new Date(dateString);
-        return isNaN(date.getTime()) ? null : date;
+        if (!isNaN(date.getTime())) {
+          return date;
+        }
+      }
+      
+      // Fallback: coba parse langsung
+      const date = new Date(dateString);
+      if (!isNaN(date.getTime())) {
+        return date;
       }
       
       return null;
@@ -244,244 +222,61 @@ const utils = {
     };
   },
 
-  isSameDate: (date1, date2) => {
-    if (!date1 || !date2) return false;
-    const d1 = date1 instanceof Date ? date1 : new Date(date1);
-    const d2 = date2 instanceof Date ? date2 : new Date(date2);
-    return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+  throttle: (func, limit) => {
+    let inThrottle;
+    return function () {
+      const args = arguments;
+      const context = this;
+      if (!inThrottle) {
+        func.apply(context, args);
+        inThrottle = true;
+        setTimeout(() => (inThrottle = false), limit);
+      }
+    };
   },
 };
 
 // Main application class
-class OptimizedDataPenjualanApp {
+class DataPenjualanApp {
   constructor() {
     this.salesData = [];
     this.filteredData = [];
     this.dataTable = null;
     this.currentTransaction = null;
     this.isLoading = false;
-    this.realtimeListener = null;
-    this.isListeningToday = false;
-    this.currentSelectedDate = null;
 
     // Bind methods
-    this.filterData = utils.debounce(this.filterData.bind(this), 300);
+    this.refreshData = utils.debounce(this.refreshData.bind(this), 1000);
+    this.filterData = utils.throttle(this.filterData.bind(this), 500);
   }
 
   // Initialize application
   async init() {
-    // Load cache first
-    cacheManager.loadFromStorage();
-
     this.setupEventListeners();
     this.initDatePickers();
     this.setDefaultDates();
-
-    // Load initial data
-    await this.loadInitialData();
-
+    await this.loadSalesData();
     this.initDataTable();
     this.populateSalesFilter();
+
+    // Load filter from URL or set default
     this.loadFilterFromURL();
 
-    // Set default if no URL params
+    // If no URL params, set default date
     const params = new URLSearchParams(window.location.search);
     if (!params.get("date")) {
       this.setDefaultDates();
     }
 
+    // Apply filter
     this.filterData();
-    console.log("✅ Optimized Data Penjualan initialized");
   }
 
-  // Load initial data with smart caching
-  async loadInitialData() {
-    try {
-      utils.showLoading(true);
-
-      // Check cache first
-      const cachedData = cacheManager.get("salesData");
-      if (cachedData && Array.isArray(cachedData) && cachedData.length > 0) {
-        console.log("📦 Using cached sales data");
-        this.salesData = cachedData;
-        return;
-      }
-
-      // Load from Firestore if no cache
-      console.log("🔄 Loading fresh data from Firestore");
-      await this.loadSalesDataFromFirestore();
-    } catch (error) {
-      console.error("Error loading initial data:", error);
-      utils.showAlert("Gagal memuat data: " + error.message, "Error", "error");
-    } finally {
-      utils.showLoading(false);
-    }
-  }
-
-  // Load data from Firestore
-  async loadSalesDataFromFirestore() {
-    try {
-      // Load recent data first (last 30 days for better performance)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-      const recentQuery = query(
-        collection(firestore, "penjualanAksesoris"),
-        where("timestamp", ">=", Timestamp.fromDate(thirtyDaysAgo)),
-        orderBy("timestamp", "desc")
-      );
-
-      const recentSnapshot = await getDocs(recentQuery);
-      this.salesData = recentSnapshot.docs.map((doc) => {
-        const data = doc.data();
-        if (data.jenisPenjualan === "gantiLock") {
-          data.jenisPenjualan = "manual";
-          data.isGantiLock = true;
-        }
-        return { id: doc.id, ...data };
-      });
-
-      // Cache the data
-      cacheManager.set("salesData", this.salesData);
-
-      console.log(`✅ Loaded ${this.salesData.length} recent transactions`);
-    } catch (error) {
-      console.error("Error loading from Firestore:", error);
-      throw error;
-    }
-  }
-
-  // Setup real-time listener for today's data
-  setupRealtimeListener(selectedDate) {
-    const today = new Date();
-    const isToday = utils.isSameDate(selectedDate, today);
-
-    // Only setup listener for today's data
-    if (isToday && !this.isListeningToday) {
-      this.setupTodayListener();
-      this.isListeningToday = true;
-      console.log("📡 Real-time listener activated for today");
-    } else if (!isToday && this.isListeningToday) {
-      this.removeTodayListener();
-      this.isListeningToday = false;
-      console.log("🔇 Real-time listener deactivated");
-    }
-  }
-
-  // Setup today's real-time listener
-  setupTodayListener() {
-    const today = new Date();
-    const startOfDay = new Date(today);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(today);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const todayQuery = query(
-      collection(firestore, "penjualanAksesoris"),
-      where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
-      where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
-      orderBy("timestamp", "desc")
-    );
-
-    this.realtimeListener = onSnapshot(
-      todayQuery,
-      (snapshot) => {
-        if (!snapshot.metadata.hasPendingWrites) {
-          this.handleRealtimeUpdate(snapshot);
-        }
-      },
-      (error) => {
-        console.error("Real-time listener error:", error);
-      }
-    );
-  }
-
-  // Remove today's listener
-  removeTodayListener() {
-    if (this.realtimeListener) {
-      this.realtimeListener();
-      this.realtimeListener = null;
-    }
-  }
-
-  // Handle real-time updates
-  handleRealtimeUpdate(snapshot) {
-    let hasChanges = false;
-
-    snapshot.docChanges().forEach((change) => {
-      const docData = { id: change.doc.id, ...change.doc.data() };
-
-      // Standardize jenis penjualan
-      if (docData.jenisPenjualan === "gantiLock") {
-        docData.jenisPenjualan = "manual";
-        docData.isGantiLock = true;
-      }
-
-      if (change.type === "added") {
-        // ✅ PERBAIKAN: Cek duplikasi lebih ketat
-        const exists = this.salesData.find((item) => item.id === docData.id);
-        if (!exists) {
-          // ✅ PERBAIKAN: Cek apakah data sudah ada di filtered data juga
-          const existsInFiltered = this.filteredData.find((item) => item.id === docData.id);
-          if (!existsInFiltered) {
-            this.salesData.unshift(docData);
-            cacheManager.addTransaction(docData);
-            hasChanges = true;
-            console.log("➕ New transaction added:", docData.id);
-          }
-        }
-      } else if (change.type === "modified") {
-        const index = this.salesData.findIndex((item) => item.id === docData.id);
-        if (index !== -1) {
-          this.salesData[index] = docData;
-          cacheManager.updateTransaction(docData.id, docData);
-          hasChanges = true;
-          console.log("✏️ Transaction updated:", docData.id);
-        }
-      } else if (change.type === "removed") {
-        this.salesData = this.salesData.filter((item) => item.id !== docData.id);
-        cacheManager.removeTransaction(docData.id);
-        hasChanges = true;
-        console.log("🗑️ Transaction removed:", docData.id);
-      }
-    });
-
-    if (hasChanges) {
-      // ✅ PERBAIKAN: Hindari double filtering
-      this.filterData();
-      this.showUpdateIndicator();
-    }
-  }
-
-  // Show update indicator
-  showUpdateIndicator() {
-    const existingIndicator = document.getElementById("updateIndicator");
-    if (existingIndicator) existingIndicator.remove();
-
-    const indicator = document.createElement("div");
-    indicator.id = "updateIndicator";
-    indicator.className = "alert alert-success alert-dismissible fade show mb-2";
-    indicator.innerHTML = `
-      <i class="fas fa-sync-alt me-2"></i>
-      Data telah diperbarui secara real-time
-      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-
-    const container = document.querySelector(".container-fluid");
-    if (container) {
-      container.insertBefore(indicator, container.firstChild);
-    }
-
-    setTimeout(() => {
-      if (indicator.parentNode) indicator.remove();
-    }, 3000);
-  }
-
-  // Setup event listeners
+  // Setup all event listeners (tetap sama)
   setupEventListeners() {
     const events = {
       btnTambahTransaksi: () => (window.location.href = "penjualanAksesoris.html"),
-      btnRefreshData: () => this.refreshData(),
+      btnRefreshData: () => this.refreshData(true),
       btnPrintReceipt: () => this.printDocument("receipt"),
       btnPrintInvoice: () => this.printDocument("invoice"),
       btnSaveEdit: () => this.saveEditTransaction(),
@@ -493,6 +288,7 @@ class OptimizedDataPenjualanApp {
       if (element) element.addEventListener("click", handler);
     });
 
+    // Auto filter when filter inputs change
     this.setupAutoFilter();
 
     // Table action handlers
@@ -536,37 +332,43 @@ class OptimizedDataPenjualanApp {
       );
   }
 
-  // Setup auto filter functionality
+  // Setup auto filter functionality (tetap sama)
   setupAutoFilter() {
+    // Auto filter on date change
     $("#filterTanggal").on("changeDate", () => {
       this.filterData();
     });
 
+    // Auto filter on manual date input
     $("#filterTanggal").on("blur", () => {
       this.filterData();
     });
 
+    // Auto filter on dropdown change
     $("#filterJenisPenjualan, #filterSales").on("change", () => {
       this.filterData();
     });
   }
 
-  // Initialize date pickers
+  // Initialize date pickers (tetap sama)
   initDatePickers() {
     const today = new Date();
 
+    // Initialize single date picker
     $("#filterTanggal")
       .datepicker({
         format: "dd/mm/yyyy",
         autoclose: true,
         language: "id",
         todayHighlight: true,
-        endDate: today,
+        endDate: today, // Tidak bisa pilih tanggal masa depan
       })
       .on("changeDate", () => {
+        // Trigger filter when date changes
         setTimeout(() => this.filterData(), 100);
       });
 
+    // Manual input validation
     $("#filterTanggal").on("blur", (e) => {
       const inputDate = utils.parseDate(e.target.value);
       if (inputDate && inputDate > today) {
@@ -577,14 +379,94 @@ class OptimizedDataPenjualanApp {
     });
   }
 
-  // Set default dates
+  // Set default date range (tetap sama)
   setDefaultDates() {
     const today = new Date();
     const todayFormatted = utils.formatDate(today);
+
     document.getElementById("filterTanggal").value = todayFormatted;
   }
 
-  // Initialize DataTable
+  // PERBAIKAN: Load sales data dengan cache yang lebih efisien
+  async loadSalesData(forceRefresh = false) {
+    if (this.isLoading) return;
+
+    try {
+      this.isLoading = true;
+      utils.showLoading(true);
+
+      const cacheKey = "salesData";
+      
+      // Cek apakah perlu refresh berdasarkan berbagai kondisi
+      const needsRefresh = forceRefresh || 
+                          cacheManager.shouldUpdate(cacheKey) ||
+                          this.checkForDataUpdates();
+
+      // Cek cache terlebih dahulu jika tidak perlu refresh
+      if (!needsRefresh) {
+        const cachedData = cacheManager.get(cacheKey);
+        if (cachedData && Array.isArray(cachedData)) {
+          console.log("Using cached sales data");
+          this.salesData = cachedData;
+          this.filterData();
+          return;
+        }
+      }
+
+      console.log("Fetching fresh sales data from Firestore");
+      const salesSnapshot = await getDocs(
+        query(collection(firestore, "penjualanAksesoris"), orderBy("timestamp", "desc"))
+      );
+
+      this.salesData = salesSnapshot.docs.map((doc) => {
+        const data = doc.data();
+        // Standardize jenis penjualan
+        if (data.jenisPenjualan === "gantiLock") {
+          data.jenisPenjualan = "manual";
+          data.isGantiLock = true;
+        }
+        return { id: doc.id, ...data };
+      });
+
+      // Simpan ke cache dengan TTL yang sesuai
+      cacheManager.set(cacheKey, this.salesData);
+      
+      // Update timestamp untuk tracking
+      localStorage.setItem("lastSalesUpdate", Date.now().toString());
+
+    } catch (error) {
+      console.error("Error loading sales data:", error);
+      
+      // Fallback ke cache jika ada error
+      const cachedData = cacheManager.get("salesData");
+      if (cachedData && Array.isArray(cachedData)) {
+        console.log("Fallback to cached data due to error");
+        utils.showAlert("Gagal memuat data terbaru. Menggunakan data cache.", "Peringatan", "warning");
+        this.salesData = cachedData;
+      } else {
+        utils.showAlert("Gagal memuat data penjualan: " + error.message, "Error", "error");
+        this.salesData = [];
+      }
+    } finally {
+      this.isLoading = false;
+      utils.showLoading(false);
+    }
+  }
+
+  // TAMBAHAN: Cek apakah ada update data yang memerlukan refresh
+  checkForDataUpdates() {
+    // Cek apakah ada transaksi baru yang ditambahkan
+    const lastTransactionTime = localStorage.getItem("lastTransactionTime");
+    const cacheTimestamp = localStorage.getItem(cacheManager.prefix + "salesData_meta");
+    
+    if (lastTransactionTime && cacheTimestamp) {
+      return parseInt(lastTransactionTime) > parseInt(cacheTimestamp);
+    }
+    
+    return false;
+  }
+
+  // Initialize DataTable (tetap sama)
   initDataTable() {
     if (this.dataTable) {
       this.dataTable.off();
@@ -617,8 +499,14 @@ class OptimizedDataPenjualanApp {
       fixedColumns: false,
       autoWidth: false,
       columnDefs: [
-        { targets: "_all", className: "text-nowrap" },
-        { targets: [10], className: "text-wrap" },
+        {
+          targets: "_all",
+          className: "text-nowrap",
+        },
+        {
+          targets: [10], // Kolom keterangan
+          className: "text-wrap",
+        },
       ],
       language: {
         decimal: "",
@@ -651,112 +539,88 @@ class OptimizedDataPenjualanApp {
     });
   }
 
-  // Filter data based on form inputs
+  // Filter data based on form inputs (tetap sama)
   filterData() {
-  const filters = {
-    selectedDate: utils.parseDate(document.getElementById("filterTanggal").value),
-    jenis: document.getElementById("filterJenisPenjualan").value,
-    sales: document.getElementById("filterSales").value,
-  };
+    const filters = {
+      selectedDate: utils.parseDate(document.getElementById("filterTanggal").value),
+      jenis: document.getElementById("filterJenisPenjualan").value,
+      sales: document.getElementById("filterSales").value,
+    };
 
-  // Store current selected date for real-time listener
-  this.currentSelectedDate = filters.selectedDate;
+    // PERBAIKAN: Jika tidak ada tanggal, tampilkan data kosong
+    if (!filters.selectedDate) {
+      this.filteredData = [];
+      this.updateDataTable();
+      this.updateSummary();
+      return;
+    }
 
-  // Setup real-time listener based on selected date
-  this.setupRealtimeListener(filters.selectedDate);
+    // Set tanggal ke awal dan akhir hari
+    const startOfDay = new Date(filters.selectedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(filters.selectedDate);
+    endOfDay.setHours(23, 59, 59, 999);
 
-  // If no date selected, show empty data
-  if (!filters.selectedDate) {
-    this.filteredData = [];
+    this.filteredData = this.salesData.filter((transaction) => {
+      // PERBAIKAN: Tangani berbagai format timestamp dengan error handling yang lebih baik
+      let transactionDate = null;
+      
+      if (transaction.timestamp) {
+        // Jika timestamp adalah Firestore Timestamp dengan method toDate()
+        if (typeof transaction.timestamp.toDate === 'function') {
+          try {
+            transactionDate = transaction.timestamp.toDate();
+          } catch (error) {
+            console.warn('Error converting Firestore timestamp:', error);
+          }
+        }
+        // Jika timestamp sudah dalam format Date object
+        else if (transaction.timestamp instanceof Date) {
+          transactionDate = transaction.timestamp;
+        }
+        // Jika timestamp adalah string atau number
+        else {
+          transactionDate = new Date(transaction.timestamp);
+          if (isNaN(transactionDate.getTime())) {
+            transactionDate = null;
+          }
+        }
+      }
+      
+      // Fallback ke field tanggal jika timestamp tidak ada atau tidak valid
+      if (!transactionDate && transaction.tanggal) {
+        transactionDate = utils.parseDate(transaction.tanggal);
+      }
+
+      // PERBAIKAN: Jika masih tidak bisa mendapatkan tanggal yang valid, log detail dan skip
+      if (!transactionDate || isNaN(transactionDate.getTime())) {
+        console.warn('Skipping transaction with invalid date:', {
+          id: transaction.id,
+          timestamp: transaction.timestamp,
+          tanggal: transaction.tanggal,
+          parsedDate: transactionDate
+        });
+        return false;
+      }
+
+      // Date filter - hanya untuk hari yang dipilih
+      if (transactionDate < startOfDay || transactionDate > endOfDay) return false;
+
+      // Jenis filter
+      if (filters.jenis !== "all" && transaction.jenisPenjualan !== filters.jenis) return false;
+
+      // Sales filter
+      if (filters.sales !== "all" && transaction.sales !== filters.sales) return false;
+
+      return true;
+    });
+
     this.updateDataTable();
     this.updateSummary();
-    return;
+    this.updateURLParams(filters);
   }
 
-  // Set date range for filtering
-  const startOfDay = new Date(filters.selectedDate);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(filters.selectedDate);
-  endOfDay.setHours(23, 59, 59, 999);
-
-  // ✅ PERBAIKAN: Remove duplicates before filtering
-  const uniqueSalesData = this.removeDuplicates(this.salesData);
-
-  this.filteredData = uniqueSalesData.filter((transaction) => {
-    // ✅ PERBAIKAN: Handle different timestamp formats dengan error handling
-    let transactionDate = null;
-    
-    if (transaction.timestamp) {
-      // Handle Firestore Timestamp
-      if (typeof transaction.timestamp.toDate === 'function') {
-        try {
-          transactionDate = transaction.timestamp.toDate();
-        } catch (error) {
-          console.warn('Error converting Firestore timestamp:', error);
-        }
-      }
-      // Handle Date object
-      else if (transaction.timestamp instanceof Date) {
-        transactionDate = transaction.timestamp;
-      }
-      // Handle object with seconds
-      else if (transaction.timestamp && typeof transaction.timestamp === 'object' && transaction.timestamp.seconds) {
-        transactionDate = new Date(transaction.timestamp.seconds * 1000);
-      }
-      // Handle number or string
-      else {
-        transactionDate = new Date(transaction.timestamp);
-        if (isNaN(transactionDate.getTime())) {
-          transactionDate = null;
-        }
-      }
-    }
-    
-    // Fallback to tanggal field
-    if (!transactionDate && transaction.tanggal) {
-      transactionDate = utils.parseDate(transaction.tanggal);
-    }
-
-    // Skip if no valid date
-    if (!transactionDate || isNaN(transactionDate.getTime())) {
-      console.warn('Skipping transaction with invalid date:', {
-        id: transaction.id,
-        timestamp: transaction.timestamp,
-        tanggal: transaction.tanggal
-      });
-      return false;
-    }
-
-    // Date filter
-    if (transactionDate < startOfDay || transactionDate > endOfDay) return false;
-
-    // Jenis filter
-    if (filters.jenis !== "all" && transaction.jenisPenjualan !== filters.jenis) return false;
-
-    // Sales filter
-    if (filters.sales !== "all" && transaction.sales !== filters.sales) return false;
-
-    return true;
-  });
-
-  this.updateDataTable();
-  this.updateSummary();
-  this.updateURLParams(filters);
-}
-
-// ✅ PERBAIKAN: Tambahkan method untuk remove duplicates
-removeDuplicates(data) {
-  const seen = new Set();
-  return data.filter(item => {
-    if (seen.has(item.id)) {
-      return false;
-    }
-    seen.add(item.id);
-    return true;
-  });
-}
-
-  // Update URL parameters
+  // Update URL parameters to maintain filter state (tetap sama)
   updateURLParams(filters) {
     const params = new URLSearchParams();
 
@@ -770,11 +634,12 @@ removeDuplicates(data) {
       params.set("sales", filters.sales);
     }
 
+    // Update URL without page reload
     const newURL = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
     window.history.replaceState({}, "", newURL);
   }
 
-  // Load filter state from URL
+  // Load filter state from URL parameters (tetap sama)
   loadFilterFromURL() {
     const params = new URLSearchParams(window.location.search);
 
@@ -789,92 +654,79 @@ removeDuplicates(data) {
     }
   }
 
-  // Update DataTable with filtered data
+  // Update DataTable with filtered data (tetap sama)
   updateDataTable() {
     const tableData = this.prepareTableData();
+
     if (this.dataTable) {
       this.dataTable.clear().rows.add(tableData).draw();
     }
   }
 
-  // Prepare data for DataTable
-  prepareTableData() {
-  const tableData = [];
-  
-  // ✅ PERBAIKAN: Remove duplicates sebelum prepare data
-  const uniqueFilteredData = this.removeDuplicates(this.filteredData);
-  
-  uniqueFilteredData.forEach((transaction) => {
-    // ✅ PERBAIKAN: Handle timestamp dengan lebih robust
-    let displayDate = "-";
-    
-    if (transaction.timestamp) {
-      if (typeof transaction.timestamp.toDate === 'function') {
-        try {
+  // Prepare data for DataTable (tetap sama)
+   prepareTableData() {
+    const tableData = [];
+    this.filteredData.forEach((transaction) => {
+      // PERBAIKAN: Tangani berbagai format timestamp untuk display
+      let displayDate = "-";
+      if (transaction.timestamp) {
+        if (typeof transaction.timestamp.toDate === 'function') {
           displayDate = utils.formatDate(transaction.timestamp.toDate());
-        } catch (error) {
-          console.warn('Error formatting timestamp:', error);
-          displayDate = utils.formatDate(transaction.tanggal) || "-";
+        } else if (transaction.timestamp instanceof Date) {
+          displayDate = utils.formatDate(transaction.timestamp);
+        } else {
+          displayDate = utils.formatDate(new Date(transaction.timestamp));
         }
-      } else if (transaction.timestamp instanceof Date) {
-        displayDate = utils.formatDate(transaction.timestamp);
-      } else if (transaction.timestamp && typeof transaction.timestamp === 'object' && transaction.timestamp.seconds) {
-        displayDate = utils.formatDate(new Date(transaction.timestamp.seconds * 1000));
-      } else {
-        const parsedDate = new Date(transaction.timestamp);
-        displayDate = isNaN(parsedDate.getTime()) ? "-" : utils.formatDate(parsedDate);
+      } else if (transaction.tanggal) {
+        displayDate = utils.formatDate(transaction.tanggal);
       }
-    } else if (transaction.tanggal) {
-      displayDate = utils.formatDate(transaction.tanggal);
-    }
 
-    const baseData = {
-      date: displayDate,
-      sales: transaction.sales || "Admin",
-      jenis: this.formatJenisPenjualan(transaction),
-      status: this.getStatusBadge(transaction),
-      actions: this.getActionButtons(transaction.id),
-    };
+      const baseData = {
+        date: displayDate,
+        sales: transaction.sales || "Admin",
+        jenis: this.formatJenisPenjualan(transaction),
+        status: this.getStatusBadge(transaction),
+        actions: this.getActionButtons(transaction.id),
+      };
 
-    if (transaction.items?.length > 0) {
-      transaction.items.forEach((item) => {
+      if (transaction.items?.length > 0) {
+        transaction.items.forEach((item) => {
+          tableData.push([
+            baseData.date,
+            baseData.sales,
+            baseData.jenis,
+            item.kodeText || item.barcode || "-",
+            item.nama || "-",
+            item.jumlah || 1,
+            item.berat ? `${item.berat} gr` : "-",
+            item.kadar || "-",
+            `Rp ${utils.formatRupiah(item.totalHarga || 0)}`,
+            baseData.status,
+            item.keterangan || transaction.keterangan || "-",
+            baseData.actions,
+          ]);
+        });
+      } else {
         tableData.push([
           baseData.date,
           baseData.sales,
           baseData.jenis,
-          item.kodeText || item.barcode || "-",
-          item.nama || "-",
-          item.jumlah || 1,
-          item.berat ? `${item.berat} gr` : "-",
-          item.kadar || "-",
-          `Rp ${utils.formatRupiah(item.totalHarga || 0)}`,
+          "-",
+          "-",
+          "-",
+          "-",
+          "-",
+          `Rp ${utils.formatRupiah(transaction.totalHarga || 0)}`,
           baseData.status,
-          item.keterangan || transaction.keterangan || "-",
+          transaction.keterangan || "-",
           baseData.actions,
         ]);
-      });
-    } else {
-      tableData.push([
-        baseData.date,
-        baseData.sales,
-        baseData.jenis,
-        "-",
-        "-",
-        "-",
-        "-",
-        "-",
-        `Rp ${utils.formatRupiah(transaction.totalHarga || 0)}`,
-        baseData.status,
-        transaction.keterangan || "-",
-        baseData.actions,
-      ]);
-    }
-  });
-  
-  return tableData;
-}
+      }
+    });
+    return tableData;
+  }
 
-  // Format jenis penjualan
+  // Format jenis penjualan (tetap sama)
   formatJenisPenjualan(transaction) {
     if (transaction.isGantiLock || transaction.jenisPenjualan === "gantiLock") {
       const kodeAksesoris = transaction.items?.find((item) => item.kodeLock)?.kodeLock || "";
@@ -890,7 +742,7 @@ removeDuplicates(data) {
     return jenis.charAt(0).toUpperCase() + jenis.slice(1);
   }
 
-  // Get status badge HTML
+  // Get status badge HTML (tetap sama)
   getStatusBadge(transaction) {
     const status = transaction.statusPembayaran || "Lunas";
 
@@ -903,7 +755,7 @@ removeDuplicates(data) {
     return badges[status] || `<span class="badge bg-secondary">${status}</span>`;
   }
 
-  // Get action buttons HTML
+  // Get action buttons HTML (tetap sama)
   getActionButtons(transactionId) {
     return `
     <div class="action-buttons">
@@ -920,7 +772,7 @@ removeDuplicates(data) {
   `;
   }
 
-  // Update summary cards
+  // Update summary cards (tetap sama)
   updateSummary() {
     const totalTransaksi = this.filteredData.length;
     const totalPendapatan = this.calculateTotalRevenue(this.filteredData);
@@ -929,12 +781,13 @@ removeDuplicates(data) {
     document.getElementById("totalPendapatan").textContent = `Rp ${utils.formatRupiah(totalPendapatan)}`;
   }
 
-  // Calculate actual revenue
+  // Helper function to calculate actual revenue (tetap sama)
   calculateActualRevenue(transaction) {
     if (transaction.metodeBayar === "free" || transaction.statusPembayaran === "Free") {
       return 0;
     }
 
+    // Untuk transaksi manual dengan DP, hitung sisa pembayaran
     if (
       transaction.jenisPenjualan === "manual" &&
       (transaction.metodeBayar === "dp" || transaction.statusPembayaran === "DP")
@@ -942,17 +795,18 @@ removeDuplicates(data) {
       return transaction.sisaPembayaran || 0;
     }
 
+    // For completed transactions, return full amount
     return transaction.totalHarga || 0;
   }
 
-  // Calculate total revenue
+  // Calculate total revenue (tetap sama)
   calculateTotalRevenue(transactions) {
     return transactions.reduce((total, transaction) => {
       return total + this.calculateActualRevenue(transaction);
     }, 0);
   }
 
-  // Populate sales filter dropdown
+  // Populate sales filter dropdown (tetap sama)
   populateSalesFilter() {
     const salesPersons = [...new Set(this.salesData.map((item) => item.sales).filter(Boolean))];
     const dropdown = document.getElementById("filterSales");
@@ -968,7 +822,7 @@ removeDuplicates(data) {
     });
   }
 
-  // Handle reprint action
+  // Handle reprint action (tetap sama)
   handleReprint(transactionId) {
     this.currentTransaction = this.salesData.find((t) => t.id === transactionId);
     if (!this.currentTransaction) {
@@ -977,7 +831,7 @@ removeDuplicates(data) {
     $("#printModal").modal("show");
   }
 
-  // Handle edit action
+  // Handle edit action (tetap sama)
   handleEdit(transactionId) {
     this.currentTransaction = this.salesData.find((t) => t.id === transactionId);
     if (!this.currentTransaction) {
@@ -986,7 +840,7 @@ removeDuplicates(data) {
     this.showEditModal();
   }
 
-  // Handle delete action
+  // Handle delete action (tetap sama)
   handleDelete(transactionId) {
     this.currentTransaction = this.salesData.find((t) => t.id === transactionId);
     if (!this.currentTransaction) {
@@ -995,7 +849,7 @@ removeDuplicates(data) {
     this.showDeleteModal();
   }
 
-  // Show edit modal
+  // Show edit modal (tetap sama)
   showEditModal() {
     const transaction = this.currentTransaction;
     const jenisPenjualan = transaction.jenisPenjualan;
@@ -1003,11 +857,13 @@ removeDuplicates(data) {
     const formHtml = this.generateEditForm(transaction, jenisPenjualan);
     document.getElementById("editModalBody").innerHTML = formHtml;
 
+    // Attach form events
     this.attachEditFormEvents(transaction);
+
     $("#editModal").modal("show");
   }
 
-  // Generate edit form HTML
+  // Generate edit form HTML (tetap sama)
   generateEditForm(transaction, jenisPenjualan) {
     let formHtml = `
       <div class="mb-3">
@@ -1088,7 +944,7 @@ removeDuplicates(data) {
     return formHtml;
   }
 
-  // Attach edit form events
+  // Attach edit form events (tetap sama)
   attachEditFormEvents(transaction) {
     if (transaction.items) {
       transaction.items.forEach((item, index) => {
@@ -1103,7 +959,7 @@ removeDuplicates(data) {
     }
   }
 
-  // Save edit transaction
+  // PERBAIKAN: Save edit transaction dengan cache invalidation
   async saveEditTransaction() {
     try {
       utils.showLoading(true);
@@ -1140,8 +996,12 @@ removeDuplicates(data) {
       // Update in Firestore
       await updateDoc(doc(firestore, "penjualanAksesoris", this.currentTransaction.id), updateData);
 
-      // Update local data and cache
+      // Update local data
       this.updateLocalData(this.currentTransaction.id, updateData);
+
+      // PERBAIKAN: Invalidate cache setelah update
+      cacheManager.clear();
+      localStorage.setItem("lastTransactionTime", Date.now().toString());
 
       $("#editModal").modal("hide");
       utils.showAlert("Transaksi berhasil diperbarui", "Sukses", "success");
@@ -1153,7 +1013,7 @@ removeDuplicates(data) {
     }
   }
 
-  // Update local data
+  // Update local data (tetap sama)
   updateLocalData(transactionId, updateData) {
     // Update salesData
     const salesIndex = this.salesData.findIndex((item) => item.id === transactionId);
@@ -1169,15 +1029,12 @@ removeDuplicates(data) {
       delete this.filteredData[filteredIndex].lastUpdated;
     }
 
-    // Update cache
-    cacheManager.updateTransaction(transactionId, updateData);
-
     // Re-render table
     this.updateDataTable();
     this.updateSummary();
   }
 
-  // Show delete modal
+  // Show delete modal (tetap sama)
   showDeleteModal() {
     const transaction = this.currentTransaction;
     const date = utils.formatDate(transaction.timestamp || transaction.tanggal);
@@ -1190,6 +1047,7 @@ removeDuplicates(data) {
     </div>
   `;
 
+    // Clear password field
     const passwordInput = document.getElementById("deleteVerificationPassword");
     if (passwordInput) {
       passwordInput.value = "";
@@ -1198,7 +1056,7 @@ removeDuplicates(data) {
     $("#deleteModal").modal("show");
   }
 
-  // Confirm delete transaction
+  // PERBAIKAN: Confirm delete transaction dengan cache invalidation
   async confirmDeleteTransaction() {
     const password = document.getElementById("deleteVerificationPassword").value;
 
@@ -1219,8 +1077,9 @@ removeDuplicates(data) {
       this.salesData = this.salesData.filter((item) => item.id !== this.currentTransaction.id);
       this.filteredData = this.filteredData.filter((item) => item.id !== this.currentTransaction.id);
 
-      // Update cache
-      cacheManager.removeTransaction(this.currentTransaction.id);
+      // PERBAIKAN: Invalidate cache setelah delete
+      cacheManager.clear();
+      localStorage.setItem("lastTransactionTime", Date.now().toString());
 
       this.updateDataTable();
       this.updateSummary();
@@ -1235,7 +1094,7 @@ removeDuplicates(data) {
     }
   }
 
-  // Print document (receipt or invoice)
+  // Print document (receipt or invoice) (tetap sama)
   printDocument(type) {
     if (!this.currentTransaction) {
       return utils.showAlert("Tidak ada data transaksi untuk dicetak!");
@@ -1254,7 +1113,7 @@ removeDuplicates(data) {
     printWindow.document.close();
   }
 
-  // Generate receipt HTML
+  // Generate receipt HTML (tetap sama)
   generateReceiptHTML(transaction) {
     const tanggal = utils.formatDate(transaction.timestamp || transaction.tanggal);
     let salesType = transaction.jenisPenjualan || "aksesoris";
@@ -1377,7 +1236,7 @@ removeDuplicates(data) {
     return receiptHTML;
   }
 
-  // Generate invoice HTML
+  // Generate invoice HTML (tetap sama)
   generateInvoiceHTML(transaction) {
     const tanggal = utils.formatDate(transaction.timestamp || transaction.tanggal);
 
@@ -1393,7 +1252,7 @@ removeDuplicates(data) {
         .header-info { text-align: right; margin-bottom: 2cm; margin-right: 3cm; margin-top: 0.8cm; }
         .total-row { margin-top: 0.7cm; text-align: right; font-weight: bold; margin-right: 3cm; }
         .sales { text-align: right; margin-top: 0.6cm; margin-right: 2cm; }
-        .keterangan { font-style: italic; font-size: 10px; margin-top: 1cm; margin-bottom: 0.5cm; padding-top: 2mm; text-align: left; margin-left: 0.5cm; margin-right: 3cm; }
+                .keterangan { font-style: italic; font-size: 10px; margin-top: 1cm; margin-bottom: 0.5cm; padding-top: 2mm; text-align: left; margin-left: 0.5cm; margin-right: 3cm; }
         .keterangan-spacer { height: 1.6cm; }
         .item-details { display: flex; flex-wrap: wrap; }
         .item-data { display: grid; grid-template-columns: 2cm 1.8cm 5cm 2cm 2cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 0.5cm; margin-top: 1cm; margin-right: 3cm; }
@@ -1412,7 +1271,7 @@ removeDuplicates(data) {
     let keteranganText = "";
     let totalHarga = 0;
 
-    // Loop untuk menampilkan semua item-data
+    // Loop untuk menampilkan semua item-data terlebih dahulu
     transaction.items?.forEach((item) => {
       const itemHarga = parseInt(item.totalHarga || 0);
       totalHarga += itemHarga;
@@ -1437,7 +1296,7 @@ removeDuplicates(data) {
       }
     });
 
-    // Tampilkan keterangan atau spacer
+    // Tampilkan keterangan atau spacer untuk menjaga posisi total-row
     if (hasKeterangan && transaction.jenisPenjualan === "manual") {
       invoiceHTML += `
       <div class="keterangan">
@@ -1446,7 +1305,10 @@ removeDuplicates(data) {
       </div>
     `;
     } else {
-      invoiceHTML += `<div class="keterangan-spacer"></div>`;
+      // Tambahkan spacer jika tidak ada keterangan untuk menjaga posisi total-row
+      invoiceHTML += `
+      <div class="keterangan-spacer"></div>
+    `;
     }
 
     // Tampilkan total dan sales
@@ -1455,6 +1317,9 @@ removeDuplicates(data) {
         Rp ${utils.formatRupiah(totalHarga)}
       </div>
       <div class="sales">${transaction.sales || "-"}</div>
+  `;
+
+    invoiceHTML += `
       </div>
       <script>
         window.onload = function() {
@@ -1469,134 +1334,69 @@ removeDuplicates(data) {
     return invoiceHTML;
   }
 
-  // Refresh data manually
-  async refreshData() {
-    try {
-      utils.showLoading(true);
-
-      // Clear cache and reload from Firestore
+  // PERBAIKAN: Refresh data dengan cache management yang lebih baik
+  async refreshData(forceRefresh = false) {
+    // Clear cache sebelum refresh untuk memastikan data terbaru
+    if (forceRefresh) {
       cacheManager.clear();
-      await this.loadSalesDataFromFirestore();
-
-      this.populateSalesFilter();
-      this.filterData();
-
-      utils.showAlert("Data berhasil diperbarui", "Sukses", "success");
-    } catch (error) {
-      console.error("Error refreshing data:", error);
-      utils.showAlert("Gagal memperbarui data: " + error.message, "Error", "error");
-    } finally {
-      utils.showLoading(false);
     }
-  }
-
-  // Load older data when needed
-  async loadOlderData() {
-    try {
-      const oldestTransaction = this.salesData[this.salesData.length - 1];
-      if (!oldestTransaction) return;
-
-      const olderQuery = query(
-        collection(firestore, "penjualanAksesoris"),
-        where("timestamp", "<", oldestTransaction.timestamp),
-        orderBy("timestamp", "desc"),
-        limit(50)
-      );
-
-      const olderSnapshot = await getDocs(olderQuery);
-      const olderData = olderSnapshot.docs.map((doc) => {
-        const data = doc.data();
-        if (data.jenisPenjualan === "gantiLock") {
-          data.jenisPenjualan = "manual";
-          data.isGantiLock = true;
-        }
-        return { id: doc.id, ...data };
-      });
-
-      if (olderData.length > 0) {
-        this.salesData.push(...olderData);
-        cacheManager.set("salesData", this.salesData);
-        console.log(`📥 Loaded ${olderData.length} older transactions`);
-      }
-
-      return olderData.length;
-    } catch (error) {
-      console.error("Error loading older data:", error);
-      return 0;
-    }
-  }
-
-  // Cleanup method
-  destroy() {
-    console.log("🧹 Destroying Optimized Data Penjualan");
-
-    // Remove real-time listener
-    this.removeTodayListener();
-
-    // Destroy DataTable
-    if (this.dataTable) {
-      this.dataTable.off();
-      this.dataTable.destroy();
-      this.dataTable = null;
-    }
-
-    // Clear data
-    this.salesData = [];
-    this.filteredData = [];
-    this.currentTransaction = null;
-    this.isLoading = false;
-    this.isListeningToday = false;
-    this.currentSelectedDate = null;
-
-    console.log("✅ Optimized Data Penjualan destroyed");
+    
+    await this.loadSalesData(forceRefresh);
+    this.populateSalesFilter();
+    utils.showAlert("Data berhasil diperbarui", "Sukses", "success");
   }
 }
 
-// Initialize application when DOM is ready
+// PERBAIKAN: Initialize application dengan cache cleanup
 $(document).ready(async function () {
-  try {
-    // Check dependencies
-    if (typeof firestore === "undefined") {
-      throw new Error("Firebase Firestore not initialized");
+  // Bersihkan cache lama saat aplikasi dimulai
+  cacheManager.clearOldCache();
+  
+  // Initialize the application
+  const app = new DataPenjualanApp();
+  await app.init();
+
+  // PERBAIKAN: Auto-refresh yang lebih efisien - hanya jika diperlukan
+  setInterval(() => {
+    // Hanya refresh jika cache sudah expired atau ada indikasi data baru
+    const needsRefresh = cacheManager.shouldUpdate("salesData") || 
+                        app.checkForDataUpdates();
+    
+    if (needsRefresh) {
+      app.refreshData();
     }
+  }, 5 * 60 * 1000); // Check setiap 5 menit
 
-    if (typeof $ === "undefined") {
-      throw new Error("jQuery not loaded");
+  // PERBAIKAN: Clear cache yang lebih selektif saat page unload
+  window.addEventListener("beforeunload", () => {
+    // Hanya clear cache yang sudah expired
+    const now = Date.now();
+    Object.keys(localStorage)
+      .filter(key => key.startsWith(cacheManager.prefix))
+      .forEach(key => {
+        try {
+          const item = JSON.parse(localStorage.getItem(key));
+          if (item && item.timestamp && (now - item.timestamp) > item.ttl) {
+            localStorage.removeItem(key);
+          }
+        } catch (error) {
+          // Jika ada error parsing, hapus item tersebut
+          localStorage.removeItem(key);
+        }
+      });
+  });
+
+  // TAMBAHAN: Event listener untuk mendeteksi perubahan data dari tab lain
+  window.addEventListener("storage", (e) => {
+    if (e.key === "lastTransactionTime") {
+      // Ada transaksi baru dari tab lain, refresh data
+      app.refreshData(true);
     }
+  });
 
-    // Initialize the optimized application
-    const app = new OptimizedDataPenjualanApp();
-    await app.init();
-
-    // Make app globally available for debugging
-    window.dataPenjualanApp = app;
-
-    console.log("✅ Optimized Data Penjualan System initialized successfully");
-  } catch (error) {
-    console.error("❌ Failed to initialize Optimized Data Penjualan System:", error);
-    utils.showAlert("Gagal menginisialisasi aplikasi: " + error.message, "Error", "error");
-  }
-});
-
-// Cleanup on page unload
-window.addEventListener("beforeunload", () => {
-  if (window.dataPenjualanApp) {
-    window.dataPenjualanApp.destroy();
-  }
-});
-
-// Cross-tab communication for cache synchronization
-window.addEventListener("storage", (e) => {
-  if (e.key === "optimizedSalesCache" && window.dataPenjualanApp) {
-    // Reload cache when updated from another tab
-    cacheManager.loadFromStorage();
-    window.dataPenjualanApp.salesData = cacheManager.get("salesData") || [];
-    window.dataPenjualanApp.filterData();
-    console.log("🔄 Cache synchronized from another tab");
-  }
+  console.log("Data Penjualan application initialized with improved cache management");
 });
 
 // Export for potential use in other modules
-export default OptimizedDataPenjualanApp;
+export default DataPenjualanApp;
 
-console.log("📊 Optimized Data Penjualan Module loaded successfully");

@@ -1,5 +1,6 @@
-pada file dataPenjalan.js yang sudah diupdate saya ingin ada perbaikan tambahan dengan ketentuan:
-- ketika klik tombol btn-delete tampilkan opsi untuk hapus penjualan dan batal penjualan. jika klik hapus penjualan maka logika yang digunakan sama seperti yang digunakan sekarang. jika klik batal penjualan maka selain menghapus data penjualan ditambahkan untuk menghapus kode barang di koleksi stokAksesorisTransaksi agar data kode stok dikembalikan seperti sebelumnya.
-- hanya perbaiki pada kode yang diperlukan bukan merubah keseluruhan kode. 
-- saya akan melampirkan kode dataPenjualan.html dataPenjualan.html agar konteks lebih komprehensif dan file penjualanAksesoris.js penjualanAksesoris.js yang menyimpan data penjualan di koleksi stokAksesorisTransaksi
-- berikan saya skenario perbaikan yang kamu rekomendasikan jika sudah saya konfirmasi baru buat penulisan kodenya
+buatkan saya perbaika pada penjualanAksesoris.js dengan mengikuti kelebihan yang  ada pada optimizedDp.js dengan ketentuan:
+- tidak menggunkan TTL melainkan listener realtime namun dengan logika yang smart
+- penggunaan reads firestore sefefktif mungkin karena menggunkan firestore spark plan.
+- penulisan kode dengan tingkat kompleksitas sedang dan hanya pada kode yang benar benar diperlukan agar file tidak terlalu panjang dan bisa efektif
+- buatkan kode secara lengkap agar bisa langsung saya gunakan untuk menggantikan file sebelumnya
+- saya akan melampirkan file penjualanAksesoris.html untuk konteks yang lebih komprehensif penjualanAksesoris.html 
