@@ -15,7 +15,7 @@ class OptimizedStockReport {
   constructor() {
     // Cache configuration
     this.CACHE_TTL_STANDARD = 60 * 60 * 1000; // 1 hour for historical data
-    this.CACHE_TTL_TODAY = 5 * 60 * 1000; // 5 minutes for today's data
+    this.CACHE_TTL_TODAY = 30 * 60 * 1000; // 5 minutes for today's data
     
     // Data storage
     this.stockData = [];
@@ -47,7 +47,7 @@ class OptimizedStockReport {
     this.prepareEmptyTable();
     
     // Cleanup cache periodically
-    setInterval(() => this.cleanupCache(), 10 * 60 * 1000);
+    setInterval(() => this.cleanupCache(), 30 * 60 * 1000);
   }
 
   // Initialize date pickers

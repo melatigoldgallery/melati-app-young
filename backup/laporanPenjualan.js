@@ -1,4 +1,4 @@
-import { firestore } from "./configFirebase.js";
+import { firestore } from "../js/configFirebase.js";
 import {
   collection,
   getDocs,
@@ -9,7 +9,7 @@ import {
   where,
   orderBy,
   Timestamp,
-  onSnapshot,
+  serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
 // Table configurations
@@ -32,11 +32,11 @@ const tableConfigs = {
   },
 };
 
-// Smart cache management adapted from laporanStok.js
+// Enhanced cache management with localStorage persistence
 const cacheManager = {
   // Cache TTL constants
-  CACHE_TTL_TODAY: 30 * 60 * 1000,     // 30 menit untuk data hari ini
-  CACHE_TTL_STANDARD: 60 * 60 * 1000,  // 1 jam untuk data historis
+  CACHE_TTL_TODAY: 5 * 60 * 1000,     // 5 menit untuk data hari ini
+  CACHE_TTL_STANDARD: 60 * 60 * 1000, // 1 jam untuk data historis
 
   // Check if cache is valid
   isValid(cacheKey) {
@@ -61,15 +61,18 @@ const cacheManager = {
   // Set cache data with localStorage persistence
   set(cacheKey, data) {
     try {
+      // Simpan data ke localStorage dengan kompresi
       const compressedData = this.compressData(data);
       localStorage.setItem(cacheKey, compressedData);
       
+      // Simpan timestamp
       const metaKey = `${cacheKey}_timestamp`;
       localStorage.setItem(metaKey, Date.now().toString());
       
       console.log(`Cache saved for key: ${cacheKey}`);
     } catch (error) {
       console.error("Error saving cache:", error);
+      // Jika localStorage penuh, hapus cache lama
       this.clearOldCache();
       try {
         const compressedData = this.compressData(data);
@@ -100,12 +103,13 @@ const cacheManager = {
     }
   },
 
-  // Clear specific cache
+  // Clear specific cache or all cache
   clear(cacheKey = null) {
     if (cacheKey) {
       localStorage.removeItem(cacheKey);
       localStorage.removeItem(`${cacheKey}_timestamp`);
     } else {
+      // Clear all sales cache
       const keys = Object.keys(localStorage);
       keys.forEach(key => {
         if (key.startsWith('salesData_') || key.includes('_timestamp')) {
@@ -115,7 +119,7 @@ const cacheManager = {
     }
   },
 
-  // Clear old cache entries
+  // Clear old cache entries (older than 24 hours)
   clearOldCache() {
     const now = Date.now();
     const maxAge = 24 * 60 * 60 * 1000; // 24 hours
@@ -133,57 +137,48 @@ const cacheManager = {
     });
   },
 
-  // Clear cache for specific date
-  clearCacheForDate(date) {
-    const dateStr = formatDate(date).replace(/\//g, "-");
-    const keys = Object.keys(localStorage);
-    keys.forEach(key => {
-      if (key.includes(dateStr) && key.startsWith('salesData_')) {
-        localStorage.removeItem(key);
-        localStorage.removeItem(`${key}_timestamp`);
-      }
-    });
-    console.log(`🗑️ Cleared cache for ${dateStr}`);
-  },
-
   // Compress data before storing
   compressData(data) {
-    try {
-      const processedData = JSON.parse(JSON.stringify(data, (key, value) => {
-        if (value && typeof value === 'object' && value.seconds && value.nanoseconds) {
-          return new Date(value.seconds * 1000 + value.nanoseconds / 1000000).toISOString();
-        }
-        return value;
-      }));
-      
-      const jsonString = JSON.stringify(processedData);
-      return jsonString.replace(/\s+/g, "");
-    } catch (error) {
-      console.error("Error compressing data:", error);
-      return JSON.stringify(data);
-    }
-  },
+  try {
+    // Convert Firestore Timestamps to ISO strings before caching
+    const processedData = JSON.parse(JSON.stringify(data, (key, value) => {
+      // Handle Firestore Timestamp objects
+      if (value && typeof value === 'object' && value.seconds && value.nanoseconds) {
+        // Convert Firestore Timestamp to ISO string
+        return new Date(value.seconds * 1000 + value.nanoseconds / 1000000).toISOString();
+      }
+      return value;
+    }));
+    
+    const jsonString = JSON.stringify(processedData);
+    return jsonString.replace(/\s+/g, "");
+  } catch (error) {
+    console.error("Error compressing data:", error);
+    return JSON.stringify(data);
+  }
+},
 
   // Decompress data after retrieving
-  decompressData(compressedData) {
-    try {
-      const parsed = JSON.parse(compressedData);
-      
-      if (Array.isArray(parsed)) {
-        return parsed.map(item => {
-          if (item.timestamp && typeof item.timestamp === 'string') {
-            item.timestamp = new Date(item.timestamp);
-          }
-          return item;
-        });
-      }
-      
-      return parsed;
-    } catch (error) {
-      console.error("Error decompressing data:", error);
-      return null;
+decompressData(compressedData) {
+  try {
+    const parsed = JSON.parse(compressedData);
+    
+    // Restore timestamp fields to Date objects
+    if (Array.isArray(parsed)) {
+      return parsed.map(item => {
+        if (item.timestamp && typeof item.timestamp === 'string') {
+          item.timestamp = new Date(item.timestamp);
+        }
+        return item;
+      });
     }
-  },
+    
+    return parsed;
+  } catch (error) {
+    console.error("Error decompressing data:", error);
+    return null;
+  }
+},
 
   // Get local date string in YYYY-MM-DD format
   getLocalDateString() {
@@ -192,20 +187,20 @@ const cacheManager = {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  },
+
+  // Check if date range includes today
+  includesCurrentDay(startDate, endDate) {
+    const today = this.getLocalDateString();
+    return (startDate <= today && today <= endDate);
   }
 };
 
-// Main handler object with smart real-time updates
+// Main handler object
 const laporanPenjualanHandler = {
   salesData: [],
   filteredSalesData: [],
   dataTable: null,
-  
-  // Real-time listener management (adapted from laporanStok.js)
-  currentListener: null,
-  currentSelectedDate: null,
-  isListeningToday: false,
-  isDataLoaded: false,
 
   // Utility functions
   showAlert: (message, title = "Informasi", type = "info") => {
@@ -225,115 +220,86 @@ const laporanPenjualanHandler = {
     }
   },
 
-  // Smart real-time listener setup (adapted from laporanStok.js)
-  setupRealtimeListener(selectedDate) {
-    const today = new Date();
-    const isToday = this.isSameDate(selectedDate, today);
+  // ✅ BARU: Refresh hanya data tanggal spesifik
+  async refreshSpecificDateData() {
+    const startDateStr = document.getElementById("startDate").value;
+    const endDateStr = document.getElementById("endDate").value;
     
-    // Only setup listener for today's data
-    if (isToday && !this.isListeningToday) {
-      this.setupTodayListener();
-      this.isListeningToday = true;
-      console.log("📡 Real-time listener activated for today");
-    } else if (!isToday && this.isListeningToday) {
-      // Remove listener if not viewing today's data
-      this.removeTodayListener();
-      this.isListeningToday = false;
-      console.log("🔇 Real-time listener deactivated");
+    if (!startDateStr || !endDateStr) {
+      this.showAlert("Pilih rentang tanggal terlebih dahulu", "Peringatan", "warning");
+      return;
     }
-  },
-
-  // Setup listener for today's sales data
-  setupTodayListener() {
+    
+    const startDate = parseDate(startDateStr);
+    const endDate = parseDate(endDateStr);
+    
+    if (!startDate || !endDate) {
+      this.showAlert("Format tanggal tidak valid", "Error", "error");
+      return;
+    }
+    
+    // Cek apakah rentang tanggal mencakup hari ini
     const today = new Date();
-    const startOfDay = new Date(today);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(today);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    // Listen to sales data for today
-    const salesQuery = query(
-      collection(firestore, "penjualanAksesoris"),
-      where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
-      where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
-      orderBy("timestamp", "desc")
-    );
-
-    this.currentListener = onSnapshot(salesQuery, (snapshot) => {
-      if (!snapshot.metadata.hasPendingWrites && this.isDataLoaded) {
-        console.log("📡 Real-time update detected for sales data");
-        this.handleRealtimeUpdate();
-      }
-    });
-  },
-
-  // Remove today's listener
-  removeTodayListener() {
-    if (this.currentListener) {
-      this.currentListener();
-      this.currentListener = null;
-      console.log("🔇 Removed real-time listener");
+    const todayStr = formatDate(today);
+    const isIncludingToday = startDateStr <= todayStr && endDateStr >= todayStr;
+    
+    if (!isIncludingToday) {
+      this.showAlert("Refresh data hanya untuk rentang tanggal yang mencakup hari ini", "Info", "info");
+      return;
     }
-  },
-
-  // Handle real-time updates
-  async handleRealtimeUpdate() {
-    if (!this.currentSelectedDate) return;
     
     try {
-      // Clear cache for current date
-      cacheManager.clearCacheForDate(this.currentSelectedDate);
+      this.showLoading(true);
       
-      // Reload data for current date
-      await this.loadSalesDataByDate(this.currentSelectedDate, true);
+      // Clear cache hanya untuk rentang tanggal spesifik
+      const cacheKey = `salesData_${startDateStr}_${endDateStr}`;
+      cacheManager.clear(cacheKey);
       
-      // Filter and render
+      // Load data hanya untuk rentang tanggal
+      await this.loadSalesDataByDateRange(startDate, endDate, true);
+      
+      // Filter dan render ulang
       this.filterSalesData();
       
-      // Show update indicator
-      this.showUpdateIndicator();
+      this.showAlert(`Data untuk periode ${startDateStr} - ${endDateStr} berhasil diperbarui`, "Berhasil", "success");
       
     } catch (error) {
-      console.error("Error handling real-time update:", error);
+      console.error("Error refreshing specific date data:", error);
+      this.showAlert("Gagal memperbarui data: " + error.message, "Error", "error");
+    } finally {
+      this.showLoading(false);
     }
   },
 
-  // Load sales data by specific date
-  async loadSalesDataByDate(selectedDate, forceRefresh = false) {
+  // ✅ BARU: Load data berdasarkan rentang tanggal
+  async loadSalesDataByDateRange(startDate, endDate, forceRefresh = false) {
     try {
-      const dateStr = formatDate(selectedDate).replace(/\//g, "-");
-      const cacheKey = `salesData_${dateStr}`;
+      const startDateStr = formatDate(startDate);
+      const endDateStr = formatDate(endDate);
+      const cacheKey = `salesData_${startDateStr}_${endDateStr}`;
       
-      this.currentSelectedDate = selectedDate;
-      
-      // Setup real-time listener
-      this.setupRealtimeListener(selectedDate);
-      
-      // Check cache first (except for forced refresh)
+      // Cek cache dulu
       if (!forceRefresh) {
         const cachedData = cacheManager.get(cacheKey);
         if (cachedData) {
-          console.log(`📦 Using cached data for ${dateStr}`);
+          console.log(`📦 Using cached data for ${startDateStr} - ${endDateStr}`);
           this.salesData = cachedData;
-          this.showCacheIndicator(`Menggunakan data cache (${formatDate(selectedDate)})`);
-          this.populateSalesPersonFilter();
+          this.showCacheIndicator(`Menggunakan data cache (${startDateStr} - ${endDateStr})`);
           return;
         }
       }
-
-      console.log(`🔄 Loading fresh data for ${dateStr}`);
+      
+      console.log(`🔄 Loading fresh data for ${startDateStr} - ${endDateStr}`);
       this.hideCacheIndicator();
       
-      // Query for specific date
-      const startOfDay = new Date(selectedDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(selectedDate);
-      endOfDay.setHours(23, 59, 59, 999);
+      // Query dengan filter tanggal
+      const startTimestamp = Timestamp.fromDate(startDate);
+      const endTimestamp = Timestamp.fromDate(new Date(endDate.getTime() + 24 * 60 * 60 * 1000)); // +1 hari
       
       const salesQuery = query(
         collection(firestore, "penjualanAksesoris"),
-        where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
-        where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
+        where("timestamp", ">=", startTimestamp),
+        where("timestamp", "<", endTimestamp),
         orderBy("timestamp", "desc")
       );
       
@@ -353,15 +319,72 @@ const laporanPenjualanHandler = {
       cacheManager.set(cacheKey, salesData);
       
       this.salesData = salesData;
-      this.populateSalesPersonFilter();
-      console.log(`✅ Loaded ${salesData.length} sales records for ${dateStr}`);
+      console.log(`✅ Loaded ${salesData.length} sales records for date range`);
       
     } catch (error) {
-      console.error("Error loading sales data by date:", error);
+      console.error("Error loading sales data by date range:", error);
+      throw error;
+    }
+  },
+
+  // Enhanced load data with improved cache management
+  async loadSalesData(forceRefresh = false) {
+    try {
+      // Cek apakah ada filter tanggal aktif
+      const startDateStr = document.getElementById("startDate").value;
+      const endDateStr = document.getElementById("endDate").value;
       
-      // Try fallback to cache
-      const dateStr = formatDate(selectedDate).replace(/\//g, "-");
-      const cacheKey = `salesData_${dateStr}`;
+      if (startDateStr && endDateStr) {
+        // Jika ada filter tanggal, gunakan query spesifik
+        const startDate = parseDate(startDateStr);
+        const endDate = parseDate(endDateStr);
+        
+        if (startDate && endDate) {
+          await this.loadSalesDataByDateRange(startDate, endDate, forceRefresh);
+          this.populateSalesPersonFilter();
+          return;
+        }
+      }
+      
+      // Fallback ke load semua data (hanya jika tidak ada filter)
+      const cacheKey = 'salesData_all';
+      
+      if (!forceRefresh) {
+        const cachedData = cacheManager.get(cacheKey);
+        if (cachedData) {
+          console.log("📦 Using cached all sales data");
+          this.showCacheIndicator('Menggunakan data cache (semua data)');
+          this.salesData = cachedData;
+          this.populateSalesPersonFilter();
+          return;
+        }
+      }
+
+      this.hideCacheIndicator();
+      this.showLoading(true);
+      console.log("🔄 Loading all sales data from Firestore");
+
+      const salesSnapshot = await getDocs(collection(firestore, "penjualanAksesoris"));
+      const salesData = [];
+
+      salesSnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.jenisPenjualan === "gantiLock") {
+          data.jenisPenjualan = "manual";
+          data.isGantiLock = true;
+        }
+        salesData.push({ id: doc.id, ...data });
+      });
+
+      cacheManager.set(cacheKey, salesData);
+      this.salesData = salesData;
+      this.populateSalesPersonFilter();
+      
+    } catch (error) {
+      console.error("Error loading sales data:", error);
+      
+      // Try fallback
+      const cacheKey = 'salesData_all';
       const cachedData = cacheManager.get(cacheKey);
       
       if (cachedData) {
@@ -373,6 +396,8 @@ const laporanPenjualanHandler = {
       } else {
         this.showAlert("Gagal memuat data penjualan: " + error.message, "Error", "error");
       }
+    } finally {
+      this.showLoading(false);
     }
   },
 
@@ -384,6 +409,7 @@ const laporanPenjualanHandler = {
       cacheIndicator.id = 'cacheIndicator';
       cacheIndicator.className = 'text-muted ms-2';
       
+      // Add to appropriate location (near filter button or table header)
       const filterBtn = document.getElementById('filterSalesBtn');
       if (filterBtn && filterBtn.parentNode) {
         filterBtn.parentNode.appendChild(cacheIndicator);
@@ -402,33 +428,19 @@ const laporanPenjualanHandler = {
     }
   },
 
-  // Show update indicator
-  showUpdateIndicator() {
-    // Remove existing indicator
-    const existingIndicator = document.getElementById("updateIndicator");
-    if (existingIndicator) {
-      existingIndicator.remove();
+  // Force refresh data function
+  forceRefreshData() {
+    const startDateStr = document.getElementById("startDate").value;
+    const endDateStr = document.getElementById("endDate").value;
+    
+    if (!startDateStr || !endDateStr) {
+      this.showAlert("Pilih rentang tanggal terlebih dahulu sebelum refresh", "Peringatan", "warning");
+      return;
     }
-
-    // Create new indicator
-    const indicator = document.createElement("div");
-    indicator.id = "updateIndicator";
-    indicator.className = "alert alert-success alert-dismissible fade show mb-2";
-    indicator.innerHTML = `
-      <i class="fas fa-sync-alt me-2"></i>
-      Data telah diperbarui secara real-time
-      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-
-    const tableContainer = document.querySelector("#penjualanTable").parentElement;
-    tableContainer.insertBefore(indicator, tableContainer.firstChild);
-
-    // Auto remove after 3 seconds
-    setTimeout(() => {
-      if (indicator.parentNode) {
-        indicator.remove();
-      }
-    }, 3000);
+    
+    if (confirm("Apakah Anda yakin ingin menyegarkan data untuk periode yang dipilih?")) {
+      this.refreshSpecificDateData();
+    }
   },
 
   // DataTable management
@@ -458,7 +470,7 @@ const laporanPenjualanHandler = {
           let totalPcs = 0;
           let totalBerat = 0;
           let totalHarga = 0;
-          let hasValidBerat = false;
+          let hasValidBerat = false; // Flag untuk cek apakah ada berat valid
 
           data.forEach((row) => {
             const jumlah = parseInt(row[4]) || 0;
@@ -468,6 +480,7 @@ const laporanPenjualanHandler = {
             totalPcs += jumlah;
             totalHarga += harga;
 
+            // Cek jika kolom berat bukan "-" dan memiliki nilai
             if (row[5] !== "-") {
               const beratStr = row[5].replace(" gr", "").replace(",", ".") || "0";
               const berat = parseFloat(beratStr) || 0;
@@ -480,10 +493,11 @@ const laporanPenjualanHandler = {
 
           const api = this.api();
           $(api.column(4).footer()).html(totalPcs);
+          // Tampilkan total berat jika ada data dengan berat valid, jika tidak tampilkan "-"
           $(api.column(5).footer()).html(hasValidBerat ? `${totalBerat.toFixed(2)} gr` : "-");
           $(api.column(7).footer()).html(`Rp ${totalHarga.toLocaleString("id-ID")}`);
         },
-        dom: "Bfrtip",
+        dom: "Bfrtip", // Tetap gunakan "B" untuk buttons
         buttons: [
           {
             extend: "excel",
@@ -491,8 +505,9 @@ const laporanPenjualanHandler = {
             className: "btn btn-success btn-sm",
             title: "Laporan Penjualan Manual / Aksesoris / Kotak \n Melati Atas",
             filename: function () {
-              const selectedDate = document.getElementById("startDate").value || "semua";
-              return `Laporan_Penjualan_Atas_${selectedDate.replace(/\//g, "-")}`;
+              const startDate = document.getElementById("startDate").value || "semua";
+              const endDate = document.getElementById("endDate").value || "semua";
+              return `Laporan_Penjualan_Atas_${startDate}_${endDate}`;
             },
             exportOptions: {
               columns: ":visible",
@@ -500,10 +515,12 @@ const laporanPenjualanHandler = {
             customize: function (xlsx) {
               const sheet = xlsx.xl.worksheets["sheet1.xml"];
 
+              // Ambil nilai footer yang sudah dihitung dari DataTable
               const footerPcs = $(laporanPenjualanHandler.dataTable.column(4).footer()).text() || "0";
               const footerBerat = $(laporanPenjualanHandler.dataTable.column(5).footer()).text() || "-";
-              const footerHarga = $(laporanPenjualanHandler.dataTable.column(7).footer()).text() || "Rp 0";
+                            const footerHarga = $(laporanPenjualanHandler.dataTable.column(7).footer()).text() || "Rp 0";
 
+              // Tambahkan baris footer
               const footerRow = `
         <row>
           <c t="inlineStr"><is><t>TOTAL:</t></is></c>
@@ -519,6 +536,7 @@ const laporanPenjualanHandler = {
         </row>
       `;
 
+              // Insert footer sebelum closing sheetData tag
               const sheetDataEnd = sheet.indexOf("</sheetData>");
               if (sheetDataEnd > -1) {
                 const newSheet = sheet.substring(0, sheetDataEnd) + footerRow + sheet.substring(sheetDataEnd);
@@ -532,8 +550,9 @@ const laporanPenjualanHandler = {
             className: "btn btn-danger btn-sm",
             title: "Laporan Penjualan Manual / Aksesoris / Kotak \n Melati Atas",
             filename: function () {
-              const selectedDate = document.getElementById("startDate").value || "semua";
-              return `Laporan_Penjualan_Atas_${selectedDate.replace(/\//g, "-")}`;
+              const startDate = document.getElementById("startDate").value || "semua";
+              const endDate = document.getElementById("endDate").value || "semua";
+              return `Laporan_Penjualan_Atas_${startDate}_${endDate}`;
             },
             orientation: "potrait",
             pageSize: "A4",
@@ -541,15 +560,19 @@ const laporanPenjualanHandler = {
               columns: ":visible",
             },
             customize: function (doc) {
+              // Ambil nilai footer yang sudah dihitung dari DataTable
               const footerPcs = $(laporanPenjualanHandler.dataTable.column(4).footer()).text() || "0";
               const footerBerat = $(laporanPenjualanHandler.dataTable.column(5).footer()).text() || "-";
               const footerHarga = $(laporanPenjualanHandler.dataTable.column(7).footer()).text() || "Rp 0";
 
+              // Tambahkan baris footer
               const footerRow = ["TOTAL:", "", "", "", footerPcs, footerBerat, "", footerHarga, "", ""];
 
+              // Tambahkan footer ke table
               if (doc.content[1].table && doc.content[1].table.body) {
                 doc.content[1].table.body.push(footerRow);
 
+                // Style untuk footer row
                 const footerIndex = doc.content[1].table.body.length - 1;
                 doc.content[1].table.body[footerIndex].forEach((cell, index) => {
                   if (typeof cell === "object") {
@@ -646,90 +669,90 @@ const laporanPenjualanHandler = {
 
   // Prepare data for DataTable
   prepareTableData() {
-    const salesType = document.getElementById("salesType").value;
-    const configKey = "manual";
-    const config = tableConfigs[configKey];
-    if (!config) return [];
+  const salesType = document.getElementById("salesType").value;
+  const configKey = "manual";
+  const config = tableConfigs[configKey];
+  if (!config) return [];
 
-    const summaryMap = new Map();
+  const summaryMap = new Map();
 
-    this.filteredSalesData.forEach((transaction) => {
-      // Enhanced date formatting with better timestamp handling
-      let date = "-";
-      if (transaction.timestamp) {
-        if (typeof transaction.timestamp.toDate === 'function') {
-          date = formatDate(transaction.timestamp.toDate());
-        } else if (transaction.timestamp instanceof Date) {
-          date = formatDate(transaction.timestamp);
-        } else if (typeof transaction.timestamp === 'string') {
-          date = formatDate(new Date(transaction.timestamp));
-        } else if (typeof transaction.timestamp === 'object' && transaction.timestamp.seconds) {
-          date = formatDate(new Date(transaction.timestamp.seconds * 1000));
-        }
-      } else if (transaction.tanggal) {
-        date = transaction.tanggal;
+  this.filteredSalesData.forEach((transaction) => {
+    // Enhanced date formatting with better timestamp handling
+    let date = "-";
+    if (transaction.timestamp) {
+      if (typeof transaction.timestamp.toDate === 'function') {
+        date = formatDate(transaction.timestamp.toDate());
+      } else if (transaction.timestamp instanceof Date) {
+        date = formatDate(transaction.timestamp);
+      } else if (typeof transaction.timestamp === 'string') {
+        date = formatDate(new Date(transaction.timestamp));
+      } else if (typeof transaction.timestamp === 'object' && transaction.timestamp.seconds) {
+        date = formatDate(new Date(transaction.timestamp.seconds * 1000));
+      }
+    } else if (transaction.tanggal) {
+      date = transaction.tanggal;
+    }
+
+    const jenisPenjualan = this.formatJenisPenjualan(transaction);
+    const status = this.getStatusBadge(transaction);
+    const keterangan = transaction.keterangan || "-";
+
+    if (!transaction.items) return;
+
+    transaction.items.forEach((item) => {
+      const key = item.kodeText || item.barcode || "-";
+      const name = item.nama || "-";
+      const kadar = item.kadar || "-";
+      const berat = parseFloat(item.berat) || 0;
+      const jumlah = parseInt(item.jumlah) || 1;
+      let harga = parseInt(item.totalHarga) || 0;
+
+      if (transaction.metodeBayar === "dp" && transaction.statusPembayaran === "DP") {
+        const prop = harga / transaction.totalHarga;
+        harga = Math.round(prop * transaction.sisaPembayaran);
+      } else if (transaction.metodeBayar === "free") {
+        harga = 0;
       }
 
-      const jenisPenjualan = this.formatJenisPenjualan(transaction);
-      const status = this.getStatusBadge(transaction);
-      const keterangan = transaction.keterangan || "-";
-
-      if (!transaction.items) return;
-
-      transaction.items.forEach((item) => {
-        const key = item.kodeText || item.barcode || "-";
-        const name = item.nama || "-";
-        const kadar = item.kadar || "-";
-        const berat = parseFloat(item.berat) || 0;
-        const jumlah = parseInt(item.jumlah) || 1;
-        let harga = parseInt(item.totalHarga) || 0;
-
-        if (transaction.metodeBayar === "dp" && transaction.statusPembayaran === "DP") {
-          const prop = harga / transaction.totalHarga;
-          harga = Math.round(prop * transaction.sisaPembayaran);
-        } else if (transaction.metodeBayar === "free") {
-          harga = 0;
-        }
-
-        if (summaryMap.has(key)) {
-          const existing = summaryMap.get(key);
-          existing.jumlah += jumlah;
-          existing.berat += berat;
-          existing.harga += harga;
-        } else {
-          summaryMap.set(key, {
-            tanggal: date,
-            jenis: jenisPenjualan,
-            kode: key,
-            nama: name,
-            jumlah,
-            berat,
-            kadar,
-            harga,
-            status,
-            keterangan: item.keterangan || keterangan,
-            jenisPenjualan: transaction.jenisPenjualan,
-          });
-        }
-      });
+      if (summaryMap.has(key)) {
+        const existing = summaryMap.get(key);
+        existing.jumlah += jumlah;
+        existing.berat += berat;
+        existing.harga += harga;
+      } else {
+        summaryMap.set(key, {
+          tanggal: date,
+          jenis: jenisPenjualan,
+          kode: key,
+          nama: name,
+          jumlah,
+          berat,
+          kadar,
+          harga,
+          status,
+          keterangan: item.keterangan || keterangan,
+          jenisPenjualan: transaction.jenisPenjualan,
+        });
+      }
     });
+  });
 
-    return Array.from(summaryMap.values()).map((item) => {
-      const beratDisplay = item.jenisPenjualan === "kotak" ? "-" : `${item.berat.toFixed(2)} gr`;
-      return [
-        item.tanggal,
-        item.jenis,
-        item.kode,
-        item.nama,
-        item.jumlah,
-        beratDisplay,
-        item.kadar,
-        `Rp ${item.harga.toLocaleString("id-ID")}`,
-        item.status,
-        item.keterangan,
-      ];
-    });
-  },
+  return Array.from(summaryMap.values()).map((item) => {
+    const beratDisplay = item.jenisPenjualan === "kotak" ? "-" : `${item.berat.toFixed(2)} gr`;
+    return [
+      item.tanggal,
+      item.jenis,
+      item.kode,
+      item.nama,
+      item.jumlah,
+      beratDisplay,
+      item.kadar,
+      `Rp ${item.harga.toLocaleString("id-ID")}`,
+      item.status,
+      item.keterangan,
+    ];
+  });
+},
 
   getStatusBadge(transaction) {
     const status = transaction.statusPembayaran || "Lunas";
@@ -758,67 +781,146 @@ const laporanPenjualanHandler = {
     }
   },
 
-  // Filter data for selected date and other criteria
+  // Enhanced filter data with cache consideration
   filterSalesData() {
-    if (!this.salesData || !this.salesData.length) return;
+  if (!this.salesData || !this.salesData.length) return;
 
-    this.showLoading(true);
+  this.showLoading(true);
 
-    try {
-      const salesType = document.getElementById("salesType").value;
-      const salesPerson = document.getElementById("salesPerson").value;
+  try {
+    const startDateStr = document.getElementById("startDate").value;
+    const endDateStr = document.getElementById("endDate").value;
+    const salesType = document.getElementById("salesType").value;
+    const salesPerson = document.getElementById("salesPerson").value;
 
-      this.filteredSalesData = this.salesData.filter((item) => {
-        if (!item) return false;
+    const startDate = parseDate(startDateStr);
+    const endDate = parseDate(endDateStr);
+    if (endDate) endDate.setDate(endDate.getDate() + 1);
 
-        // Type filter
-        let typeMatches = true;
-        if (salesType !== "all") {
-          if (salesType === "layanan") {
-            typeMatches = item.jenisPenjualan === "manual";
-          } else {
-            typeMatches = item.jenisPenjualan === salesType;
+    this.filteredSalesData = this.salesData.filter((item) => {
+      if (!item) return false;
+
+      // Enhanced timestamp handling
+      let transactionDate = null;
+      
+      if (item.timestamp) {
+        // Handle different timestamp formats
+        if (typeof item.timestamp.toDate === 'function') {
+          // Firestore Timestamp object
+          transactionDate = item.timestamp.toDate();
+        } else if (item.timestamp instanceof Date) {
+          // Already a Date object
+          transactionDate = item.timestamp;
+        } else if (typeof item.timestamp === 'string') {
+          // ISO string from cache
+          transactionDate = new Date(item.timestamp);
+        } else if (typeof item.timestamp === 'object' && item.timestamp.seconds) {
+          // Firestore Timestamp-like object
+          transactionDate = new Date(item.timestamp.seconds * 1000);
+        }
+      } else if (item.tanggal) {
+        // Fallback to tanggal field
+        transactionDate = parseDate(item.tanggal);
+      }
+
+      if (!transactionDate || isNaN(transactionDate.getTime())) {
+        console.warn("Invalid transaction date for item:", item);
+        return false;
+      }
+
+      const dateInRange = (!startDate || transactionDate >= startDate) && (!endDate || transactionDate < endDate);
+
+      let typeMatches = true;
+      if (salesType !== "all") {
+        if (salesType === "layanan") {
+          typeMatches = item.jenisPenjualan === "manual";
+        } else {
+          typeMatches = item.jenisPenjualan === salesType;
+        }
+      }
+
+      let salesMatches = true;
+      if (salesPerson !== "all") {
+        salesMatches = item.sales === salesPerson;
+      }
+
+      return dateInRange && typeMatches && salesMatches;
+    });
+
+    this.filteredSalesData.sort((a, b) => {
+      // Enhanced sorting with better timestamp handling
+      const getDate = (item) => {
+        if (item.timestamp) {
+          if (typeof item.timestamp.toDate === 'function') {
+            return item.timestamp.toDate();
+          } else if (item.timestamp instanceof Date) {
+            return item.timestamp;
+          } else if (typeof item.timestamp === 'string') {
+            return new Date(item.timestamp);
+          } else if (typeof item.timestamp === 'object' && item.timestamp.seconds) {
+            return new Date(item.timestamp.seconds * 1000);
           }
         }
+        return parseDate(item.tanggal) || new Date(0);
+      };
 
-        // Sales person filter
-        let salesMatches = true;
-        if (salesPerson !== "all") {
-          salesMatches = item.sales === salesPerson;
-        }
+      const dateA = getDate(a);
+      const dateB = getDate(b);
+      return dateB - dateA;
+    });
 
-        return typeMatches && salesMatches;
-      });
+    this.renderSalesTable();
+  } catch (error) {
+    console.error("Error filtering sales data:", error);
+    this.showAlert("Terjadi kesalahan saat memfilter data", "Error", "error");
+  } finally {
+    this.showLoading(false);
+  }
+},
 
-      // Sort by timestamp (newest first)
-      this.filteredSalesData.sort((a, b) => {
-        const getDate = (item) => {
-          if (item.timestamp) {
-            if (typeof item.timestamp.toDate === 'function') {
-              return item.timestamp.toDate();
-            } else if (item.timestamp instanceof Date) {
-              return item.timestamp;
-            } else if (typeof item.timestamp === 'string') {
-              return new Date(item.timestamp);
-            } else if (typeof item.timestamp === 'object' && item.timestamp.seconds) {
-              return new Date(item.timestamp.seconds * 1000);
-            }
-          }
-          return parseDate(item.tanggal) || new Date(0);
-        };
+  updateFooterSummary() {
+    const totalPcsEl = document.getElementById("totalPcs");
+    const totalBeratEl = document.getElementById("totalBerat");
+    const totalHargaEl = document.getElementById("totalHarga");
 
-        const dateA = getDate(a);
-        const dateB = getDate(b);
-        return dateB - dateA;
-      });
-
-      this.renderSalesTable();
-    } catch (error) {
-      console.error("Error filtering sales data:", error);
-      this.showAlert("Terjadi kesalahan saat memfilter data", "Error", "error");
-    } finally {
-      this.showLoading(false);
+    if (this.isSummaryMode) {
+      totalPcsEl.textContent = "-";
+      totalBeratEl.textContent = "-";
+      totalHargaEl.textContent = "-";
+      return;
     }
+
+    let totalPcs = 0;
+    let totalBerat = 0;
+    let totalHarga = 0;
+
+    this.filteredSalesData.forEach((transaction) => {
+      if (transaction.items && transaction.items.length > 0) {
+        transaction.items.forEach((item) => {
+          const jumlah = parseInt(item.jumlah) || 0;
+          const berat = parseFloat(item.berat) || 0;
+          let harga = parseInt(item.totalHarga) || 0;
+
+          if (transaction.metodeBayar === "dp" && transaction.statusPembayaran === "DP") {
+            const prop = harga / transaction.totalHarga;
+            harga = Math.round(prop * transaction.sisaPembayaran);
+          } else if (transaction.metodeBayar === "free") {
+            harga = 0;
+          }
+
+          totalPcs += jumlah;
+          totalBerat += berat;
+          totalHarga += harga;
+        });
+      } else {
+        const harga = parseInt(transaction.totalHarga) || 0;
+        totalHarga += harga;
+      }
+    });
+
+    totalPcsEl.textContent = totalPcs;
+    totalBeratEl.textContent = `${totalBerat.toFixed(2)} gr`;
+    totalHargaEl.textContent = `Rp ${totalHarga.toLocaleString("id-ID")}`;
   },
 
   // Populate sales person filter
@@ -837,7 +939,7 @@ const laporanPenjualanHandler = {
       option.value = person;
       option.textContent = person;
       dropdown.appendChild(option);
-    });
+          });
   },
 
   // Initialize date pickers
@@ -854,95 +956,44 @@ const laporanPenjualanHandler = {
   setDefaultDates() {
     const today = new Date();
     const formattedToday = formatDate(today);
-    document.getElementById("startDate").value = formattedToday;
+    document.querySelectorAll(".datepicker").forEach((input) => {
+      input.value = formattedToday;
+    });
   },
 
-  // Attach event listeners
-  attachEventListeners() {
-    // Main filter button
+  // Enhanced attach event listeners with refresh button
+ attachEventListeners() {
     document.getElementById("filterSalesBtn")?.addEventListener("click", () => {
-      const startDateStr = document.getElementById("startDate").value;
-      if (!startDateStr) {
-        this.showAlert("Silakan pilih tanggal terlebih dahulu", "Peringatan", "warning");
-        return;
-      }
-
-      const selectedDate = parseDate(startDateStr);
-      if (!selectedDate) {
-        this.showAlert("Format tanggal tidak valid", "Error", "error");
-        return;
-      }
-
-      this.showLoading(true);
-      this.loadSalesDataByDate(selectedDate).then(() => {
+      this.loadSalesData().then(() => {
         this.filterSalesData();
-        this.isDataLoaded = true;
-      }).finally(() => {
-        this.showLoading(false);
       });
     });
 
-    // Sales type filter change
     document.getElementById("salesType")?.addEventListener("change", () => {
       if (this.filteredSalesData && this.filteredSalesData.length > 0) {
-        this.filterSalesData();
+        this.renderSalesTable();
       }
     });
 
-    // Sales person filter change
-    document.getElementById("salesPerson")?.addEventListener("change", () => {
-      if (this.filteredSalesData && this.filteredSalesData.length > 0) {
-        this.filterSalesData();
-      }
-    });
+    // ✅ Update refresh button functionality
+    this.addRefreshButton();
+  },
 
-    // Date change handler
-    document.getElementById("startDate")?.addEventListener("change", () => {
-      // Reset data when date changes
-      this.isDataLoaded = false;
-      this.salesData = [];
-      this.filteredSalesData = [];
+  // Add refresh button to UI
+   addRefreshButton() {
+    if (document.getElementById('refreshSalesData')) return;
+
+    const filterBtn = document.getElementById('filterSalesBtn');
+    if (filterBtn && filterBtn.parentNode) {
+      const refreshButton = document.createElement('button');
+      refreshButton.id = 'refreshSalesData';
+      refreshButton.className = 'btn btn-outline-secondary ms-2';
+      refreshButton.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Data Periode';
+      refreshButton.title = 'Refresh data untuk periode yang dipilih';
+      refreshButton.addEventListener('click', () => this.forceRefreshData());
       
-      // Clear table
-      const tableBody = document.querySelector("#penjualanTable tbody");
-      if (tableBody) {
-        tableBody.innerHTML = `
-          <tr>
-            <td colspan="10" class="text-center">Klik tombol "Tampilkan" untuk melihat data tanggal yang dipilih</td>
-          </tr>
-        `;
-      }
-    });
-  },
-
-  // Utility function to check if two dates are the same
-  isSameDate(date1, date2) {
-    if (!date1 || !date2) return false;
-    return (
-      date1.getFullYear() === date2.getFullYear() &&
-      date1.getMonth() === date2.getMonth() &&
-      date1.getDate() === date2.getDate()
-    );
-  },
-
-  // Cleanup method
-  destroy() {
-    console.log("🧹 Destroying Sales Report Handler");
-    
-    // Remove real-time listener
-    this.removeTodayListener();
-    
-    // Destroy DataTable
-    this.destroyDataTable();
-    
-    // Clear data
-    this.salesData = [];
-    this.filteredSalesData = [];
-    this.isDataLoaded = false;
-    this.currentSelectedDate = null;
-    this.isListeningToday = false;
-    
-    console.log("✅ Sales Report Handler destroyed");
+      filterBtn.parentNode.insertBefore(refreshButton, filterBtn.nextSibling);
+    }
   },
 
   // Initialize
@@ -957,24 +1008,28 @@ const laporanPenjualanHandler = {
     if (tableBody) {
       tableBody.innerHTML = `
         <tr>
-          <td colspan="10" class="text-center">Silakan pilih tanggal dan klik tombol "Tampilkan" untuk melihat data</td>
+          <td colspan="12" class="text-center">Silakan pilih filter dan klik tombol "Tampilkan" untuk melihat data</td>
         </tr>
       `;
     }
 
-    // Clear old cache periodically (every 30 minutes)
+    // Clear old cache periodically (every 10 minutes)
     setInterval(() => {
       cacheManager.clearOldCache();
-    }, 30 * 60 * 1000);
+    }, 10 * 60 * 1000);
 
-    // Clear today's cache when page is about to unload (to ensure fresh data on next visit)
+    // Clear cache when page is about to unload (optional)
     window.addEventListener('beforeunload', () => {
-      const today = new Date();
-      cacheManager.clearCacheForDate(today);
-      this.destroy();
+      // Only clear today's cache to ensure fresh data on next visit
+      const today = cacheManager.getLocalDateString();
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.includes(today) && key.startsWith('salesData_')) {
+          localStorage.removeItem(key);
+          localStorage.removeItem(`${key}_timestamp`);
+        }
+      });
     });
-
-    console.log("✅ Sales Report Handler initialized successfully");
   },
 };
 
@@ -1005,32 +1060,7 @@ document.addEventListener("DOMContentLoaded", function () {
     console.warn("SheetJS (XLSX) library is not loaded. Excel export will not work.");
   }
 
-  try {
-    // Check dependencies
-    if (typeof firestore === 'undefined') {
-      throw new Error("Firebase Firestore not initialized");
-    }
-    
-    if (typeof $ === 'undefined') {
-      throw new Error("jQuery not loaded");
-    }
-    
-    // Initialize the handler
-    laporanPenjualanHandler.init();
-    
-    console.log("✅ Sales Report System initialized successfully");
-    
-  } catch (error) {
-    console.error("❌ Failed to initialize Sales Report System:", error);
-    alert("Gagal menginisialisasi sistem laporan penjualan: " + error.message);
-  }
-});
-
-// Cleanup on page unload
-window.addEventListener('beforeunload', () => {
-  if (typeof laporanPenjualanHandler !== 'undefined') {
-    laporanPenjualanHandler.destroy();
-  }
+  laporanPenjualanHandler.init();
 });
 
 export default laporanPenjualanHandler;
