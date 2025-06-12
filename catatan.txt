@@ -1,0 +1,5 @@
+pada file dataPenjalan.js yang sudah diupdate saya ingin ada perbaikan tambahan dengan ketentuan:
+- ketika klik tombol btn-delete tampilkan opsi untuk hapus penjualan dan batal penjualan. jika klik hapus penjualan maka logika yang digunakan sama seperti yang digunakan sekarang. jika klik batal penjualan maka selain menghapus data penjualan ditambahkan untuk menghapus kode barang di koleksi stokAksesorisTransaksi agar data kode stok dikembalikan seperti sebelumnya.
+- hanya perbaiki pada kode yang diperlukan bukan merubah keseluruhan kode. 
+- saya akan melampirkan kode dataPenjualan.html dataPenjualan.html agar konteks lebih komprehensif dan file penjualanAksesoris.js penjualanAksesoris.js yang menyimpan data penjualan di koleksi stokAksesorisTransaksi
+- berikan saya skenario perbaikan yang kamu rekomendasikan jika sudah saya konfirmasi baru buat penulisan kodenya

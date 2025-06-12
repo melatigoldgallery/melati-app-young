@@ -20,11 +20,11 @@ const VERIFICATION_PASSWORD = "smlt116";
 const cacheManager = {
   prefix: "melati_sales_",
   cache: new Map(),
-  
+
   set(key, data) {
     this.cache.set(this.prefix + key, {
       data: data,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
     this.saveToStorage();
   },
@@ -52,7 +52,7 @@ const cacheManager = {
   updateTransaction(transactionId, updatedData) {
     const salesData = this.get("salesData");
     if (salesData && Array.isArray(salesData)) {
-      const index = salesData.findIndex(item => item.id === transactionId);
+      const index = salesData.findIndex((item) => item.id === transactionId);
       if (index !== -1) {
         salesData[index] = { ...salesData[index], ...updatedData };
         this.set("salesData", salesData);
@@ -66,7 +66,7 @@ const cacheManager = {
   removeTransaction(transactionId) {
     const salesData = this.get("salesData");
     if (salesData && Array.isArray(salesData)) {
-      const filtered = salesData.filter(item => item.id !== transactionId);
+      const filtered = salesData.filter((item) => item.id !== transactionId);
       this.set("salesData", filtered);
       return true;
     }
@@ -109,7 +109,7 @@ const cacheManager = {
 
   clearStorage() {
     localStorage.removeItem("optimizedSalesCache");
-  }
+  },
 };
 
 // Utility functions
@@ -124,43 +124,101 @@ const utils = {
 
   formatDate: (date) => {
     if (!date) return "-";
+    
     try {
-      const d = date.toDate ? date.toDate() : date instanceof Date ? date : new Date(date);
-      return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-    } catch {
+      let dateObj = null;
+      
+      // Handle Firestore Timestamp
+      if (date && typeof date.toDate === 'function') {
+        dateObj = date.toDate();
+      }
+      // Handle Date object
+      else if (date instanceof Date) {
+        dateObj = date;
+      }
+      // Handle timestamp number
+      else if (typeof date === 'number') {
+        dateObj = new Date(date);
+      }
+      // Handle string
+      else if (typeof date === 'string') {
+        dateObj = new Date(date);
+      }
+      // Handle object with seconds (Firestore timestamp format)
+      else if (date && typeof date === 'object' && date.seconds) {
+        dateObj = new Date(date.seconds * 1000);
+      }
+      
+      // Validate the date
+      if (!dateObj || isNaN(dateObj.getTime())) {
+        console.warn('Invalid date object:', date);
+        return "-";
+      }
+      
+      const day = String(dateObj.getDate()).padStart(2, "0");
+      const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+      const year = dateObj.getFullYear();
+      
+      return `${day}/${month}/${year}`;
+    } catch (error) {
+      console.error('Error formatting date:', date, error);
       return "-";
     }
   },
 
+  // ✅ PERBAIKAN: Parse date dengan validasi yang lebih ketat
   parseDate: (dateString) => {
     if (!dateString) return null;
     
     try {
-      if (dateString instanceof Date) return dateString;
+      // Jika sudah berupa Date object
+      if (dateString instanceof Date) {
+        return isNaN(dateString.getTime()) ? null : dateString;
+      }
       
+      // Handle Firestore Timestamp
+      if (dateString && typeof dateString.toDate === 'function') {
+        try {
+          return dateString.toDate();
+        } catch (error) {
+          console.warn('Error converting Firestore timestamp:', error);
+          return null;
+        }
+      }
+      
+      // Handle object with seconds (Firestore timestamp format)
+      if (dateString && typeof dateString === 'object' && dateString.seconds) {
+        return new Date(dateString.seconds * 1000);
+      }
+      
+      // Handle string dengan format dd/mm/yyyy
       if (typeof dateString === 'string') {
         const parts = dateString.split("/");
         if (parts.length === 3) {
           const day = parseInt(parts[0], 10);
-          const month = parseInt(parts[1], 10) - 1;
+          const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
           const year = parseInt(parts[2], 10);
           
+          // Validasi komponen tanggal
           if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 1900) {
             const date = new Date(year, month, day);
+            // Pastikan tanggal yang dibuat valid
             if (date.getDate() === day && date.getMonth() === month && date.getFullYear() === year) {
               return date;
             }
           }
         }
+        
+        // Fallback: coba parse langsung
+        const parsedDate = new Date(dateString);
+        return isNaN(parsedDate.getTime()) ? null : parsedDate;
       }
       
+      // Handle number (timestamp)
       if (typeof dateString === 'number') {
         const date = new Date(dateString);
-        if (!isNaN(date.getTime())) return date;
+        return isNaN(date.getTime()) ? null : date;
       }
-      
-      const date = new Date(dateString);
-      if (!isNaN(date.getTime())) return date;
       
       return null;
     } catch (error) {
@@ -190,10 +248,8 @@ const utils = {
     if (!date1 || !date2) return false;
     const d1 = date1 instanceof Date ? date1 : new Date(date1);
     const d2 = date2 instanceof Date ? date2 : new Date(date2);
-    return d1.getFullYear() === d2.getFullYear() &&
-           d1.getMonth() === d2.getMonth() &&
-           d1.getDate() === d2.getDate();
-  }
+    return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+  },
 };
 
 // Main application class
@@ -216,14 +272,14 @@ class OptimizedDataPenjualanApp {
   async init() {
     // Load cache first
     cacheManager.loadFromStorage();
-    
+
     this.setupEventListeners();
     this.initDatePickers();
     this.setDefaultDates();
-    
+
     // Load initial data
     await this.loadInitialData();
-    
+
     this.initDataTable();
     this.populateSalesFilter();
     this.loadFilterFromURL();
@@ -254,7 +310,6 @@ class OptimizedDataPenjualanApp {
       // Load from Firestore if no cache
       console.log("🔄 Loading fresh data from Firestore");
       await this.loadSalesDataFromFirestore();
-      
     } catch (error) {
       console.error("Error loading initial data:", error);
       utils.showAlert("Gagal memuat data: " + error.message, "Error", "error");
@@ -288,7 +343,7 @@ class OptimizedDataPenjualanApp {
 
       // Cache the data
       cacheManager.set("salesData", this.salesData);
-      
+
       console.log(`✅ Loaded ${this.salesData.length} recent transactions`);
     } catch (error) {
       console.error("Error loading from Firestore:", error);
@@ -328,13 +383,17 @@ class OptimizedDataPenjualanApp {
       orderBy("timestamp", "desc")
     );
 
-    this.realtimeListener = onSnapshot(todayQuery, (snapshot) => {
-      if (!snapshot.metadata.hasPendingWrites) {
-        this.handleRealtimeUpdate(snapshot);
+    this.realtimeListener = onSnapshot(
+      todayQuery,
+      (snapshot) => {
+        if (!snapshot.metadata.hasPendingWrites) {
+          this.handleRealtimeUpdate(snapshot);
+        }
+      },
+      (error) => {
+        console.error("Real-time listener error:", error);
       }
-    }, (error) => {
-      console.error("Real-time listener error:", error);
-    });
+    );
   }
 
   // Remove today's listener
@@ -351,7 +410,7 @@ class OptimizedDataPenjualanApp {
 
     snapshot.docChanges().forEach((change) => {
       const docData = { id: change.doc.id, ...change.doc.data() };
-      
+
       // Standardize jenis penjualan
       if (docData.jenisPenjualan === "gantiLock") {
         docData.jenisPenjualan = "manual";
@@ -359,16 +418,20 @@ class OptimizedDataPenjualanApp {
       }
 
       if (change.type === "added") {
-        // Check if already exists to avoid duplicates
-        const exists = this.salesData.find(item => item.id === docData.id);
+        // ✅ PERBAIKAN: Cek duplikasi lebih ketat
+        const exists = this.salesData.find((item) => item.id === docData.id);
         if (!exists) {
-          this.salesData.unshift(docData);
-          cacheManager.addTransaction(docData);
-          hasChanges = true;
-          console.log("➕ New transaction added:", docData.id);
+          // ✅ PERBAIKAN: Cek apakah data sudah ada di filtered data juga
+          const existsInFiltered = this.filteredData.find((item) => item.id === docData.id);
+          if (!existsInFiltered) {
+            this.salesData.unshift(docData);
+            cacheManager.addTransaction(docData);
+            hasChanges = true;
+            console.log("➕ New transaction added:", docData.id);
+          }
         }
       } else if (change.type === "modified") {
-        const index = this.salesData.findIndex(item => item.id === docData.id);
+        const index = this.salesData.findIndex((item) => item.id === docData.id);
         if (index !== -1) {
           this.salesData[index] = docData;
           cacheManager.updateTransaction(docData.id, docData);
@@ -376,7 +439,7 @@ class OptimizedDataPenjualanApp {
           console.log("✏️ Transaction updated:", docData.id);
         }
       } else if (change.type === "removed") {
-        this.salesData = this.salesData.filter(item => item.id !== docData.id);
+        this.salesData = this.salesData.filter((item) => item.id !== docData.id);
         cacheManager.removeTransaction(docData.id);
         hasChanges = true;
         console.log("🗑️ Transaction removed:", docData.id);
@@ -384,6 +447,7 @@ class OptimizedDataPenjualanApp {
     });
 
     if (hasChanges) {
+      // ✅ PERBAIKAN: Hindari double filtering
       this.filterData();
       this.showUpdateIndicator();
     }
@@ -434,30 +498,42 @@ class OptimizedDataPenjualanApp {
     // Table action handlers
     $(document)
       .off("click", ".btn-reprint")
-      .on("click", ".btn-reprint", utils.debounce((e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const id = e.target.closest("button").dataset.id;
-        if (id) this.handleReprint(id);
-      }, 300));
+      .on(
+        "click",
+        ".btn-reprint",
+        utils.debounce((e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = e.target.closest("button").dataset.id;
+          if (id) this.handleReprint(id);
+        }, 300)
+      );
 
     $(document)
       .off("click", ".btn-edit")
-      .on("click", ".btn-edit", utils.debounce((e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const id = e.target.closest("button").dataset.id;
-        if (id) this.handleEdit(id);
-      }, 300));
+      .on(
+        "click",
+        ".btn-edit",
+        utils.debounce((e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = e.target.closest("button").dataset.id;
+          if (id) this.handleEdit(id);
+        }, 300)
+      );
 
     $(document)
       .off("click", ".btn-delete")
-      .on("click", ".btn-delete", utils.debounce((e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const id = e.target.closest("button").dataset.id;
-        if (id) this.handleDelete(id);
-      }, 300));
+      .on(
+        "click",
+        ".btn-delete",
+        utils.debounce((e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = e.target.closest("button").dataset.id;
+          if (id) this.handleDelete(id);
+        }, 300)
+      );
   }
 
   // Setup auto filter functionality
@@ -577,84 +653,108 @@ class OptimizedDataPenjualanApp {
 
   // Filter data based on form inputs
   filterData() {
-    const filters = {
-      selectedDate: utils.parseDate(document.getElementById("filterTanggal").value),
-      jenis: document.getElementById("filterJenisPenjualan").value,
-      sales: document.getElementById("filterSales").value,
-    };
+  const filters = {
+    selectedDate: utils.parseDate(document.getElementById("filterTanggal").value),
+    jenis: document.getElementById("filterJenisPenjualan").value,
+    sales: document.getElementById("filterSales").value,
+  };
 
-    // Store current selected date for real-time listener
-    this.currentSelectedDate = filters.selectedDate;
+  // Store current selected date for real-time listener
+  this.currentSelectedDate = filters.selectedDate;
 
-    // Setup real-time listener based on selected date
-    this.setupRealtimeListener(filters.selectedDate);
+  // Setup real-time listener based on selected date
+  this.setupRealtimeListener(filters.selectedDate);
 
-    // If no date selected, show empty data
-    if (!filters.selectedDate) {
-      this.filteredData = [];
-      this.updateDataTable();
-      this.updateSummary();
-      return;
-    }
-
-    // Set date range for filtering
-    const startOfDay = new Date(filters.selectedDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(filters.selectedDate);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    this.filteredData = this.salesData.filter((transaction) => {
-      // Handle different timestamp formats
-      let transactionDate = null;
-      
-      if (transaction.timestamp) {
-        if (typeof transaction.timestamp.toDate === 'function') {
-          try {
-            transactionDate = transaction.timestamp.toDate();
-          } catch (error) {
-            console.warn('Error converting Firestore timestamp:', error);
-          }
-        } else if (transaction.timestamp instanceof Date) {
-          transactionDate = transaction.timestamp;
-        } else {
-          transactionDate = new Date(transaction.timestamp);
-          if (isNaN(transactionDate.getTime())) {
-            transactionDate = null;
-          }
-        }
-      }
-      
-      // Fallback to tanggal field
-      if (!transactionDate && transaction.tanggal) {
-        transactionDate = utils.parseDate(transaction.tanggal);
-      }
-
-      // Skip if no valid date
-      if (!transactionDate || isNaN(transactionDate.getTime())) {
-        console.warn('Skipping transaction with invalid date:', {
-          id: transaction.id,
-          timestamp: transaction.timestamp,
-          tanggal: transaction.tanggal
-        });
-        return false;
-      }
-
-      // Date filter
-      if (transactionDate < startOfDay || transactionDate > endOfDay) return false;
-
-      // Jenis filter
-      if (filters.jenis !== "all" && transaction.jenisPenjualan !== filters.jenis) return false;
-
-      // Sales filter
-      if (filters.sales !== "all" && transaction.sales !== filters.sales) return false;
-
-      return true;
-    });
-
+  // If no date selected, show empty data
+  if (!filters.selectedDate) {
+    this.filteredData = [];
     this.updateDataTable();
     this.updateSummary();
-    this.updateURLParams(filters);
+    return;
   }
+
+  // Set date range for filtering
+  const startOfDay = new Date(filters.selectedDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(filters.selectedDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  // ✅ PERBAIKAN: Remove duplicates before filtering
+  const uniqueSalesData = this.removeDuplicates(this.salesData);
+
+  this.filteredData = uniqueSalesData.filter((transaction) => {
+    // ✅ PERBAIKAN: Handle different timestamp formats dengan error handling
+    let transactionDate = null;
+    
+    if (transaction.timestamp) {
+      // Handle Firestore Timestamp
+      if (typeof transaction.timestamp.toDate === 'function') {
+        try {
+          transactionDate = transaction.timestamp.toDate();
+        } catch (error) {
+          console.warn('Error converting Firestore timestamp:', error);
+        }
+      }
+      // Handle Date object
+      else if (transaction.timestamp instanceof Date) {
+        transactionDate = transaction.timestamp;
+      }
+      // Handle object with seconds
+      else if (transaction.timestamp && typeof transaction.timestamp === 'object' && transaction.timestamp.seconds) {
+        transactionDate = new Date(transaction.timestamp.seconds * 1000);
+      }
+      // Handle number or string
+      else {
+        transactionDate = new Date(transaction.timestamp);
+        if (isNaN(transactionDate.getTime())) {
+          transactionDate = null;
+        }
+      }
+    }
+    
+    // Fallback to tanggal field
+    if (!transactionDate && transaction.tanggal) {
+      transactionDate = utils.parseDate(transaction.tanggal);
+    }
+
+    // Skip if no valid date
+    if (!transactionDate || isNaN(transactionDate.getTime())) {
+      console.warn('Skipping transaction with invalid date:', {
+        id: transaction.id,
+        timestamp: transaction.timestamp,
+        tanggal: transaction.tanggal
+      });
+      return false;
+    }
+
+    // Date filter
+    if (transactionDate < startOfDay || transactionDate > endOfDay) return false;
+
+    // Jenis filter
+    if (filters.jenis !== "all" && transaction.jenisPenjualan !== filters.jenis) return false;
+
+    // Sales filter
+    if (filters.sales !== "all" && transaction.sales !== filters.sales) return false;
+
+    return true;
+  });
+
+  this.updateDataTable();
+  this.updateSummary();
+  this.updateURLParams(filters);
+}
+
+// ✅ PERBAIKAN: Tambahkan method untuk remove duplicates
+removeDuplicates(data) {
+  const seen = new Set();
+  return data.filter(item => {
+    if (seen.has(item.id)) {
+      return false;
+    }
+    seen.add(item.id);
+    return true;
+  });
+}
 
   // Update URL parameters
   updateURLParams(filters) {
@@ -699,65 +799,80 @@ class OptimizedDataPenjualanApp {
 
   // Prepare data for DataTable
   prepareTableData() {
-    const tableData = [];
-    this.filteredData.forEach((transaction) => {
-      let displayDate = "-";
-      if (transaction.timestamp) {
-        if (typeof transaction.timestamp.toDate === 'function') {
+  const tableData = [];
+  
+  // ✅ PERBAIKAN: Remove duplicates sebelum prepare data
+  const uniqueFilteredData = this.removeDuplicates(this.filteredData);
+  
+  uniqueFilteredData.forEach((transaction) => {
+    // ✅ PERBAIKAN: Handle timestamp dengan lebih robust
+    let displayDate = "-";
+    
+    if (transaction.timestamp) {
+      if (typeof transaction.timestamp.toDate === 'function') {
+        try {
           displayDate = utils.formatDate(transaction.timestamp.toDate());
-        } else if (transaction.timestamp instanceof Date) {
-          displayDate = utils.formatDate(transaction.timestamp);
-        } else {
-          displayDate = utils.formatDate(new Date(transaction.timestamp));
+        } catch (error) {
+          console.warn('Error formatting timestamp:', error);
+          displayDate = utils.formatDate(transaction.tanggal) || "-";
         }
-      } else if (transaction.tanggal) {
-        displayDate = utils.formatDate(transaction.tanggal);
-      }
-
-      const baseData = {
-        date: displayDate,
-        sales: transaction.sales || "Admin",
-        jenis: this.formatJenisPenjualan(transaction),
-        status: this.getStatusBadge(transaction),
-        actions: this.getActionButtons(transaction.id),
-      };
-
-      if (transaction.items?.length > 0) {
-        transaction.items.forEach((item) => {
-          tableData.push([
-            baseData.date,
-            baseData.sales,
-            baseData.jenis,
-            item.kodeText || item.barcode || "-",
-            item.nama || "-",
-            item.jumlah || 1,
-            item.berat ? `${item.berat} gr` : "-",
-            item.kadar || "-",
-            `Rp ${utils.formatRupiah(item.totalHarga || 0)}`,
-            baseData.status,
-            item.keterangan || transaction.keterangan || "-",
-            baseData.actions,
-          ]);
-        });
+      } else if (transaction.timestamp instanceof Date) {
+        displayDate = utils.formatDate(transaction.timestamp);
+      } else if (transaction.timestamp && typeof transaction.timestamp === 'object' && transaction.timestamp.seconds) {
+        displayDate = utils.formatDate(new Date(transaction.timestamp.seconds * 1000));
       } else {
+        const parsedDate = new Date(transaction.timestamp);
+        displayDate = isNaN(parsedDate.getTime()) ? "-" : utils.formatDate(parsedDate);
+      }
+    } else if (transaction.tanggal) {
+      displayDate = utils.formatDate(transaction.tanggal);
+    }
+
+    const baseData = {
+      date: displayDate,
+      sales: transaction.sales || "Admin",
+      jenis: this.formatJenisPenjualan(transaction),
+      status: this.getStatusBadge(transaction),
+      actions: this.getActionButtons(transaction.id),
+    };
+
+    if (transaction.items?.length > 0) {
+      transaction.items.forEach((item) => {
         tableData.push([
           baseData.date,
           baseData.sales,
           baseData.jenis,
-          "-",
-          "-",
-          "-",
-          "-",
-          "-",
-          `Rp ${utils.formatRupiah(transaction.totalHarga || 0)}`,
+          item.kodeText || item.barcode || "-",
+          item.nama || "-",
+          item.jumlah || 1,
+          item.berat ? `${item.berat} gr` : "-",
+          item.kadar || "-",
+          `Rp ${utils.formatRupiah(item.totalHarga || 0)}`,
           baseData.status,
-          transaction.keterangan || "-",
+          item.keterangan || transaction.keterangan || "-",
           baseData.actions,
         ]);
-      }
-    });
-    return tableData;
-  }
+      });
+    } else {
+      tableData.push([
+        baseData.date,
+        baseData.sales,
+        baseData.jenis,
+        "-",
+        "-",
+        "-",
+        "-",
+        "-",
+        `Rp ${utils.formatRupiah(transaction.totalHarga || 0)}`,
+        baseData.status,
+        transaction.keterangan || "-",
+        baseData.actions,
+      ]);
+    }
+  });
+  
+  return tableData;
+}
 
   // Format jenis penjualan
   formatJenisPenjualan(transaction) {
@@ -1358,14 +1473,14 @@ class OptimizedDataPenjualanApp {
   async refreshData() {
     try {
       utils.showLoading(true);
-      
+
       // Clear cache and reload from Firestore
       cacheManager.clear();
       await this.loadSalesDataFromFirestore();
-      
+
       this.populateSalesFilter();
       this.filterData();
-      
+
       utils.showAlert("Data berhasil diperbarui", "Sukses", "success");
     } catch (error) {
       console.error("Error refreshing data:", error);
@@ -1414,17 +1529,17 @@ class OptimizedDataPenjualanApp {
   // Cleanup method
   destroy() {
     console.log("🧹 Destroying Optimized Data Penjualan");
-    
+
     // Remove real-time listener
     this.removeTodayListener();
-    
+
     // Destroy DataTable
     if (this.dataTable) {
       this.dataTable.off();
       this.dataTable.destroy();
       this.dataTable = null;
     }
-    
+
     // Clear data
     this.salesData = [];
     this.filteredData = [];
@@ -1432,7 +1547,7 @@ class OptimizedDataPenjualanApp {
     this.isLoading = false;
     this.isListeningToday = false;
     this.currentSelectedDate = null;
-    
+
     console.log("✅ Optimized Data Penjualan destroyed");
   }
 }
@@ -1441,23 +1556,22 @@ class OptimizedDataPenjualanApp {
 $(document).ready(async function () {
   try {
     // Check dependencies
-    if (typeof firestore === 'undefined') {
+    if (typeof firestore === "undefined") {
       throw new Error("Firebase Firestore not initialized");
     }
-    
-    if (typeof $ === 'undefined') {
+
+    if (typeof $ === "undefined") {
       throw new Error("jQuery not loaded");
     }
-    
+
     // Initialize the optimized application
     const app = new OptimizedDataPenjualanApp();
     await app.init();
-    
+
     // Make app globally available for debugging
     window.dataPenjualanApp = app;
-    
+
     console.log("✅ Optimized Data Penjualan System initialized successfully");
-    
   } catch (error) {
     console.error("❌ Failed to initialize Optimized Data Penjualan System:", error);
     utils.showAlert("Gagal menginisialisasi aplikasi: " + error.message, "Error", "error");
@@ -1465,7 +1579,7 @@ $(document).ready(async function () {
 });
 
 // Cleanup on page unload
-window.addEventListener('beforeunload', () => {
+window.addEventListener("beforeunload", () => {
   if (window.dataPenjualanApp) {
     window.dataPenjualanApp.destroy();
   }
@@ -1486,6 +1600,3 @@ window.addEventListener("storage", (e) => {
 export default OptimizedDataPenjualanApp;
 
 console.log("📊 Optimized Data Penjualan Module loaded successfully");
-
-
-
