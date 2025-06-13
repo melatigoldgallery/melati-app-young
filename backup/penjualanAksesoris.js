@@ -1,4 +1,4 @@
-import { firestore } from "./configFirebase.js";
+import { firestore } from "../js/configFirebase.js";
 import {
   collection,
   getDocs,
