@@ -944,7 +944,7 @@ export const aksesorisSaleHandler = {
       </head>
       <body>
         <div class="header">
-          <h2>MELATI BAWAH</h2>
+          <h2>MELATI ATAS</h2>
           <h2>LAPORAN PENAMBAHAN STOK</h2>
         </div>
         
