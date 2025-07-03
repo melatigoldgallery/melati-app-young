@@ -533,9 +533,9 @@ const laporanPenjualanHandler = {
             title: "Laporan Penjualan Manual / Aksesoris / Kotak \n Melati Atas",
             filename: function () {
               const selectedDate = document.getElementById("startDate").value || "semua";
-              return `Laporan_Penjualan_Atas_${selectedDate.replace(/\//g, "-")}`;
+              return `Laporan_Penjualan_Bawah_${selectedDate.replace(/\//g, "-")}`;
             },
-            orientation: "potrait",
+            orientation: "landscape",
             pageSize: "A4",
             exportOptions: {
               columns: ":visible",
@@ -547,6 +547,16 @@ const laporanPenjualanHandler = {
 
               const footerRow = ["TOTAL:", "", "", "", footerPcs, footerBerat, "", footerHarga, "", ""];
 
+              // PERBAIKAN: Mengatur ukuran font yang lebih kecil
+              doc.defaultStyle.fontSize = 10; // Font default lebih kecil
+              doc.styles.tableHeader.fontSize = 11; // Header tabel
+              doc.styles.tableBodyEven.fontSize = 10; // Baris genap
+              doc.styles.tableBodyOdd.fontSize = 10; // Baris ganjil
+              doc.styles.title.fontSize = 13; // Judul dokumen
+
+              // Mengatur margin untuk memberikan lebih banyak ruang
+              doc.pageMargins = [20, 60, 20, 40]; // [left, top, right, bottom]
+
               if (doc.content[1].table && doc.content[1].table.body) {
                 doc.content[1].table.body.push(footerRow);
 
@@ -555,14 +565,21 @@ const laporanPenjualanHandler = {
                   if (typeof cell === "object") {
                     cell.fillColor = "#e3f2fd";
                     cell.bold = true;
+                    cell.fontSize = 10; // Font footer
                   } else {
                     doc.content[1].table.body[footerIndex][index] = {
                       text: cell,
                       fillColor: "#e3f2fd",
                       bold: true,
+                      fontSize: 10, // Font footer
                     };
                   }
                 });
+              }
+
+              // Mengatur lebar kolom agar lebih proporsional
+              if (doc.content[1].table) {
+                doc.content[1].table.widths = ["9%", "8%", "7%", "20%", "5%", "6%", "7%", "12%", "13%", "13%"];
               }
             },
           },
@@ -633,7 +650,7 @@ const laporanPenjualanHandler = {
   // Update table header
   updateTableHeader() {
     const salesType = document.getElementById("salesType").value;
-    let configKey = salesType === "all" ? "manual" : salesType === "layanan" ? "manual" : salesType;
+    let configKey = salesType === "all" ? "manual" : salesType === "manual" ? "manual" : salesType;
 
     const config = tableConfigs[configKey];
     if (!config) return;
@@ -657,13 +674,13 @@ const laporanPenjualanHandler = {
       // Enhanced date formatting with better timestamp handling
       let date = "-";
       if (transaction.timestamp) {
-        if (typeof transaction.timestamp.toDate === 'function') {
+        if (typeof transaction.timestamp.toDate === "function") {
           date = formatDate(transaction.timestamp.toDate());
         } else if (transaction.timestamp instanceof Date) {
           date = formatDate(transaction.timestamp);
-        } else if (typeof transaction.timestamp === 'string') {
+        } else if (typeof transaction.timestamp === "string") {
           date = formatDate(new Date(transaction.timestamp));
-        } else if (typeof transaction.timestamp === 'object' && transaction.timestamp.seconds) {
+        } else if (typeof transaction.timestamp === "object" && transaction.timestamp.seconds) {
           date = formatDate(new Date(transaction.timestamp.seconds * 1000));
         }
       } else if (transaction.tanggal) {
@@ -682,14 +699,15 @@ const laporanPenjualanHandler = {
         const kadar = item.kadar || "-";
         const berat = parseFloat(item.berat) || 0;
         const jumlah = parseInt(item.jumlah) || 1;
+
+        // PERBAIKAN: Selalu gunakan harga asli, bukan harga setelah dipotong DP
         let harga = parseInt(item.totalHarga) || 0;
 
-        if (transaction.metodeBayar === "dp" && transaction.statusPembayaran === "DP") {
-          const prop = harga / transaction.totalHarga;
-          harga = Math.round(prop * transaction.sisaPembayaran);
-        } else if (transaction.metodeBayar === "free") {
+        // Hapus logika pemotongan DP - selalu tampilkan harga asli
+        if (transaction.metodeBayar === "free") {
           harga = 0;
         }
+        // Tidak ada lagi pemotongan untuk DP - harga tetap asli
 
         if (summaryMap.has(key)) {
           const existing = summaryMap.get(key);
@@ -774,7 +792,7 @@ const laporanPenjualanHandler = {
         // Type filter
         let typeMatches = true;
         if (salesType !== "all") {
-          if (salesType === "layanan") {
+          if (salesType === "manual") {
             typeMatches = item.jenisPenjualan === "manual";
           } else {
             typeMatches = item.jenisPenjualan === salesType;
