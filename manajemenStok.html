@@ -63,30 +63,95 @@
         font-weight: 700;
         color: #3a3a3a;
       }
-      .kalung-card {
-        background-color: #e3f2fd;
-      }
-      .liontin-card {
-        background-color: #e8f5e9;
-      }
-      .anting-card {
-        background-color: #fff3e0;
-      }
-      .cincin-card {
-        background-color: #f3e5f5;
-      }
-      .hala-card {
-        background-color: #e0f7fa;
-      }
-      .gelang-card {
-        background-color: #fff8e1;
-      }
-      .giwang-card {
-        background-color: #f1f8e9;
-      }
-      .batu-card {
-        background-color: #fce4ec;
-      }
+      
+  .table-container {
+    max-height: 500px;
+    overflow-y: auto;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .table tbody td {
+    vertical-align: middle;
+    padding: 12px;
+  }
+  
+  /* Perbaikan card */
+  .card {
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border: none;
+  }
+  
+  .card-header {
+    background: linear-gradient(135deg, #f4f6ff 0%, #5966e0 100%);
+    color: white;
+    border-radius: 12px 12px 0 0 !important;
+    border: none;
+  }
+  
+  .card-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+  
+  /* Perbaikan button */
+  .btn {
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+  
+  .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+  
+  /* Perbaikan tab */
+  .nav-tabs .nav-link {
+    border-radius: 8px 8px 0 0;
+    font-weight: 500;
+    color: #6c757d;
+  }
+  
+  .nav-tabs .nav-link.active {
+    background-color: #495057;
+    color: white;
+    border-color: #495057;
+  }
+  
+  /* Perbaikan stock summary */
+  .stock-summary {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    border: 1px solid #dee2e6;
+  }
+  
+  .stock-card {
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 15px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+  }
+  
+  .stock-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  }
+  
+  /* Enhanced colors */
+  .kalung-card { background: linear-gradient(135deg, #e3f2fd 0%, #9cd1fc 100%); }
+  .liontin-card { background: linear-gradient(135deg, #e8f5e9 0%, #adffb0 100%); }
+  .anting-card { background: linear-gradient(135deg, #fff3e0 0%, #ffcc02 100%); }
+  .cincin-card { background: linear-gradient(135deg, #f7f3f8 0%, #ee8dff 100%); }
+  .hala-card { background: linear-gradient(135deg, #e0f7fa 0%, #88e8f5 100%); }
+  .gelang-card { background: linear-gradient(135deg, #fff8e1 0%, #fd907c 100%); }
+  .giwang-card { background: linear-gradient(135deg, #f1f8e9 0%, #b3fc60 100%); }
+
     </style>
   </head>
   <body>
@@ -430,7 +495,7 @@
                     </h2>
                     <div>
                       <button
-                        class="btn btn-primary me-2"
+                        class="btn btn-success me-2"
                         data-bs-toggle="modal"
                         data-bs-target="#tambahStokBrankasModal"
                       >
@@ -474,7 +539,7 @@
                     </h2>
                     <div>
                       <button
-                        class="btn btn-primary me-2"
+                        class="btn btn-success me-2"
                         data-bs-toggle="modal"
                         data-bs-target="#tambahStokAdminModal"
                       >
@@ -518,7 +583,7 @@
                     </h2>
                     <div>
                       <button
-                        class="btn btn-primary me-2"
+                        class="btn btn-success me-2"
                         data-bs-toggle="modal"
                         data-bs-target="#tambahStokPostingModal"
                       >
@@ -568,7 +633,7 @@
                     </h2>
                     <div>
                       <button
-                        class="btn btn-primary me-2"
+                        class="btn btn-success me-2"
                         data-bs-toggle="modal"
                         data-bs-target="#tambahStokBarangRusakModal"
                       >
@@ -616,7 +681,7 @@
                     </h2>
                     <div>
                       <button
-                        class="btn btn-primary me-2"
+                        class="btn btn-success me-2"
                         data-bs-toggle="modal"
                         data-bs-target="#tambahStokBatuLepasModal"
                       >

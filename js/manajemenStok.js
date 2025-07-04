@@ -14,7 +14,6 @@ let stockData = {};
 const CACHE_KEY = 'stockDataCache';
 const CACHE_TTL_STANDARD = 5 * 60 * 1000; // 5 minutes for standard data
 const CACHE_TTL_REALTIME = 30 * 1000; // 30 seconds for real-time updates
-const HISTORY_RETENTION_DAYS = 7;
 const MAX_HISTORY_RECORDS = 10;
 
 // Cache management with Map for better performance
@@ -95,17 +94,11 @@ function shouldUpdateCache() {
 
 // Function to clean and limit history
 function cleanAndLimitHistory(data) {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - HISTORY_RETENTION_DAYS);
-    const cutoffTime = cutoffDate.getTime();
-    
     Object.keys(data).forEach(category => {
         Object.keys(data[category]).forEach(type => {
             if (data[category][type].history && Array.isArray(data[category][type].history)) {
-                let filteredHistory = data[category][type].history.filter(entry => {
-                    const entryDate = new Date(entry.date).getTime();
-                    return entryDate >= cutoffTime;
-                });
+                // HANYA SORT DAN LIMIT JUMLAH
+                let filteredHistory = data[category][type].history;
                 
                 filteredHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
                 
@@ -130,15 +123,7 @@ function addHistoryEntry(item, historyEntry) {
     item.history.unshift(historyEntry);
     item.history.sort((a, b) => new Date(b.date) - new Date(a.date));
     
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - HISTORY_RETENTION_DAYS);
-    const cutoffTime = cutoffDate.getTime();
-    
-    item.history = item.history.filter(entry => {
-        const entryDate = new Date(entry.date).getTime();
-        return entryDate >= cutoffTime;
-    });
-    
+    // HANYA BATASI BERDASARKAN JUMLAH RECORD (HAPUS PEMBATASAN WAKTU)
     if (item.history.length > MAX_HISTORY_RECORDS) {
         item.history = item.history.slice(0, MAX_HISTORY_RECORDS);
     }
@@ -310,17 +295,41 @@ async function populateTables() {
                 const item = stockData[category][type];
                 if (!item) return;
                 
+                // Determine stock status color
+                let quantityBadge = 'bg-primary';
+                if (item.quantity === 0) quantityBadge = 'bg-danger';
+                else if (item.quantity <= 5) quantityBadge = 'bg-warning';
+                else if (item.quantity >= 20) quantityBadge = 'bg-success';
+                
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${index}</td>
-                    <td>${type}</td>
-                    <td>${item.quantity}</td>
-                    <td>${item.lastUpdated ? formatDate(item.lastUpdated) : '-'}</td>
                     <td>
-                        <button class="btn btn-sm btn-info view-history" 
+                        <span class="badge bg-secondary">${index}</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-gem me-2 text-primary"></i>
+                            <strong>${type}</strong>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge ${quantityBadge} fs-6">${item.quantity}</span>
+                        ${item.quantity === 0 ? '<small class="text-danger ms-2">Kosong</small>' : 
+                          item.quantity <= 5 ? '<small class="text-warning ms-2">Sedikit</small>' : ''}
+                    </td>
+                    <td>
+                        <small class="text-muted">
+                            <i class="fas fa-clock me-1"></i>
+                            ${item.lastUpdated ? formatDate(item.lastUpdated) : 'Belum ada update'}
+                        </small>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-info view-history" 
                                 data-category="${category}" 
-                                data-type="${type}">
-                            <i class="fas fa-history"></i> Lihat
+                                data-type="${type}"
+                                title="Lihat riwayat ${type}">
+                            <i class="fas fa-history me-1"></i>
+                            Lihat
                         </button>
                     </td>
                 `;
@@ -388,10 +397,16 @@ function showHistory(category, type) {
         
         sortedHistory.forEach((record, index) => {
             const row = document.createElement('tr');
+            
+            // Determine badge style based on action
+            const actionBadge = record.action === 'Tambah' 
+                ? '<span class="badge bg-success"><i class="fas fa-plus me-1"></i>Tambah</span>'
+                : '<span class="badge bg-danger"><i class="fas fa-minus me-1"></i>Kurang</span>';
+            
             row.innerHTML = `
                 <td>${formatDate(record.date)}</td>
-                <td>${record.action}</td>
-                <td>${record.quantity}</td>
+                <td>${actionBadge}</td>
+                <td><span class="badge bg-primary">${record.quantity}</span></td>
                 <td>${record.action === 'Tambah' ? record.adder : record.reducer}</td>
                 <td>${record.action === 'Tambah' ? record.receiver : record.notes}</td>
             `;
@@ -973,7 +988,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         
         // Add info about history limits to the UI
-        console.log(`Stock management initialized. History limited to ${MAX_HISTORY_RECORDS} records per item.`);
+        console.log(`Stock management initialized. History limited to ${MAX_HISTORY_RECORDS} records per item (no time restriction).`);
         console.log(`Cache TTL: ${CACHE_TTL_STANDARD/1000}s standard, ${CACHE_TTL_REALTIME/1000}s realtime`);
         
     } catch (error) {
