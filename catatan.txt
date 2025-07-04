@@ -1,0 +1,6 @@
+buatkan saya perbaika pada penjualanAksesoris.js dengan mengikuti kelebihan yang  ada pada optimizedDp.js dengan ketentuan:
+- tidak menggunkan TTL melainkan listener realtime namun dengan logika yang smart
+- penggunaan reads firestore sefefktif mungkin karena menggunkan firestore spark plan.
+- penulisan kode dengan tingkat kompleksitas sedang dan hanya pada kode yang benar benar diperlukan agar file tidak terlalu panjang dan bisa efektif
+- buatkan kode secara lengkap agar bisa langsung saya gunakan untuk menggantikan file sebelumnya
+- saya akan melampirkan file penjualanAksesoris.html untuk konteks yang lebih komprehensif penjualanAksesoris.html 
