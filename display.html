@@ -219,7 +219,7 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        min-height: 200px;
+        min-height: 250px;
         position: relative;
         overflow: hidden; /* Mencegah overflow teks */
       }
@@ -397,11 +397,11 @@
 
       /* Promo Carousel */
       .promo-carousel {
-        margin-top: 3rem;
-        margin-bottom: 2rem;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
         border-radius: 15px;
         overflow: hidden;
-        box-shadow: var(--shadow-soft);
+        box-shadow: var(--shadow-gold);
       }
 
       .carousel-item {
@@ -412,7 +412,7 @@
       }
 
       .carousel-caption {
-        background: rgba(0, 0, 0, 0.6);
+        background: transparent;
         border-left: 4px solid var(--gold-primary);
         padding: 1rem;
         border-radius: 5px;
@@ -422,15 +422,20 @@
 
       .carousel-caption h3 {
         font-family: 'Playfair Display', serif;
-        font-size: 1.5rem;
-        color: var(--gold-secondary);
+        font-size: 1.8rem;
+        color: var(--dark-brown);
+      }
+      .carousel-caption p {
+        font-family: 'Roboto', serif;
+        font-size: 1.6rem;
+        color: var(--dark-brown);
       }
 
       /* Footer Styles */
       .footer {
         background: linear-gradient(135deg, var(--dark-brown), var(--gold-dark));
         color: var(--white);
-        padding: 1.5rem 0;
+        padding: 0.5rem 0;
         text-align: center;
         position: relative;
       }
@@ -659,7 +664,7 @@
         <div class="col-md-4" data-aos="fade-up" data-aos-delay="200">
           <div class="queue-card card-delayed gold-border">
             <div class="queue-card-header">
-              <h2><i class="fas fa-pause-circle"></i> ANTRIAN TERTUNDA</h2>
+              <h2><i class="fas fa-pause-circle"></i> ANTRIAN TERLEWATI</h2>
             </div>
             <div class="queue-card-body">
               <div class="delayed-queue-container">
@@ -703,22 +708,36 @@
       <!-- Promo Carousel -->
       <div id="promoCarousel" class="carousel slide promo-carousel" data-bs-ride="carousel" data-aos="fade-up" data-aos-delay="600">
         <div class="carousel-inner">
-          <div class="carousel-item active" style="background-image: url('https://images.unsplash.com/photo-1584307833174-a3bbb76ab367?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80')">
-            <div class="carousel-caption">
-              <h3>Koleksi Terbaru</h3>
-              <p>Temukan koleksi perhiasan terbaru kami dengan desain eksklusif</p>
+          <!-- Slide 1: Welcome -->
+          <div class="carousel-item active" style="background: linear-gradient(135deg, #ffebb4 30%, #f8dd83 100%); position: relative;">
+            <svg width="100%" height="100%" style="position:absolute;top:0;left:0;z-index:0;opacity:0.12;" viewBox="0 0 1440 320"><path fill="#d4af37" fill-opacity="1" d="M0,160L80,170.7C160,181,320,203,480,197.3C640,192,800,160,960,133.3C1120,107,1280,85,1360,74.7L1440,64L1440,320L1360,320C1280,320,1120,320,960,320C800,320,640,320,480,320C320,320,160,320,80,320L0,320Z"></path></svg>
+            <div class="carousel-caption" style="z-index:1;">
+              <h3>Selamat Datang di Melati Gold Shop</h3>
+              <p>Terima kasih telah memilih berbelanja di toko kami. Kami berkomitmen memberikan pelayanan terbaik untuk Anda.</p>
             </div>
           </div>
-          <div class="carousel-item" style="background-image: url('https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80')">
-            <div class="carousel-caption">
-              <h3>Promo Spesial</h3>
-              <h5>Dapatkan diskon hingga 10% untuk pembelian perhiasan berlian</h5>
+          <!-- Slide 2: Appreciation -->
+          <div class="carousel-item" style="background: linear-gradient(135deg, #f8f0d7 0%, #f9d776 100%); position: relative;">
+            <svg width="100%" height="100%" style="position:absolute;top:0;left:0;z-index:0;opacity:0.10;" viewBox="0 0 1440 320"><circle cx="1200" cy="100" r="120" fill="#d4af37" /></svg>
+            <div class="carousel-caption" style="z-index:1;">
+              <h3>Kepuasan Anda Prioritas Kami</h3>
+              <p>Kami sangat menghargai kepercayaan Anda. Nikmati pengalaman berbelanja yang nyaman dan aman di Melati Gold Shop.</p>
             </div>
           </div>
-          <div class="carousel-item" style="background-image: url('https://images.unsplash.com/photo-1601121141461-9d6647bca1ed?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80')">
-            <div class="carousel-caption">
-              <h3>Layanan Buyback</h3>
-              <p>Kami menerima tukar tambah perhiasan lama Anda dengan nilai terbaik</p>
+          <!-- Slide 3: Loyalty -->
+          <div class="carousel-item" style="background: linear-gradient(135deg, #f9f5eb 0%, #f9d776 100%); position: relative;">
+            <svg width="100%" height="100%" style="position:absolute;top:0;left:0;z-index:0;opacity:0.10;" viewBox="0 0 1440 320"><rect x="0" y="200" width="1440" height="120" fill="#d4af37" rx="60"/></svg>
+            <div class="carousel-caption" style="z-index:1;">
+              <h3>Terima Kasih atas Kunjungan Anda</h3>
+              <p>Semoga hari Anda menyenangkan dan menemukan perhiasan impian di toko kami!</p>
+            </div>
+          </div>
+          <!-- Slide 4: Service -->
+          <div class="carousel-item" style="background: linear-gradient(135deg, #f9d776 0%, #f8f0d7 100%); position: relative;">
+            <svg width="100%" height="100%" style="position:absolute;top:0;left:0;z-index:0;opacity:0.10;" viewBox="0 0 1440 320"><ellipse cx="300" cy="220" rx="180" ry="80" fill="#d4af37" /></svg>
+            <div class="carousel-caption" style="z-index:1;">
+              <h3>Layanan Ramah & Profesional</h3>
+              <p>Staff kami siap membantu Anda dengan sepenuh hati. Jangan ragu untuk bertanya atau berkonsultasi.</p>
             </div>
           </div>
         </div>
@@ -738,10 +757,10 @@
       <div class="container">
         <div class="social-links">
           <a href="#"><i class="fab fa-instagram"></i></a>
-          <a href="#"><i class="fab fa-facebook"></i></a>
+          <a href="#"><i class="fab fa-tiktok"></i></a>
           <a href="#"><i class="fab fa-whatsapp"></i></a>
         </div>
-        <p>&copy; 2025 Melati Gold Shop. All rights reserved.</p>
+        <p>&copy; 2025 Melati Gold Shop.</p>
       </div>
     </footer>
 
