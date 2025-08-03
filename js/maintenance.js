@@ -731,45 +731,49 @@ class MaintenanceSystem {
    * Transform data for Excel export
    */
   async transformDataForExcel(data, collectionName) {
-    const transformedData = [];
+  const transformedData = [];
 
-    for (const item of data) {
-      let row = {};
+  for (const item of data) {
+    let row = {};
 
-      switch (collectionName) {
-        case "penjualanAksesoris":
-          row = {
-            Tanggal: item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleDateString("id-ID") : "",
-            Waktu: item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleTimeString("id-ID") : "",
-            Kode: item.kodeText || "",
-            "Nama Barang": item.nama || "",
-            Sales: item.sales || "",
-            "Total Harga": item.totalHarga || 0,
-            "Jumlah Items": item.items ? item.items.length : 0,
-          };
-          break;
+    switch (collectionName) {
+      case "penjualanAksesoris":
+        // Safely extract items[0] for single-item sales
+        const firstItem = Array.isArray(item.items) && item.items.length > 0 ? item.items[0] : {};
+        
+        row = {
+          Tanggal: item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleDateString("id-ID") : "",
+          Waktu: item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleTimeString("id-ID") : "",
+          Kode: firstItem.kodeText || item.kodeText || "",
+          "Nama Barang": firstItem.nama || item.nama || "",
+          Keterangan: firstItem.keterangan || item.keterangan || "",
+          Sales: item.sales || "",
+          "Total Harga": item.totalHarga || 0,
+          "Jumlah Items": Array.isArray(item.items) ? item.items.length : 0,
+        };
+        break;
 
-        case "stockAdditions":
-          row = {
-            Tanggal: item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleDateString("id-ID") : "",
-            Waktu: item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleTimeString("id-ID") : "",
-            Kode: item.kode || "",
-            "Nama Barang": item.namaBarang || "",
-            Kategori: item.kategori || "",
-            Jumlah: item.jumlah || 0,
-            "Harga Beli": item.hargaBeli || 0,
-            "Harga Jual": item.hargaJual || 0,
-            Supplier: item.supplier || "",
-            Keterangan: item.keterangan || "",
-          };
-          break;
-      }
-
-      transformedData.push(row);
+      case "stockAdditions":
+        row = {
+          Tanggal: item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleDateString("id-ID") : "",
+          Waktu: item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleTimeString("id-ID") : "",
+          Kode: item.kode || "",
+          "Nama Barang": item.namaBarang || "",
+          Kategori: item.kategori || "",
+          Jumlah: item.jumlah || 0,
+          "Harga Beli": item.hargaBeli || 0,
+          "Harga Jual": item.hargaJual || 0,
+          Supplier: item.supplier || "",
+          Keterangan: item.keterangan || "",
+        };
+        break;
     }
 
-    return transformedData;
+    transformedData.push(row);
   }
+
+  return transformedData;
+}
 
   /**
    * Create Excel file and trigger download
