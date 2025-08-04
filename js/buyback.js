@@ -262,6 +262,7 @@ function calculatePersentase(kondisiBarang, persentaseBeli) {
 }
 
 // Show results in modal
+// Modifikasi fungsi showResults untuk menampilkan persentase potongan yang dinamis
 function showResults(results) {
   const modalBody = document.getElementById("modalMessage");
   let content = `
@@ -271,7 +272,27 @@ function showResults(results) {
   `;
 
   results.forEach((result, index) => {
-    const conditionText = result.kondisiBarang === "1" ? "Mengkilap / Mulus / Model Bagus" : result.kondisiBarang === "2" ? "Sedikit Kusam / Sedikit Baret" : result.kondisiBarang === "3" ? "Kusam / Banyak Baret" : "(Batu Banyak Lepas > 3 / Rantai Kaku / Butterfly Hilang / Lock Rusak)";
+    const conditionText = result.kondisiBarang === "1" ? "Mengkilap / Mulus / Model Bagus" : 
+                         result.kondisiBarang === "2" ? "Sedikit Kusam / Sedikit Baret" : 
+                         result.kondisiBarang === "3" ? "Kusam / Banyak Baret" : 
+                         "Ada Reject / Butterfly Hilang / Lock Rusak)";
+    
+    // Tentukan persentase potongan berdasarkan kondisi
+    const getDiscountPercentage = (kondisi) => {
+      switch(kondisi) {
+        case "1":
+        case "2":
+        case "3":
+          return "10% / 15%";
+        case "4":
+          return "15% / 20%";
+        default:
+          return "10% / 15%";
+      }
+    };
+
+    const discountPercentage = getDiscountPercentage(result.kondisiBarang);
+    
     let specialNotice = "";
     
     if (result.isHigherPurchasePrice) {
@@ -280,6 +301,16 @@ function showResults(results) {
           <i class="fas fa-exclamation-triangle me-2"></i>
           <strong>Perhatian:</strong> Harga per gram saat beli lebih tinggi dari harga per gram hari ini. 
           Harga penerimaan menggunakan 100% dari harga hari ini.
+        </div>
+      `;
+    }
+
+    // Tambahkan notifikasi khusus untuk kondisi K4 dengan class "no-print"
+    if (result.kondisiBarang === "4") {
+      specialNotice += `
+        <div class="alert alert-info mb-3 no-print">
+          <i class="fas fa-info-circle me-2"></i>
+          <strong>Informasi:</strong> Untuk kondisi K4 (Tidak Sempurna), potongan yang diterapkan adalah 15% / 20%.
         </div>
       `;
     }
@@ -298,14 +329,14 @@ function showResults(results) {
       <div class="alert ${result.priceDifference >= 0 ? "alert-success" : "alert-danger"} mb-0">
         <div class="row">
           <div class="col-md-12">
-            <p class="mb-0 fs-6 fw-bold">Harga Buyback Per Gram Sebelum Potongan 10% / 15%: \n <strong>Rp ${formatNumber(result.buybackPrice)}</strong></p>
+            <p class="mb-0 fs-6 fw-bold">Harga Buyback Per Gram Sebelum Potongan ${discountPercentage}: \n <strong>Rp ${formatNumber(result.buybackPrice)}</strong></p>
           </div>
         </div>
       </div>
-          <div class="alert alert-warning mb-4">
-      <i class="fas fa-info-circle me-2"></i>
-      Harga buyback per gram bisa berubah sesuai dengan kondisi barang
-    </div>
+      <div class="alert alert-warning my-2">
+        <i class="fas fa-info-circle me-2"></i>
+        Note: Harga buyback per gram bisa berubah sesuai dengan kondisi barang
+      </div>
     </div>
   `;
   });
@@ -416,6 +447,10 @@ function printModal() {
         }
         .fas {
           display: none;
+        }
+        /* CSS untuk menyembunyikan elemen dengan class no-print saat print */
+        .no-print {
+          display: none !important;
         }
       </style>
     </head>

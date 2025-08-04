@@ -22,7 +22,7 @@
     <!-- Favicon sederhana -->
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
     <title>Buyback Perhiasan - Melati Gold Shop</title>
-<style>
+    <style>
       .condition-visual-btn {
         margin-left: 10px;
         padding: 2px 8px;
@@ -322,8 +322,13 @@
         #tablePenerimaan td:nth-child(6) {
           width: 15% !important;
         }
-        .hapus-baris{
+        .hapus-baris {
           padding: 5px 8px;
+        }
+      }
+      @media print {
+        .no-print {
+          display: none !important;
         }
       }
     </style>
@@ -587,7 +592,7 @@
                   <h5 class="fw-bold">Aturan Penentuan Harga:</h5>
                   <ul class="condition-list fs-6 mx-3">
                     <li>
-                      * Perhitungan ini hanya digunakan ketika kondisi barang tidak rusak 
+                      * Perhitungan ini hanya digunakan ketika kondisi barang tidak rusak
                       <strong>(bukan barang leburan).</strong>
                     </li>
                     <li>
@@ -636,7 +641,7 @@
                     </li>
                     <li>
                       <strong>K4 = Kondisi Tidak Sempurna</strong>
-                      (Batu Banyak Lepas > 3 / Butterfly Hilang / Lock Rusak)
+                      (Ada Reject / Butterfly Hilang / Lock Rusak)
                       <button
                         type="button"
                         class="btn btn-sm btn-outline-primary ms-2 condition-visual-btn"
