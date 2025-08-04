@@ -309,6 +309,23 @@ class OptimizedStockReport {
       this.renderStockTable();
       this.isDataLoaded = true;
       console.log("✅ Data loading completed successfully");
+// Setup real-time listener
+    this.setupRealtimeListener(selectedDate);
+
+    // Force trigger real-time update untuk data hari ini
+    if (this.isSameDate(selectedDate, new Date())) {
+      console.log("📡 Forcing initial real-time update for today's data...");
+      await this.handleRealtimeUpdate();
+    } else {
+      // Load normal untuk tanggal sebelumnya
+      await this.loadStockMasterData(forceRefresh);
+      await this.fetchReturnData(selectedDate);
+      await this.calculateStockForDate(selectedDate, forceRefresh);
+      this.renderStockTable();
+    }
+
+    this.isDataLoaded = true;
+
     } catch (error) {
       console.error("❌ Error loading stock data:", error);
       this.showError("Terjadi kesalahan saat memuat data: " + error.message);
@@ -396,35 +413,59 @@ class OptimizedStockReport {
     this.listeners.clear();
   }
 
-  // Handle real-time updates
-  async handleRealtimeUpdate() {
-    if (!this.currentSelectedDate) return;
+  // Improved handleRealtimeUpdate with force refresh and proper initialization
+async handleRealtimeUpdate() {
+  if (!this.currentSelectedDate) return;
 
-    try {
-      // Clear cache for current date
-      this.clearCacheForDate(this.currentSelectedDate);
+  try {
+    console.log("📡 Processing real-time update...");
 
-      // Recalculate and update display
-      await this.calculateStockForDate(this.currentSelectedDate, true);
+    // Clear all relevant caches to force fresh data
+    this.clearCacheForDate(this.currentSelectedDate);
+    
+    // Force refresh stock master data first
+    await this.loadStockMasterData(true);
+    
+    // Get fresh base snapshot
+    const baseSnapshot = await this.getSnapshotAsBase(this.currentSelectedDate);
+    console.log(`📊 Got base snapshot with ${baseSnapshot.size} items`);
 
-      // Refresh return data for real-time updates
-      await this.fetchReturnData(this.currentSelectedDate);
+    // Recalculate with fresh data
+    await this.calculateStockForDate(this.currentSelectedDate, true);
+    
+    // Refresh return data
+    await this.fetchReturnData(this.currentSelectedDate);
 
-      // Recalculate stok akhir with return data
-      this.filteredStockData.forEach((item) => {
-        const returnAmount = this.returnData.get(item.kode) || 0;
-        item.return = returnAmount;
-        item.stokAkhir = item.stokAwal + item.tambahStok - item.laku - item.free - item.gantiLock - returnAmount;
-      });
+    // Recalculate final stock with return data
+    this.filteredStockData = this.filteredStockData.map(item => {
+      const returnAmount = this.returnData.get(item.kode) || 0;
+      return {
+        ...item,
+        return: returnAmount,
+        stokAkhir: Math.max(0, 
+          item.stokAwal + 
+          item.tambahStok - 
+          item.laku - 
+          item.free - 
+          item.gantiLock - 
+          returnAmount
+        )
+      };
+    });
 
-      this.renderStockTable();
+    // Update display
+    await this.renderStockTable();
+    
+    // Show update notification
+    this.showUpdateIndicator();
+    
+    console.log("✅ Real-time update completed successfully");
 
-      // Show update indicator
-      this.showUpdateIndicator();
-    } catch (error) {
-      console.error("Error handling real-time update:", error);
-    }
+  } catch (error) {
+    console.error("❌ Error handling real-time update:", error);
+    this.showError("Gagal memperbarui data secara real-time");
   }
+}
 
   // Load stock master data with smart caching
   async loadStockMasterData(forceRefresh = false) {
@@ -1103,7 +1144,7 @@ class OptimizedStockReport {
           <tr>
             <td class="text-center">${rowIndex++}</td>
             <td class="text-center">${item.kode || "-"}</td>
-            <td>${item.nama || "-"}</td>
+            <td class="text-start">${item.nama || "-"}</td>
             <td class="text-center">${item.stokAwal || 0}</td>
             <td class="text-center">${item.tambahStok || 0}</td>
             <td class="text-center">${item.laku || 0}</td>
@@ -1148,8 +1189,8 @@ class OptimizedStockReport {
         #stockTable { table-layout: fixed; width: 100% !important; }
         #stockTable th:nth-child(1), #stockTable td:nth-child(1) { width: 5% !important; text-align: center; }
         #stockTable th:nth-child(2), #stockTable td:nth-child(2) { width: 9% !important; text-align: center; }
-        #stockTable th:nth-child(3), #stockTable td:nth-child(3) { width: 25% !important; text-align: left; }
-        #stockTable th:nth-child(n+4), #stockTable td:nth-child(n+4) { width: 8.5% !important; text-align: center; }
+        #stockTable th:nth-child(3), #stockTable td:nth-child(3) { width: 20% !important; text-align: center; }
+        #stockTable th:nth-child(n+4), #stockTable td:nth-child(n+4) { width: 9.5% !important; text-align: center; }
         #stockTable th, #stockTable td { padding: 8px 4px; vertical-align: middle; word-wrap: break-word; }
       </style>
     `;
@@ -1187,7 +1228,13 @@ class OptimizedStockReport {
           customize: function (doc) {
             doc.defaultStyle.fontSize = 8;
             doc.styles.tableHeader.fontSize = 9;
-            doc.content[1].table.widths = ["5%", "12%", "25%", "8%", "8%", "8%", "8%", "8%", "8%", "8%"];
+            doc.content[1].table.widths = ["5%", "9%", "28%", "8%", "8%", "8%", "8%", "8%", "8%", "8%"];
+            // Center align all columns except name column (3rd column)
+            doc.content[1].table.body.forEach(row => {
+              row.forEach((cell, index) => {
+                cell.alignment = index !== 2 ? 'center' : 'left';
+              });
+            });
           },
         },
       ],
