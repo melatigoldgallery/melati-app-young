@@ -2411,8 +2411,13 @@ const validators = {
 };
 
 // Add form validation to save transaction
+// Tambahkan flag isSaving untuk mencegah double submit
+penjualanHandler.isSaving = false;
 const originalSaveTransaction = penjualanHandler.saveTransaction;
 penjualanHandler.saveTransaction = async function () {
+  if (this.isSaving) return; // Prevent double submit
+  this.isSaving = true;
+  loadingStates.show("#btnSimpanPenjualan", "Menyimpan...");
   try {
     // Validate form data
     const salesName = $("#sales").val().trim();
@@ -2426,7 +2431,14 @@ penjualanHandler.saveTransaction = async function () {
     validators.totalHarga(totalHarga, metodeBayar, "Total harga");
 
     // Call original function
-    return await originalSaveTransaction.call(this);
+    const result = await originalSaveTransaction.call(this);
+
+    // Pastikan modal print hanya trigger resetForm sekali
+    $("#printModal").off("hidden.bs.modal").on("hidden.bs.modal", () => {
+      this.resetForm();
+    });
+
+    return result;
   } catch (error) {
     if (
       error.message.includes("harus") ||
@@ -2438,6 +2450,9 @@ penjualanHandler.saveTransaction = async function () {
       return;
     }
     throw error;
+  } finally {
+    loadingStates.hide("#btnSimpanPenjualan");
+    this.isSaving = false;
   }
 };
 
