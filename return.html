@@ -39,6 +39,35 @@
         display: block;
         color: #dc3545;
       }
+      .modal-xl {
+    max-width: 400px;
+  }
+  .modal .table tbody tr:hover {
+    background-color: #f8f9fa;
+    cursor: pointer;
+  }
+  .is-invalid {
+    border-color: #dc3545;
+  }
+  .invalid-feedback {
+    display: block;
+    color: #dc3545;
+  }
+  /* CSS baru untuk fitur hapus */
+  .btn-delete-return {
+    padding: 2px 6px;
+    font-size: 12px;
+  }
+  .action-column {
+    width: 80px;
+    text-align: center;
+  }
+  #detailHapusData {
+    background-color: #f8f9fa;
+    padding: 10px;
+    border-radius: 5px;
+    margin: 10px 0;
+  }
     </style>
   </head>
   <body>
@@ -326,6 +355,7 @@
                         <th>Nama Barang</th>
                         <th>Jumlah</th>
                         <th>Keterangan</th>
+                        <th class="action-column">Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -338,6 +368,56 @@
           </div>
         </div>
       </main>
+    </div>
+
+    <!-- Modal Konfirmasi Hapus -->
+    <div
+      class="modal fade"
+      id="modalKonfirmasiHapus"
+      tabindex="-1"
+      aria-labelledby="modalKonfirmasiHapusLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title" id="modalKonfirmasiHapusLabel">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              Konfirmasi Hapus Data Return
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-warning">
+              <i class="fas fa-warning me-2"></i>
+              <strong>Peringatan!</strong>
+              Data yang dihapus tidak dapat dikembalikan.
+            </div>
+            <p>Anda akan menghapus data return dengan detail:</p>
+            <ul id="detailHapusData">
+              <!-- Detail data akan ditampilkan di sini -->
+            </ul>
+            <div class="mb-3">
+              <label for="passwordHapus" class="form-label">
+                <i class="fas fa-lock me-2"></i>
+                Masukkan Password untuk Konfirmasi:
+              </label>
+              <input type="password" class="form-control" id="passwordHapus" placeholder="Masukkan password" required />
+              <div class="invalid-feedback" id="passwordError"></div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              <i class="fas fa-times me-2"></i>
+              Batal
+            </button>
+            <button type="button" class="btn btn-danger" id="btnKonfirmasiHapus">
+              <i class="fas fa-trash me-2"></i>
+              Hapus Data
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Modal Pilih Barang -->
