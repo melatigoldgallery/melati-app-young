@@ -23,7 +23,313 @@
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
     <title>Buyback Perhiasan - Melati Gold Shop</title>
     <style>
-      
+      .condition-visual-btn {
+        margin-left: 10px;
+        padding: 2px 8px;
+        font-size: 11px;
+      }
+      .media-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+      }
+      .media-item {
+        position: relative;
+        border: 2px dashed #ddd;
+        border-radius: 8px;
+        padding: 10px;
+        text-align: center;
+        min-height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      .media-item:hover {
+        border-color: #007bff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+      .media-item.has-content {
+        border-color: #28a745;
+        border-style: solid;
+      }
+      .media-preview {
+        width: 100%;
+        height: 100px;
+        object-fit: cover;
+        border-radius: 4px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+      }
+      .media-preview:hover {
+        transform: scale(1.05);
+      }
+      .upload-placeholder {
+        color: #6c757d;
+        font-size: 12px;
+      }
+      .media-controls {
+        display: flex;
+        gap: 5px;
+        justify-content: center;
+        margin-top: 8px;
+      }
+      .btn-xs {
+        padding: 2px 6px;
+        font-size: 10px;
+      }
+      .loading-spinner {
+        display: none;
+        text-align: center;
+        padding: 20px;
+      }
+
+      /* Image Viewer Modal Styles */
+      .image-viewer-modal .modal-dialog {
+        max-width: 70vw;
+        max-height: 90vh;
+        margin: 25px auto;
+      }
+      .image-viewer-content {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 60vh;
+        background: #000;
+        border-radius: 8px;
+      }
+      .viewer-image {
+        max-width: 100%;
+        max-height: 60vh;
+        object-fit: contain;
+      }
+      .viewer-video {
+        max-width: 100%;
+        max-height: 70vh;
+      }
+      .nav-arrow {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        border: none;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        font-size: 20px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        z-index: 10;
+      }
+      .nav-arrow:hover {
+        background: rgba(0, 0, 0, 0.9);
+        transform: translateY(-50%) scale(1.1);
+      }
+      .nav-arrow.prev {
+        left: 20px;
+      }
+      .nav-arrow.next {
+        right: 20px;
+      }
+      .media-counter {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 14px;
+      }
+      .media-title {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 16px;
+        font-weight: bold;
+      }
+
+      /* Offline indicator */
+      .offline-indicator {
+        position: fixed;
+        top: 70px;
+        right: 20px;
+        background: #dc3545;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 12px;
+        z-index: 1050;
+        display: none;
+      }
+      .offline-indicator.show {
+        display: block;
+      }
+
+      /* Upload progress */
+      .upload-progress {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: #e9ecef;
+        border-radius: 0 0 8px 8px;
+        overflow: hidden;
+      }
+      .upload-progress-bar {
+        height: 100%;
+        background: #007bff;
+        width: 0%;
+        transition: width 0.3s ease;
+      }
+
+      #tablePenerimaan th:nth-child(2),
+      #tablePenerimaan td:nth-child(2) {
+        width: 10% !important;
+      }
+
+      @media (max-width: 575.98px) {
+        .card-header {
+          flex-direction: row;
+          align-items: center;
+          padding: 10px 10px;
+        }
+        .card-header h2 {
+          font-size: 1rem;
+          margin-bottom: 0 !important;
+        }
+
+        #btnSetting,
+        #btnTambahPenerimaan {
+          padding: 6px 8px !important;
+          font-size: 12px !important;
+          height: 26px;
+          width: 26px;
+          border-radius: 40%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        html,
+        body {
+          font-size: 13px !important;
+        }
+        .main-content,
+        .page-content,
+        .content-wrapper,
+        .card,
+        .card-body {
+          font-size: 13px !important;
+        }
+        .card-header h2,
+        .card-header h5,
+        .card-header h6 {
+          font-size: 1rem !important;
+        }
+        .btn,
+        .btn-sm,
+        .btn-xs {
+          font-size: 12px !important;
+        }
+        .table th,
+        .table td {
+          font-size: 11px !important;
+          padding: 6px 4px;
+        }
+        .breadcrumb {
+          font-size: 11px !important;
+        }
+        .media-title,
+        .media-counter {
+          font-size: 11px !important;
+          padding: 2px 6px;
+        }
+        .condition-visual-btn {
+          font-size: 10px !important;
+          padding: 2px 6px;
+        }
+        .buyback-notes h5,
+        .buyback-notes ul,
+        .buyback-notes li {
+          font-size: 12px !important;
+        }
+        .modal-title {
+          font-size: 1rem !important;
+        }
+        .form-control,
+        .form-select,
+        .form-control-sm,
+        .form-select-sm {
+          font-size: 12px !important;
+          padding: 4px 8px !important;
+        }
+        .sidebar .brand-name {
+          font-size: 1rem !important;
+        }
+        .sidebar-menu .menu-text {
+          font-size: 12px !important;
+        }
+        .offline-indicator {
+          font-size: 11px !important;
+          padding: 5px 10px;
+        }
+        #tablePenerimaan {
+          min-width: 800px !important;
+        }
+        .table-responsive {
+          overflow-x: auto !important;
+        }
+        #tablePenerimaan th,
+        #tablePenerimaan td {
+          white-space: nowrap !important;
+        }
+        #tablePenerimaan th:nth-child(1),
+        #tablePenerimaan td:nth-child(1),
+        #tablePenerimaan th:nth-child(7),
+        #tablePenerimaan td:nth-child(7) {
+          width: 2% !important;
+        }
+        #tablePenerimaan th:nth-child(2),
+        #tablePenerimaan td:nth-child(2) {
+          width: 8% !important;
+        }
+        #tablePenerimaan th:nth-child(3),
+        #tablePenerimaan td:nth-child(3) {
+          width: 25% !important;
+        }
+        #tablePenerimaan th:nth-child(4),
+        #tablePenerimaan td:nth-child(4) {
+          width: 15% !important;
+        }
+        #tablePenerimaan th:nth-child(5),
+        #tablePenerimaan td:nth-child(5),
+        #tablePenerimaan th:nth-child(6),
+        #tablePenerimaan td:nth-child(6) {
+          width: 15% !important;
+        }
+        .hapus-baris {
+          padding: 5px 8px;
+        }
+      }
+      @media print {
+        .no-print {
+          display: none !important;
+        }
+      }
     </style>
   </head>
   <body>
@@ -71,6 +377,41 @@
                 class="nav-link collapsed"
                 href="#"
                 data-bs-toggle="collapse"
+                data-bs-target="#antrianSubmenu"
+                aria-expanded="false"
+              >
+                <i class="fas fa-ticket-alt"></i>
+                <span class="menu-text">Antrian</span>
+                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
+              </a>
+              <div class="collapse" id="antrianSubmenu" data-bs-parent="#sidebarAccordion">
+                <ul class="nav flex-column ms-3">
+                  <li class="nav-item">
+                    <a class="nav-link" href="admin.html">
+                      <i class="fas fa-user-cog"></i>
+                      <span class="menu-text">Admin Antrian</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="display.html">
+                      <i class="fas fa-desktop"></i>
+                      <span class="menu-text">Display Antrian</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="analisis.html">
+                      <i class="fas fa-chart-bar"></i>
+                      <span class="menu-text">Laporan Antrian</span>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </li>
+            <li class="nav-item">
+              <a
+                class="nav-link collapsed"
+                href="#"
+                data-bs-toggle="collapse"
                 data-bs-target="#aksesorisSubmenu"
                 aria-expanded="false"
               >
@@ -90,6 +431,12 @@
                     <a class="nav-link" href="dataPenjualan.html">
                       <i class="fas fa-shopping-cart"></i>
                       <span class="menu-text">Penjualan Aksesoris</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="return.html">
+                      <i class="fa-solid fa-right-from-bracket"></i>
+                      <span class="menu-text">Return Aksesoris</span>
                     </a>
                   </li>
                   <li class="nav-item">
@@ -156,18 +503,28 @@
               </ol>
             </nav>
           </div>
-          
+
           <div class="content-wrapper">
             <!-- Buyback Form Card -->
             <div class="card mb-4">
-              <div class="card-header">
-                <h2>
+              <div class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">
                   <i class="fas fa-calculator"></i>
                   Detail Barang
                 </h2>
-                <button type="button" class="btn btn-sm btn-primary" id="btnTambahPenerimaan">
-                  <i class="fas fa-plus me-1"></i> Tambah
-                </button>
+                <div class="d-flex">
+                  <button type="button" class="btn btn-sm btn-success me-2" id="btnSetting">
+                    <i class="fas fa-cog me-1 mx-1"></i>
+                    <span class="d-none d-sm-inline">Setting</span>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-primary" id="btnTambahPenerimaan">
+                    <span class="d-none d-sm-inline">
+                      <i class="fas fa-plus me-1"></i>
+                      Tambah
+                    </span>
+                    <span class="d-inline d-sm-none"><i class="fas fa-plus"></i></span>
+                  </button>
+                </div>
               </div>
               <div class="card-body">
                 <form id="penerimaanForm">
@@ -175,13 +532,13 @@
                     <table class="table" id="tablePenerimaan">
                       <thead>
                         <tr>
-                          <th style="width:3%">No</th>
-                          <th style="width:9%">Kadar</th>
-                          <th style="width:24%">Nama Barang</th>
-                          <th style="width:9%">Kode Barang</th>
-                          <th style="width:15%">Harga Per Gram Saat Beli</th>
-                          <th style="width:15%">Harga Per Gram Hari Ini</th>
-                          <th style="width:7%">Aksi</th>
+                          <th>No</th>
+                          <th>Kadar</th>
+                          <th>Nama Barang</th>
+                          <th>Kode Kondisi Barang</th>
+                          <th>Harga Per Gram Saat Beli</th>
+                          <th>Harga Per Gram Hari Ini</th>
+                          <th>Aksi</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -198,20 +555,37 @@
                               <option value="22K">22K</option>
                             </select>
                           </td>
-                          <td><input type="text"  name="namaBarang" class="form-control form-control-sm" placeholder="Nama Barang"></td>
                           <td>
-                            <select id="kondisiBarang" name="kondisiBarang" class="form-select form-select-sm" required>
-                              <option value="" disabled selected>Pilih</option>
-                              <option value="1">K1</option>
-                              <option value="2">K2</option>
-                              <option value="3">K3</option>
-                            </select>
+                            <input
+                              type="text"
+                              name="namaBarang"
+                              class="form-control form-control-sm"
+                              placeholder="Nama Barang"
+                              required
+                            />
+                          </td>
+                          <td>
+                            <div class="d-flex align-items-center">
+                              <select
+                                id="kondisiBarang"
+                                name="kondisiBarang"
+                                class="form-select form-select-sm"
+                                required
+                              >
+                                <option value="" disabled selected>Pilih</option>
+                                <option value="1">K1</option>
+                                <option value="2">K2</option>
+                                <option value="3">K3</option>
+                                <option value="4">K4</option>
+                              </select>
+                            </div>
                           </td>
                           <td>
                             <input
                               name="hargaBeli"
                               class="form-control form-control-sm"
                               placeholder="Harga beli"
+                              type="number"
                               required
                               min="0"
                             />
@@ -221,6 +595,7 @@
                               name="hargaHariIni"
                               class="form-control form-control-sm"
                               placeholder="Harga hari ini"
+                              type="number"
                               required
                               min="0"
                             />
@@ -234,15 +609,16 @@
                       </tbody>
                     </table>
                   </div>
-                  <div class="d-grid mt-3">
+                  <div class="col-md-3 mt-3">
                     <button type="submit" class="btn btn-primary">
-                      <i class="fas fa-calculator me-2"></i> Hitung Buyback Perhiasan
+                      <i class="fas fa-calculator me-2"></i>
+                      Hitung Buyback Perhiasan
                     </button>
                   </div>
                 </form>
               </div>
             </div>
-            
+
             <!-- Buyback Notes Card -->
             <div class="card mb-4">
               <div class="card-header">
@@ -256,22 +632,64 @@
                   <h5 class="fw-bold">Aturan Penentuan Harga:</h5>
                   <ul class="condition-list fs-6 mx-3">
                     <li>
-                      * Sebelum menghitung buyback <strong>pastikan barang tidak ada cacat</strong> (ada penyok, putus, atau bekas patri).
+                      * Perhitungan ini hanya digunakan ketika kondisi barang tidak rusak
+                      <strong>(bukan barang leburan).</strong>
                     </li>
                     <li>
-                      * Untuk pembelian beberapa barang dengan kondisi berbeda, harga per gram disesuaikan dengan kondisi barang dominan (yang lebih banyak) untuk menyeragamkan harga buyback.
+                      * Sebelum menghitung buyback
+                      <strong>pastikan barang tidak ada cacat</strong>
+                      (ada penyok, putus, atau bekas patri).
                     </li>
-                  </ul>                  
+                  </ul>
                   <h5 class="fw-bold mt-3">Kode Kategori Kondisi Barang:</h5>
                   <ul class="condition-list fs-6 mx-3">
                     <li>
-                      <strong>K1 = Kondisi Sangat Baik</strong> (Mengkilap, Mulus, Model Bagus)
+                      <strong>K1 = Kondisi Sangat Baik</strong>
+                      (Mengkilap / Mulus / Model Bagus)
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary ms-2 condition-visual-btn"
+                        data-condition="1"
+                      >
+                        <i class="fas fa-images me-1"></i>
+                        Lihat Visual
+                      </button>
                     </li>
                     <li>
-                      <strong>K2 = Kondisi Sedang</strong> (Sedikit Kusam, Sedikit Baret)
+                      <strong>K2 = Kondisi Sedang</strong>
+                      (Sedikit Kusam / Sedikit Baret)
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary ms-2 condition-visual-btn"
+                        data-condition="2"
+                      >
+                        <i class="fas fa-images me-1"></i>
+                        Lihat Visual
+                      </button>
                     </li>
                     <li>
-                      <strong>K3 = Kondisi Kurang</strong> (Kusam / Banyak Baret / Batu Lepas)
+                      <strong>K3 = Kondisi Kurang</strong>
+                      (Kusam / Banyak Baret)
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary ms-2 condition-visual-btn"
+                        data-condition="3"
+                      >
+                        <i class="fas fa-images me-1"></i>
+                        Lihat Visual
+                      </button>
+                    </li>
+                    <li>
+                      <strong>K4 = Kondisi Tidak Sempurna</strong>
+                      (Ada Reject / Butterfly Hilang / Lock Rusak)
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary ms-2 condition-visual-btn"
+                        data-condition="4"
+                      >
+                        <i class="fas fa-images me-1"></i>
+                        Lihat Visual
+                      </button>
                     </li>
                   </ul>
                 </div>
@@ -282,13 +700,90 @@
       </main>
     </div>
 
+    <!-- Settings Password Modal -->
+    <div
+      class="modal fade"
+      id="settingsPasswordModal"
+      tabindex="-1"
+      aria-labelledby="settingsPasswordModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="settingsPasswordModalLabel">
+              <i class="fas fa-lock me-2"></i>
+              Verifikasi Password
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="settingsPassword" class="form-label">Masukkan password untuk mengakses pengaturan:</label>
+              <input type="password" class="form-control" id="settingsPassword" required />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="button" class="btn btn-primary" id="verifyPasswordBtn">Verifikasi</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Buyback Settings Modal -->
+    <div
+      class="modal fade"
+      id="buybackSettingsModal"
+      tabindex="-1"
+      aria-labelledby="buybackSettingsModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="buybackSettingsModalLabel">
+              <i class="fas fa-cog me-2"></i>
+              Pengaturan Persentase Buyback
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form id="buybackSettingsForm">
+              <div class="mb-3">
+                <label for="persentaseK1" class="form-label">Persentase K1 (%)</label>
+                <input type="number" class="form-control" id="persentaseK1" min="0" max="100" required />
+              </div>
+              <div class="mb-3">
+                <label for="persentaseK2" class="form-label">Persentase K2 (%)</label>
+                <input type="number" class="form-control" id="persentaseK2" min="0" max="100" required />
+              </div>
+              <div class="mb-3">
+                <label for="persentaseK3" class="form-label">Persentase K3 (%)</label>
+                <input type="number" class="form-control" id="persentaseK3" min="0" max="100" required />
+              </div>
+              <div class="mb-3">
+                <label for="persentaseK4" class="form-label">Persentase K4 (%)</label>
+                <input type="number" class="form-control" id="persentaseK4" min="0" max="100" required />
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="button" class="btn btn-primary" id="saveSettingsBtn">Simpan</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Result Modal -->
     <div class="modal fade" id="resultModal" tabindex="-1" aria-labelledby="resultModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header bg-primary text-white">
             <h5 class="modal-title" id="resultModalLabel">
-              <i class="fas fa-calculator me-2"></i>Hasil Perhitungan Buyback
+              <i class="fas fa-calculator me-2"></i>
+              Hasil Perhitungan Buyback
             </h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
@@ -297,18 +792,306 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-success" data-bs-dismiss="modal">
-              <i class="fas fa-check me-1"></i> OK
+              <i class="fas fa-check me-1"></i>
+              OK
             </button>
             <button type="button" class="btn btn-primary" id="printModalButton">
-              <i class="fas fa-print me-1"></i> Print
+              <i class="fas fa-print me-1"></i>
+              Print
             </button>
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-              <i class="fas fa-times me-1"></i> Close
+              <i class="fas fa-times me-1"></i>
+              Close
             </button>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Condition Visual Modal -->
+    <div
+      class="modal fade"
+      id="conditionVisualModal"
+      tabindex="-1"
+      aria-labelledby="conditionVisualModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+          <div class="modal-header p-2">
+            <h5 class="modal-title" id="conditionVisualModalLabel">
+              <i class="fas fa-images me-2"></i>
+              Visual Kondisi Barang
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="loading-spinner" id="loadingSpinner">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <p class="mt-2">Memuat media...</p>
+            </div>
+
+            <div id="conditionVisualContent">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0" id="conditionTitle">Kondisi Sangat Baik (K1)</h6>
+                <div>
+                  <button type="button" class="btn btn-sm btn-success" id="saveMediaBtn" style="display: none">
+                    <i class="fas fa-save me-1"></i>
+                    Simpan Perubahan
+                  </button>
+                  <button type="button" class="btn btn-sm btn-warning" id="editModeBtn">
+                    <i class="fas fa-edit me-1"></i>
+                    Mode Edit
+                  </button>
+                </div>
+              </div>
+
+              <!-- Media Grid -->
+              <div class="media-grid" id="mediaGrid">
+                <!-- 6 Photo slots -->
+                <div class="media-item" data-type="photo" data-index="0">
+                  <div class="upload-placeholder">
+                    <i class="fas fa-camera fa-2x mb-2"></i>
+                    <p>Foto 1</p>
+                  </div>
+                  <div class="media-controls" style="display: none">
+                    <input type="file" class="file-upload d-none" data-index="0" data-type="photo" accept="image/*" />
+                    <button type="button" class="btn btn-primary btn-xs upload-btn">
+                      <i class="fas fa-upload"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger btn-xs remove-media-btn"
+                      data-index="0"
+                      data-type="photo"
+                      style="display: none"
+                    >
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                  <div class="upload-progress" style="display: none">
+                    <div class="upload-progress-bar"></div>
+                  </div>
+                </div>
+
+                <div class="media-item" data-type="photo" data-index="1">
+                  <div class="upload-placeholder">
+                    <i class="fas fa-camera fa-2x mb-2"></i>
+                    <p>Foto 2</p>
+                  </div>
+                  <div class="media-controls" style="display: none">
+                    <input type="file" class="file-upload d-none" data-index="1" data-type="photo" accept="image/*" />
+                    <button type="button" class="btn btn-primary btn-xs upload-btn">
+                      <i class="fas fa-upload"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger btn-xs remove-media-btn"
+                      data-index="1"
+                      data-type="photo"
+                      style="display: none"
+                    >
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                  <div class="upload-progress" style="display: none">
+                    <div class="upload-progress-bar"></div>
+                  </div>
+                </div>
+
+                <div class="media-item" data-type="photo" data-index="2">
+                  <div class="upload-placeholder">
+                    <i class="fas fa-camera fa-2x mb-2"></i>
+                    <p>Foto 3</p>
+                  </div>
+                  <div class="media-controls" style="display: none">
+                    <input type="file" class="file-upload d-none" data-index="2" data-type="photo" accept="image/*" />
+                    <button type="button" class="btn btn-primary btn-xs upload-btn">
+                      <i class="fas fa-upload"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger btn-xs remove-media-btn"
+                      data-index="2"
+                      data-type="photo"
+                      style="display: none"
+                    >
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                  <div class="upload-progress" style="display: none">
+                    <div class="upload-progress-bar"></div>
+                  </div>
+                </div>
+
+                <div class="media-item" data-type="photo" data-index="3">
+                  <div class="upload-placeholder">
+                    <i class="fas fa-camera fa-2x mb-2"></i>
+                    <p>Foto 4</p>
+                  </div>
+                  <div class="media-controls" style="display: none">
+                    <input type="file" class="file-upload d-none" data-index="3" data-type="photo" accept="image/*" />
+                    <button type="button" class="btn btn-primary btn-xs upload-btn">
+                      <i class="fas fa-upload"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger btn-xs remove-media-btn"
+                      data-index="3"
+                      data-type="photo"
+                      style="display: none"
+                    >
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                  <div class="upload-progress" style="display: none">
+                    <div class="upload-progress-bar"></div>
+                  </div>
+                </div>
+
+                <div class="media-item" data-type="photo" data-index="4">
+                  <div class="upload-placeholder">
+                    <i class="fas fa-camera fa-2x mb-2"></i>
+                    <p>Foto 5</p>
+                  </div>
+                  <div class="media-controls" style="display: none">
+                    <input type="file" class="file-upload d-none" data-index="4" data-type="photo" accept="image/*" />
+                    <button type="button" class="btn btn-primary btn-xs upload-btn">
+                      <i class="fas fa-upload"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger btn-xs remove-media-btn"
+                      data-index="4"
+                      data-type="photo"
+                      style="display: none"
+                    >
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                  <div class="upload-progress" style="display: none">
+                    <div class="upload-progress-bar"></div>
+                  </div>
+                </div>
+
+                <div class="media-item" data-type="photo" data-index="5">
+                  <div class="upload-placeholder">
+                    <i class="fas fa-camera fa-2x mb-2"></i>
+                    <p>Foto 6</p>
+                  </div>
+                  <div class="media-controls" style="display: none">
+                    <input type="file" class="file-upload d-none" data-index="5" data-type="photo" accept="image/*" />
+                    <button type="button" class="btn btn-primary btn-xs upload-btn">
+                      <i class="fas fa-upload"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger btn-xs remove-media-btn"
+                      data-index="5"
+                      data-type="photo"
+                      style="display: none"
+                    >
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                  <div class="upload-progress" style="display: none">
+                    <div class="upload-progress-bar"></div>
+                  </div>
+                </div>
+
+                <!-- 1 Video slot -->
+                <div class="media-item" data-type="video" data-index="0">
+                  <div class="upload-placeholder">
+                    <i class="fas fa-video fa-2x mb-2"></i>
+                    <p>Video</p>
+                  </div>
+                  <div class="media-controls" style="display: none">
+                    <input type="file" class="file-upload d-none" data-index="0" data-type="video" accept="video/*" />
+                    <button type="button" class="btn btn-primary btn-xs upload-btn">
+                      <i class="fas fa-upload"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger btn-xs remove-media-btn"
+                      data-index="0"
+                      data-type="video"
+                      style="display: none"
+                    >
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                  <div class="upload-progress" style="display: none">
+                    <div class="upload-progress-bar"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              <i class="fas fa-times me-1"></i>
+              Tutup
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Viewer Modal -->
+    <div
+      class="modal fade image-viewer-modal border-radius"
+      id="imageViewerModal"
+      tabindex="-1"
+      aria-labelledby="imageViewerModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content bg-dark">
+          <div class="modal-header border-0">
+            <h5 class="modal-title text-white" id="imageViewerModalLabel">
+              <i class="fas fa-images me-2"></i>
+              Galeri Media Kondisi Barang
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="image-viewer-content">
+              <div class="media-title" id="mediaTitle">Foto 1</div>
+
+              <!-- Navigation Arrows -->
+              <button class="nav-arrow prev" id="prevBtn">
+                <i class="fas fa-chevron-left"></i>
+              </button>
+              <button class="nav-arrow next" id="nextBtn">
+                <i class="fas fa-chevron-right"></i>
+              </button>
+
+              <!-- Media Display -->
+              <img class="viewer-image" id="viewerImage" src="" alt="Media" style="display: none" />
+              <video class="viewer-video" id="viewerVideo" controls style="display: none">
+                <source src="" type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+
+              <!-- Loading Spinner -->
+              <div class="text-center" id="viewerLoading">
+                <div class="spinner-border text-light" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </div>
+
+              <!-- Media Counter -->
+              <div class="media-counter" id="mediaCounter">1 / 7</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="js/configFirebase.js"></script>
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/buyback.js"></script>
   </body>
