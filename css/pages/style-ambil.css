@@ -1,0 +1,706 @@
+/* Menggunakan CSS Variables yang sama dengan display.html */
+:root {
+  --gold-primary: #d4af37;
+  --gold-secondary: #f9d776;
+  --gold-light: #f8f0d7;
+  --gold-dark: #9d7e2d;
+  --dark-brown: #3a2c1c;
+  --cream: #f9f5eb;
+  --white: #ffffff;
+  --black: #1a1a1a;
+  --gray-light: #f5f5f5;
+  --gray-medium: #e0e0e0;
+  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.1);
+  --shadow-gold: 0 5px 15px rgba(212, 175, 55, 0.863);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Poppins", sans-serif;
+  background-color: var(--cream);
+  color: var(--dark-brown);
+  overflow-x: hidden;
+  margin: 0;
+  min-height: 100vh;
+  padding-bottom: 100px;
+  position: relative;
+}
+
+/* Header Styles - Sama dengan display.html */
+.header {
+  background: linear-gradient(135deg, var(--gold-dark), var(--dark-brown));
+  padding: 1rem 0;
+  box-shadow: var(--shadow-soft);
+  position: relative;
+  z-index: 10;
+}
+
+.header::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--gold-primary), transparent);
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--gold-primary);
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+}
+
+.brand-name {
+  margin-left: 1rem;
+  font-family: "Playfair Display", serif;
+  font-weight: 700;
+  font-size: 2rem;
+  color: var(--white);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.brand-name a {
+  color: var(--white);
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.brand-name a:hover {
+  color: var(--gold-secondary);
+}
+
+.date-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  color: var(--white);
+}
+
+.current-date {
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.current-time {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--gold-secondary);
+}
+
+/* Main Content */
+main {
+  padding: 1rem 0;
+  min-height: calc(100vh - 200px);
+}
+
+.page-title {
+  text-align: center;
+  margin-bottom: 2.5rem;
+  position: relative;
+  padding-bottom: 1rem;
+}
+
+.page-title h1 {
+  font-family: "Playfair Display", serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--dark-brown);
+  margin-bottom: 0.5rem;
+}
+
+.page-title::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 150px;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--gold-primary), transparent);
+}
+
+/* Queue Cards - Sama dengan display.html */
+.queue-card {
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  height: 100%;
+  border: none;
+  position: relative;
+  margin-bottom: 2rem;
+}
+
+.queue-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+}
+
+.queue-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+}
+
+.card-current::before, .gold-border::before {
+  background: linear-gradient(90deg, #f9d776, #9d7e2d);
+}
+
+.queue-card-header {
+  background-color: var(--white);
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--gray-medium);
+}
+
+.queue-card-header h2 {
+  font-family: "Playfair Display", serif;
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--dark-brown);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.queue-card-header h2 i {
+  margin-right: 0.5rem;
+  color: var(--gold-primary);
+}
+
+.queue-card-body {
+  padding: 2rem;
+  background-color: var(--white);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 250px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Instructions Body */
+.instructions-body {
+  padding: 2rem;
+  min-height: auto;
+}
+
+/* Queue Number Display - Sama dengan display.html */
+.queue-number {
+  font-family: "Playfair Display", serif;
+  font-weight: 700;
+  color: var(--dark-brown);
+  margin-bottom: 1.5rem;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  display: inline-block;
+  text-align: center;
+  width: 100%;
+  font-size: 4.5rem;
+  line-height: 1.2;
+}
+
+.queue-number::after {
+  content: "";
+  position: absolute;
+  bottom: -0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 50px;
+  height: 3px;
+  background: var(--gold-primary);
+  border-radius: 3px;
+}
+
+
+/* Take Queue Button */
+.button-container {
+  margin-top: 1rem;
+}
+
+.btn-take-queue {
+  background: linear-gradient(135deg, #d4af37, #9d7e2d);
+  border: none;
+  color: white;
+  padding: 0.8rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 15px;
+  box-shadow: var(--shadow-gold);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  min-width: 250px;
+  font-family: "Poppins", sans-serif;
+}
+
+.btn-take-queue:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(187, 160, 10, 0.329);
+}
+
+.btn-take-queue:active {
+  transform: translateY(0);
+}
+
+.btn-take-queue:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: var(--shadow-soft);
+}
+
+/* Modal Styles */
+.modal-content {
+  border: none;
+  border-radius: 15px;
+  box-shadow: var(--shadow-soft);
+}
+
+.success-animation {
+  margin-bottom: 1.5rem;
+}
+
+.success-icon {
+  font-size: 4rem;
+  color: #d4af37;
+  animation: successPulse 1.5s ease-in-out;
+}
+
+@keyframes successPulse {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.success-title {
+  color: #27ae60;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  font-family: "Playfair Display", serif;
+}
+
+.success-message {
+  color: var(--dark-brown);
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.print-status {
+  color: var(--gold-primary);
+  font-weight: 600;
+}
+
+/* Gold Decorative Elements - Sama dengan display.html */
+.gold-decoration {
+  position: absolute;
+  opacity: 0.1;
+  z-index: -1;
+}
+
+.gold-decoration.top-left {
+  top: 10%;
+  left: 5%;
+  width: 200px;
+  height: 200px;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path fill="%23d4af37" d="M50,0 L100,50 L50,100 L0,50 Z"/></svg>');
+  background-repeat: no-repeat;
+  transform: rotate(15deg);
+}
+
+.gold-decoration.bottom-right {
+  bottom: 10%;
+  right: 5%;
+  width: 250px;
+  height: 250px;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle fill="%23d4af37" cx="50" cy="50" r="50"/></svg>');
+  background-repeat: no-repeat;
+  transform: rotate(-10deg);
+}
+
+/* Footer Styles - Sama dengan display.html */
+.footer {
+  background: linear-gradient(135deg, var(--dark-brown), var(--gold-dark));
+  color: var(--white);
+  padding: 0.5rem 0;
+  text-align: center;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  z-index: 100;
+}
+
+.footer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--gold-primary), transparent);
+}
+
+.footer p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.social-links {
+  margin-top: 1rem;
+}
+
+.social-links a {
+  color: var(--white);
+  margin: 0 10px;
+  font-size: 1.2rem;
+  transition: color 0.3s ease;
+}
+
+.social-links a:hover {
+  color: var(--gold-secondary);
+}
+
+/* Elegant Divider - Sama dengan display.html */
+.elegant-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-primary), transparent);
+  margin: 2rem 0;
+  position: relative;
+}
+
+.elegant-divider::before {
+  content: "❖";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--cream);
+  padding: 0 1rem;
+  color: var(--gold-primary);
+  font-size: 1rem;
+}
+
+/* Gold Border Effect - Sama dengan display.html */
+.gold-border {
+  border: 1px solid var(--gold-primary);
+  border-radius: 10px;
+  padding: 1px;
+  background: linear-gradient(var(--white), var(--white)) padding-box,
+    linear-gradient(45deg, var(--gold-primary), var(--gold-secondary), var(--gold-primary)) border-box;
+  border: 1px solid transparent;
+}
+
+/* Shimmer Effect - Sama dengan display.html */
+.gold-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.gold-shimmer::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(30deg);
+  animation: shimmer 4s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%) rotate(30deg);
+  }
+  100% {
+    transform: translateX(100%) rotate(30deg);
+  }
+}
+
+/* Animation for Queue Numbers - Sama dengan display.html */
+@keyframes numberPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.queue-number.active {
+  animation: numberPulse 2s infinite;
+  color: var(--gold-dark);
+}
+
+/* Receipt Styles (for printing) */
+.receipt-container {
+  font-family: 'Courier New', monospace;
+  width: 80mm;
+  max-width: 300px;
+  margin: 0 auto;
+  text-align: center;
+  line-height: 1.4;
+  font-size: 12px;
+}
+
+.receipt-header h3 {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.receipt-number {
+  font-size: 24px;
+  font-weight: bold;
+  margin: 10px 0;
+  padding: 10px;
+  border: 2px solid #000;
+}
+
+.receipt-row {
+  margin: 5px 0;
+}
+
+.receipt-footer {
+  margin-top: 10px;
+}
+
+.receipt-footer p {
+  margin: 2px 0;
+  font-size: 10px;
+}
+
+/* Print Media Query */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  #receiptTemplate,
+  #receiptTemplate * {
+    visibility: visible;
+  }
+  
+  #receiptTemplate {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    background: white;
+  }
+  
+  .d-none {
+    display: block !important;
+  }
+}
+
+/* Add these new styles to your existing CSS */
+
+/* Edit Price Button */
+.edit-price-btn {
+  position: absolute;
+  top: 50%;
+  right: -40px;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  width: 35px;
+  height: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.edit-price-btn:hover {
+  background: transparent;
+  color: transparent;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.date-time {
+  position: relative;
+}
+
+/* Info Body Styles */
+.info-body {
+  padding: 1.5rem;
+  min-height: auto;
+  align-items: flex-start;
+}
+
+.info-section {
+  width: 100%;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.info-section:last-child {
+  margin-bottom: 0;
+}
+
+.info-title {
+  font-family: "Playfair Display", serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--dark-brown);
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.info-text {
+  color: var(--dark-brown);
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+/* Gold Prices Styles */
+.gold-prices {
+  width: 100%;
+}
+
+.price-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--gray-medium);
+}
+
+.price-item:last-child {
+  border-bottom: none;
+}
+
+.karat {
+  font-weight: 600;
+  color: var(--gold-primary);
+  font-size: 1rem;
+}
+
+.price {
+  font-weight: 500;
+  color: var(--dark-brown);
+  font-size: 0.95rem;
+}
+
+.price-note {
+  color: var(--gold-dark);
+  font-style: italic;
+  display: block;
+  margin-top: 0.5rem;
+}
+
+/* Small Elegant Divider */
+.elegant-divider-small {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-primary), transparent);
+  margin: 1rem 0;
+  position: relative;
+  width: 60%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.elegant-divider-small::before {
+  content: "❖";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--white);
+  padding: 0 0.5rem;
+  color: var(--gold-primary);
+  font-size: 0.8rem;
+}
+
+.instruction-list {
+  margin-bottom: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.instruction-list li {
+  margin-bottom: 0.75rem;
+  color: var(--dark-brown);
+  font-size: 1.1rem;
+  line-height: 1.5;
+  padding-left: 0.5rem;
+}
+
+/* Modal Styles */
+.modal-header {
+  background: linear-gradient(135deg, var(--gold-light), var(--gold-secondary));
+  border-bottom: 1px solid var(--gold-primary);
+}
+
+.modal-title {
+  color: var(--dark-brown);
+  font-family: "Playfair Display", serif;
+  font-weight: 600;
+}
+
+.input-group-text {
+  background-color: var(--gold-light);
+  border-color: var(--gold-primary);
+  color: var(--dark-brown);
+  font-weight: 600;
+}
+
+.form-control:focus {
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 0 0.2rem rgba(212, 175, 55, 0.25);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--gold-primary), var(--gold-dark));
+  border-color: var(--gold-primary);
+  color: white;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--gold-dark), var(--gold-primary));
+  border-color: var(--gold-dark);
+}
