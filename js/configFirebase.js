@@ -16,24 +16,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 const firestore = getFirestore(app);
-console.log('Firebase initialized successfully');
 export default app;
 export { database, firestore };
-
-// Test Firestore connection
-async function testFirestoreConnection() {
-  try {
-    const snapshot = await getDocs(collection(firestore, "kodeAksesoris", "kategori", "kotak"));
-    console.log("Firestore connection successful!");
-    snapshot.forEach(doc => {
-      console.log(doc.id, " => ", doc.data());
-    });
-  } catch (error) {
-    console.error("Error connecting to Firestore:", error);
-  }
-}
-
-testFirestoreConnection();
 
 export const authService = {
   getCurrentUser: async () => {
