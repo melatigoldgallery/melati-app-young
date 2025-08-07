@@ -1,42 +1,45 @@
-import { ref, onValue } from 'https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js';
+import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js';
 import { database } from './configFirebase.js';
 
 document.addEventListener("DOMContentLoaded", () => {
     const queueRef = ref(database, 'queue');
     
+    // Setup realtime listener
     onValue(queueRef, (snapshot) => {
         const data = snapshot.val();
-        if (data) {
-            // Calculate current number
-            const currentFullNumber = data.currentNumber + (data.currentBlock * 10);
-            
-            // Update current queue display
-            document.getElementById("queueNumber").textContent = 
-                `${["A", "B", "C", "D"][data.currentLetter]}${String(currentFullNumber).padStart(2, '0')}`;
-            
-            // Calculate next number and letter
-            let nextNumber = data.currentNumber + 1;
-            let nextLetter = data.currentLetter;
-            let nextBlock = data.currentBlock;
+        if (!data) return;
 
-            if (nextNumber > 10) {
-                nextNumber = 1;
-                nextLetter = data.currentLetter + 1;
-                if (nextLetter >= 4) {
-                    nextLetter = 0;
-                    nextBlock++;
-                }
+        // Update current queue number
+        const currentQueueNumber = `${["A", "B", "C", "D"][data.currentLetter]}${String(data.currentNumber).padStart(2, '0')}`;
+        const queueNumberElement = document.getElementById("queueNumber");
+        if (queueNumberElement) {
+            const oldNumber = queueNumberElement.textContent;
+            if (oldNumber !== currentQueueNumber) {
+                queueNumberElement.textContent = currentQueueNumber;
+                queueNumberElement.classList.add("active");
+                setTimeout(() => {
+                    queueNumberElement.classList.remove("active");
+                }, 2000);
             }
-
-            const nextFullNumber = nextNumber + (nextBlock * 10);
-            
-            // Update next queue display
-            document.getElementById("nextQueueNumber").textContent = 
-                `${["A", "B", "C", "D"][nextLetter]}${String(nextFullNumber).padStart(2, '0')}`;
-            
-            // Update delayed queue display
-            document.getElementById("delayQueueNumber").textContent = 
-                data.delayedQueue?.join(", ") || "-";
         }
+        
+        // Calculate and update next queue number
+        const nextNumber = data.currentNumber + 1;
+        const nextLetter = nextNumber > 50 ? (data.currentLetter + 1) % 4 : data.currentLetter;
+        const nextQueueNumber = `${["A", "B", "C", "D"][nextLetter]}${String(nextNumber > 50 ? 1 : nextNumber).padStart(2, '0')}`;
+        
+        const nextQueueElement = document.getElementById("nextQueueNumber");
+        if (nextQueueElement) {
+            nextQueueElement.textContent = nextQueueNumber;
+        }
+        
+        // Update delayed queue display
+        const delayQueueElement = document.getElementById("delayQueueNumber");
+        if (delayQueueElement) {
+            delayQueueElement.textContent = data.delayedQueue?.join(", ") || "-";
+        }
+    }, (error) => {
+        console.error("Firebase connection error:", error);
     });
 });
