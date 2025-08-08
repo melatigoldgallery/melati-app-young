@@ -196,7 +196,7 @@
         border-radius: 12px;
       }
       .dropdown-toggle::after {
-        margin-left: .5em;
+        margin-left: 0.5em;
       }
       .dropdown-action {
         min-width: 110px;
@@ -475,7 +475,7 @@
                   role="tab"
                   aria-controls="kalung"
                 >
-                 <i class="fas fa-link me-2"></i>
+                  <i class="fas fa-link me-2"></i>
                   KALUNG
                 </button>
               </li>
@@ -517,7 +517,7 @@
                   role="tab"
                   aria-controls="cincin"
                 >
-                   <i class="fas fa-circle me-2"></i>
+                  <i class="fas fa-circle me-2"></i>
                   CINCIN
                 </button>
               </li>
@@ -667,7 +667,7 @@
                 <div class="card mb-4">
                   <div class="card-header d-flex justify-content-start align-items-center">
                     <i class="fas fa-circle me-2"></i>
-                    <h3 class="mb-0  fs-5">Data Cincin</h3>
+                    <h3 class="mb-0 fs-5">Data Cincin</h3>
                   </div>
                   <div class="card-body">
                     <div class="table-container">
@@ -748,7 +748,7 @@
                 <div class="card mb-4">
                   <div class="card-header d-flex justify-content-start align-items-center">
                     <i class="fas fa-ring me-2"></i>
-                    <h3 class="mb-0  fs-5">Data Hala</h3>
+                    <h3 class="mb-0 fs-5">Data Hala</h3>
                   </div>
                   <div class="card-body">
                     <div class="table-container">
@@ -799,8 +799,43 @@
               <!-- END TAB-CONTENT -->
             </div>
 
+            <div
+              class="modal fade"
+              id="modalUpdateKomputer"
+              tabindex="-1"
+              aria-labelledby="modalUpdateKomputerLabel"
+              aria-hidden="true"
+            >
+              <div class="modal-dialog">
+                <div class="modal-content">
+                  <form id="formUpdateKomputer">
+                    <div class="modal-header">
+                      <h5 class="modal-title" id="modalUpdateKomputerLabel">Update Stok Komputer</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                    </div>
+                    <div class="modal-body">
+                      <input type="hidden" id="updateKomputerJenis" />
+                      <div class="mb-3">
+                        <label for="updateKomputerJumlah" class="form-label">Jumlah</label>
+                        <input type="number" class="form-control" id="updateKomputerJumlah" min="0" required />
+                      </div>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="submit" class="btn btn-primary w-100">Simpan</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+
             <!-- Modal Tambah Stok -->
-            <div class="modal fade" id="modalTambahStok" tabindex="-1" aria-labelledby="modalTambahStokLabel" aria-hidden="true">
+            <div
+              class="modal fade"
+              id="modalTambahStok"
+              tabindex="-1"
+              aria-labelledby="modalTambahStokLabel"
+              aria-hidden="true"
+            >
               <div class="modal-dialog">
                 <div class="modal-content">
                   <div class="modal-header">
@@ -837,7 +872,13 @@
               </div>
             </div>
             <!-- Modal Kurangi Stok -->
-            <div class="modal fade" id="modalKurangiStok" tabindex="-1" aria-labelledby="modalKurangiStokLabel" aria-hidden="true">
+            <div
+              class="modal fade"
+              id="modalKurangiStok"
+              tabindex="-1"
+              aria-labelledby="modalKurangiStokLabel"
+              aria-hidden="true"
+            >
               <div class="modal-dialog">
                 <div class="modal-content">
                   <div class="modal-header">
@@ -878,6 +919,81 @@
               </div>
             </div>
             <!-- END CONTENT WRAPPER -->
+          </div>
+          <div
+            class="modal fade"
+            id="modalRiwayat"
+            tabindex="-1"
+            aria-labelledby="modalRiwayatLabel"
+            aria-hidden="true"
+          >
+            <div class="modal-dialog modal-lg">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="modalRiwayatLabel">
+                    Riwayat Stok
+                    <span id="riwayat-title"></span>
+                  </h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                      <thead>
+                        <tr>
+                          <th>No</th>
+                          <th>Tanggal</th>
+                          <th>Status</th>
+                          <th>Jumlah</th>
+                          <th>Petugas</th>
+                          <th>Keterangan</th>
+                        </tr>
+                      </thead>
+                      <tbody id="riwayat-table-body"></tbody>
+                    </table>
+                  </div>
+                  <div id="riwayat-info" class="text-muted small mt-1"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- ... sebelum </body> -->
+          <div
+            class="modal fade"
+            id="modalRiwayat"
+            tabindex="-1"
+            aria-labelledby="modalRiwayatLabel"
+            aria-hidden="true"
+          >
+            <div class="modal-dialog modal-lg">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="modalRiwayatLabel">
+                    Riwayat Stok
+                    <span id="riwayat-title"></span>
+                  </h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                      <thead>
+                        <tr>
+                          <th>No</th>
+                          <th>Tanggal</th>
+                          <th>Status</th>
+                          <th>Jumlah</th>
+                          <th>Petugas</th>
+                          <th>Keterangan</th>
+                        </tr>
+                      </thead>
+                      <tbody id="riwayat-table-body"></tbody>
+                    </table>
+                  </div>
+                  <div id="riwayat-info" class="text-muted small mt-1"></div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </main>

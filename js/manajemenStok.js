@@ -206,6 +206,25 @@ function getCategoryKey(subCategory) {
   return categoryMapping[subCategory] || "";
 }
 
+// --- Tambahan fungsi untuk populate stok komputer
+function populateStokKomputerTable() {
+  const tbody = document.getElementById("stok-komputer-table-body");
+  if (!tbody || !stockData["stok-komputer"]) return;
+  tbody.innerHTML = "";
+  mainCategories.forEach((mainCat, idx) => {
+    const item = stockData["stok-komputer"][mainCat] || { quantity: 0, lastUpdated: null };
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${idx + 1}</td>
+      <td>${mainCat}</td>
+      <td class="text-center">${item.quantity}</td>
+      <td class="text-center">
+        <button class="btn btn-sm btn-primary edit-komputer-btn" data-main="${mainCat}"><i class="fas fa-edit"></i> Update</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
 // === Populate Table ===
 export async function populateTables() {
   await fetchStockData();
@@ -242,7 +261,44 @@ export async function populateTables() {
       tbody.appendChild(tr);
     });
   });
+  populateStokKomputerTable();
   updateSummaryTotals();
+}
+
+// --- Handler edit komputer
+let komputerEditMainCat = "";
+
+document.body.addEventListener("click", function(e) {
+  if (e.target.classList.contains("edit-komputer-btn")) {
+    komputerEditMainCat = e.target.dataset.main;
+    document.getElementById("updateKomputerJumlah").value = stockData["stok-komputer"][komputerEditMainCat]?.quantity || 0;
+    document.getElementById("updateKomputerJenis").value = komputerEditMainCat;
+    $('#modalUpdateKomputer').modal('show');
+  }
+});
+
+document.getElementById("formUpdateKomputer").onsubmit = async function(e) {
+  e.preventDefault();
+  const jumlah = document.getElementById("updateKomputerJumlah").value;
+  const jenis = document.getElementById("updateKomputerJenis").value;
+  if (!jumlah || !jenis) {
+    alert("Semua field harus diisi.");
+    return;
+  }
+  await updateStokKomputer(jenis, jumlah);
+  $('#modalUpdateKomputer').modal('hide');
+};
+
+async function updateStokKomputer(jenis, jumlah) {
+  await fetchStockData();
+  if (!stockData["stok-komputer"]) return;
+  if (!stockData["stok-komputer"][jenis]) {
+    stockData["stok-komputer"][jenis] = { quantity: 0, lastUpdated: null, history: [] };
+  }
+  stockData["stok-komputer"][jenis].quantity = parseInt(jumlah);
+  stockData["stok-komputer"][jenis].lastUpdated = new Date().toISOString();
+  await saveData("stok-komputer", jenis);
+  await populateTables();
 }
 
 // === Update Status Ringkasan ===
@@ -324,14 +380,54 @@ async function reduceStock(category, mainCat, quantity, pengurang, keterangan) {
   return true;
 }
 
-// === Show History modal (implement sesuai kebutuhan modal anda) ===
 document.body.addEventListener("click", function (e) {
-  if (e.target.classList.contains("show-history-btn")) {
-    // Implementasi modal riwayat sesuai kebutuhan
-    // Anda bisa mengisi modal dengan data stockData[category][mainCat].history
-    // e.target.dataset.category, e.target.dataset.main
+  if (e.target.classList.contains("show-history-btn") || e.target.closest(".show-history-btn")) {
+    // Mendukung klik icon di dalam button
+    const btn = e.target.classList.contains("show-history-btn") ? e.target : e.target.closest(".show-history-btn");
+    const mainCat = btn.dataset.main;
+    const categoryKey = btn.dataset.category;
+    showHistoryModal(categoryKey, mainCat);
   }
 });
+
+function showHistoryModal(category, mainCat) {
+  const modal = new bootstrap.Modal(document.getElementById("modalRiwayat"));
+  const titleEl = document.getElementById("riwayat-title");
+  const tbody = document.getElementById("riwayat-table-body");
+  const info = document.getElementById("riwayat-info");
+  titleEl.textContent = `(${mainCat} - ${category})`;
+  tbody.innerHTML = "";
+  info.textContent = "";
+
+  if (!stockData[category] || !stockData[category][mainCat] || !stockData[category][mainCat].history || stockData[category][mainCat].history.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Tidak ada riwayat</td></tr>`;
+    return modal.show();
+  }
+
+  const history = stockData[category][mainCat].history.slice(0, 10);
+  history.forEach((record, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${i + 1}</td>
+      <td>${formatDate(record.date)}</td>
+      <td>
+        ${record.action === "Tambah"
+          ? '<span class="badge bg-success">Tambah</span>'
+          : '<span class="badge bg-danger">Kurangi</span>'
+        }
+      </td>
+      <td><span class="badge bg-primary">${record.quantity}</span></td>
+      <td>${record.adder || record.pengurang || "-"}</td>
+      <td>${record.keterangan || record.receiver || "-"}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  if (stockData[category][mainCat].history.length > 10) {
+    info.textContent = "Menampilkan 10 riwayat terbaru. Riwayat lama dihapus otomatis.";
+  }
+  modal.show();
+}
 
 // === Event Delegation Untuk Tombol Tambah/Kurangi di Tabel ===
 let currentMainCat = "";
