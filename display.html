@@ -250,40 +250,8 @@
         display: inline-block;
         text-align: center;
         width: 100%;
+        font-size: 4.5rem;
         line-height: 1.2;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-        transition: font-size 0.3s ease;
-      }
-
-      /* Default size untuk queue number */
-      .queue-number {
-        font-size: 4.5rem;
-      }
-
-      /* Responsive text sizes untuk delayed queue */
-      .delayed-queue {
-        font-size: 4.5rem; /* Default size */
-      }
-      
-      .delayed-queue.text-xs {
-        font-size: 1.8rem;
-      }
-      
-      .delayed-queue.text-sm {
-        font-size: 2.5rem;
-      }
-      
-      .delayed-queue.text-md {
-        font-size: 3rem;
-      }
-      
-      .delayed-queue.text-lg {
-        font-size: 3.5rem;
-      }
-      
-      .delayed-queue.text-xl {
-        font-size: 4.5rem;
       }
 
       /* Garis bawah untuk nomor antrian */
@@ -701,7 +669,11 @@
 
     <!-- AOS Animation Library -->
     <script src="https://unpkg.com/aos@next/dist/aos.js"></script>
-    <script type="module" src="js/display.js"></script>
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
+      import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+      import { database } from "./js/configFirebase.js";
+    </script>
     <script>
       function updateDateTime() {
         const now = new Date();
@@ -731,24 +703,14 @@
         // Reset class
         element.classList.remove("text-xs", "text-sm", "text-md", "text-lg", "text-xl");
 
-        // Hitung total karakter (termasuk koma dan spasi)
-        const totalLength = String(text).length;
-        
-        // Hitung jumlah nomor antrian
-        const numberOfQueues = String(text).split(",").length;
+        // Tentukan class berdasarkan panjang teks
+        const length = String(text).length;
 
-        // Tentukan class berdasarkan panjang teks dan jumlah antrian
-        if (numberOfQueues <= 1) {
-          element.classList.add("text-xl");
-        } else if (numberOfQueues <= 2) {
-          element.classList.add(totalLength > 7 ? "text-lg" : "text-xl");
-        } else if (numberOfQueues <= 3) {
-          element.classList.add(totalLength > 11 ? "text-md" : "text-lg");
-        } else if (numberOfQueues <= 4) {
-          element.classList.add(totalLength > 15 ? "text-sm" : "text-md");
-        } else {
-          element.classList.add("text-xs");
-        }
+        if (length <= 3) element.classList.add("text-xl");
+        else if (length <= 5) element.classList.add("text-lg");
+        else if (length <= 10) element.classList.add("text-md");
+        else if (length <= 15) element.classList.add("text-sm");
+        else element.classList.add("text-xs");
       }
 
       // Animasi saat nomor antrian berubah

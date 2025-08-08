@@ -84,7 +84,7 @@
       }
 
       .card-header {
-        background: linear-gradient(135deg, #f4f6ff 0%, #5966e0 100%);
+        background: linear-gradient(135deg, #5966e0 0%, #f4f6ff 100%);
         color: white;
         border-radius: 12px 12px 0 0 !important;
         border: none;
@@ -183,6 +183,23 @@
         border-radius: 5px;
         font-weight: bold;
         color: #856404 !important;
+      }
+
+      /* Modal styling */
+      .modal-header {
+        background: #5966e0;
+        color: #fff;
+        border-radius: 12px 12px 0 0;
+        border: none;
+      }
+      .modal-content {
+        border-radius: 12px;
+      }
+      .dropdown-toggle::after {
+        margin-left: .5em;
+      }
+      .dropdown-action {
+        min-width: 110px;
       }
     </style>
   </head>
@@ -406,7 +423,7 @@
                           CINCIN
                         </h3>
                         <div class="number" id="total-cincin">0</div>
-                        <small>Total dari semua lokasi</small>
+                        <small id="label-jenis-CINCIN">Status</small>
                       </div>
                     </div>
                   </div>
@@ -418,7 +435,7 @@
                           HALA
                         </h3>
                         <div class="number" id="total-hala">0</div>
-                        <small>Total dari semua lokasi</small>
+                        <small id="label-jenis-HALA">Status</small>
                       </div>
                     </div>
                     <div class="col-md-3 col-sm-6">
@@ -428,7 +445,7 @@
                           GELANG
                         </h3>
                         <div class="number" id="total-gelang">0</div>
-                        <small>Total dari semua lokasi</small>
+                        <small id="label-jenis-GELANG">Status</small>
                       </div>
                     </div>
                     <div class="col-md-3 col-sm-6">
@@ -438,7 +455,7 @@
                           GIWANG
                         </h3>
                         <div class="number" id="total-giwang">0</div>
-                        <small>Total dari semua lokasi</small>
+                        <small id="label-jenis-GIWANG">Status</small>
                       </div>
                     </div>
                   </div>
@@ -451,11 +468,12 @@
               <li class="nav-item" role="presentation">
                 <button
                   class="nav-link active"
-                  id="brankas-tab"
+                  id="kalung-tab"
                   data-bs-toggle="tab"
-                  data-bs-target="#brankas"
+                  data-bs-target="#kalung"
                   type="button"
                   role="tab"
+                  aria-controls="kalung"
                 >
                  <i class="fas fa-link me-2"></i>
                   KALUNG
@@ -464,11 +482,12 @@
               <li class="nav-item" role="presentation">
                 <button
                   class="nav-link"
-                  id="admin-tab"
+                  id="liontin-tab"
                   data-bs-toggle="tab"
-                  data-bs-target="#admin"
+                  data-bs-target="#liontin"
                   type="button"
                   role="tab"
+                  aria-controls="liontin"
                 >
                   <i class="fas fa-gem me-2"></i>
                   LIONTIN
@@ -477,11 +496,12 @@
               <li class="nav-item" role="presentation">
                 <button
                   class="nav-link"
-                  id="posting-tab"
+                  id="anting-tab"
                   data-bs-toggle="tab"
-                  data-bs-target="#posting"
+                  data-bs-target="#anting"
                   type="button"
                   role="tab"
+                  aria-controls="anting"
                 >
                   <i class="fas fa-dot-circle me-2"></i>
                   ANTING
@@ -490,11 +510,12 @@
               <li class="nav-item" role="presentation">
                 <button
                   class="nav-link"
-                  id="barang-rusak-tab"
+                  id="cincin-tab"
                   data-bs-toggle="tab"
-                  data-bs-target="#barang-rusak"
+                  data-bs-target="#cincin"
                   type="button"
                   role="tab"
+                  aria-controls="cincin"
                 >
                    <i class="fas fa-circle me-2"></i>
                   CINCIN
@@ -503,11 +524,12 @@
               <li class="nav-item" role="presentation">
                 <button
                   class="nav-link"
-                  id="batu-lepas-tab"
+                  id="gelang-tab"
                   data-bs-toggle="tab"
-                  data-bs-target="#batu-lepas"
+                  data-bs-target="#gelang"
                   type="button"
                   role="tab"
+                  aria-controls="gelang"
                 >
                   <i class="fas fa-circle-notch me-2"></i>
                   GELANG
@@ -516,11 +538,12 @@
               <li class="nav-item" role="presentation">
                 <button
                   class="nav-link"
-                  id="barang-display-tab"
+                  id="giwang-tab"
                   data-bs-toggle="tab"
-                  data-bs-target="#barang-display"
+                  data-bs-target="#giwang"
                   type="button"
                   role="tab"
+                  aria-controls="giwang"
                 >
                   <i class="fas fa-dot-circle me-2"></i>
                   GIWANG
@@ -529,11 +552,12 @@
               <li class="nav-item" role="presentation">
                 <button
                   class="nav-link"
-                  id="manual-tab"
+                  id="hala-tab"
                   data-bs-toggle="tab"
-                  data-bs-target="#manual"
+                  data-bs-target="#hala"
                   type="button"
                   role="tab"
+                  aria-controls="hala"
                 >
                   <i class="fas fa-ring me-2"></i>
                   HALA
@@ -547,6 +571,7 @@
                   data-bs-target="#stok-komputer"
                   type="button"
                   role="tab"
+                  aria-controls="stok-komputer"
                 >
                   <i class="fas fa-desktop me-2"></i>
                   STOK KOMPUTER
@@ -556,45 +581,307 @@
 
             <!-- Tab Content -->
             <div class="tab-content" id="stockTabContent">
-              <!-- Tab Template untuk setiap kategori -->
-<template id="categoryTabTemplate">
-  <div class="tab-pane fade" role="tabpanel">
-    <div class="card mb-4">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <h3 class="mb-0"></h3>
-        <div class="btn-group">
-          <button class="btn btn-primary btn-sm add-stock-btn">
-            <i class="fas fa-plus"></i> Tambah Stok
-          </button>
-          <button class="btn btn-warning btn-sm reduce-stock-btn">
-            <i class="fas fa-minus"></i> Kurangi Stok
-          </button>
-        </div>
-      </div>
-      <div class="card-body">
-        <div class="table-container">
-          <table class="table table-hover">
-            <thead>
-              <tr>
-                <th>Jenis</th>
-                <th class="text-center">Jumlah</th>
-                <th class="text-center">Terakhir Update</th>
-                <th class="text-center">Aksi</th>
-              </tr>
-            </thead>
-            <tbody class="category-table-body">
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
-<!-- Container untuk tab-pane yang akan diisi secara dinamis -->
-<div id="dynamicTabContent"></div>
+              <!-- TAB KALUNG -->
+              <div class="tab-pane fade show active" id="kalung" role="tabpanel" aria-labelledby="kalung-tab">
+                <div class="card mb-4">
+                  <div class="card-header d-flex justify-content-start align-items-center">
+                    <i class="fas fa-link me-2"></i>
+                    <h3 class="mb-0 fs-5">Data Kalung</h3>
+                  </div>
+                  <div class="card-body">
+                    <div class="table-container">
+                      <table class="table table-hover">
+                        <thead>
+                          <tr>
+                            <th>No</th>
+                            <th>Jenis</th>
+                            <th class="text-center">Jumlah</th>
+                            <th class="text-center">Aksi</th>
+                            <th class="text-center">Riwayat</th>
+                          </tr>
+                        </thead>
+                        <tbody id="kalung-table-body">
+                          <!-- Data Kalung diisi oleh JS -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
               </div>
+              <!-- TAB LIONTIN -->
+              <div class="tab-pane fade" id="liontin" role="tabpanel" aria-labelledby="liontin-tab">
+                <div class="card mb-4">
+                  <div class="card-header d-flex justify-content-start align-items-center">
+                    <i class="fas fa-gem me-2"></i>
+                    <h3 class="mb-0 fs-5">Data Liontin</h3>
+                  </div>
+                  <div class="card-body">
+                    <div class="table-container">
+                      <table class="table table-hover">
+                        <thead>
+                          <tr>
+                            <th>No</th>
+                            <th>Jenis</th>
+                            <th class="text-center">Jumlah</th>
+                            <th class="text-center">Aksi</th>
+                            <th class="text-center">Riwayat</th>
+                          </tr>
+                        </thead>
+                        <tbody id="liontin-table-body">
+                          <!-- Data Liontin diisi oleh JS -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- TAB ANTING -->
+              <div class="tab-pane fade" id="anting" role="tabpanel" aria-labelledby="anting-tab">
+                <div class="card mb-4">
+                  <div class="card-header d-flex justify-content-start align-items-center">
+                    <i class="fas fa-dot-circle me-2"></i>
+                    <h3 class="mb-0 fs-5">Data Anting</h3>
+                  </div>
+                  <div class="card-body">
+                    <div class="table-container">
+                      <table class="table table-hover">
+                        <thead>
+                          <tr>
+                            <th>No</th>
+                            <th>Jenis</th>
+                            <th class="text-center">Jumlah</th>
+                            <th class="text-center">Aksi</th>
+                            <th class="text-center">Riwayat</th>
+                          </tr>
+                        </thead>
+                        <tbody id="anting-table-body">
+                          <!-- Data Anting diisi oleh JS -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- TAB CINCIN -->
+              <div class="tab-pane fade" id="cincin" role="tabpanel" aria-labelledby="cincin-tab">
+                <div class="card mb-4">
+                  <div class="card-header d-flex justify-content-start align-items-center">
+                    <i class="fas fa-circle me-2"></i>
+                    <h3 class="mb-0  fs-5">Data Cincin</h3>
+                  </div>
+                  <div class="card-body">
+                    <div class="table-container">
+                      <table class="table table-hover">
+                        <thead>
+                          <tr>
+                            <th>No</th>
+                            <th>Jenis</th>
+                            <th class="text-center">Jumlah</th>
+                            <th class="text-center">Aksi</th>
+                            <th class="text-center">Riwayat</th>
+                          </tr>
+                        </thead>
+                        <tbody id="cincin-table-body">
+                          <!-- Data Cincin diisi oleh JS -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- TAB GELANG -->
+              <div class="tab-pane fade" id="gelang" role="tabpanel" aria-labelledby="gelang-tab">
+                <div class="card mb-4">
+                  <div class="card-header d-flex justify-content-start align-items-center">
+                    <i class="fas fa-circle-notch me-2"></i>
+                    <h3 class="mb-0 fs-5">Data Gelang</h3>
+                  </div>
+                  <div class="card-body">
+                    <div class="table-container">
+                      <table class="table table-hover">
+                        <thead>
+                          <tr>
+                            <th>No</th>
+                            <th>Jenis</th>
+                            <th class="text-center">Jumlah</th>
+                            <th class="text-center">Aksi</th>
+                            <th class="text-center">Riwayat</th>
+                          </tr>
+                        </thead>
+                        <tbody id="gelang-table-body">
+                          <!-- Data Gelang diisi oleh JS -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- TAB GIWANG -->
+              <div class="tab-pane fade" id="giwang" role="tabpanel" aria-labelledby="giwang-tab">
+                <div class="card mb-4">
+                  <div class="card-header d-flex justify-content-start align-items-center">
+                    <i class="fas fa-dot-circle me-2"></i>
+                    <h3 class="mb-0 fs-5">Data Giwang</h3>
+                  </div>
+                  <div class="card-body">
+                    <div class="table-container">
+                      <table class="table table-hover">
+                        <thead>
+                          <tr>
+                            <th>No</th>
+                            <th>Jenis</th>
+                            <th class="text-center">Jumlah</th>
+                            <th class="text-center">Aksi</th>
+                            <th class="text-center">Riwayat</th>
+                          </tr>
+                        </thead>
+                        <tbody id="giwang-table-body">
+                          <!-- Data Giwang diisi oleh JS -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- TAB HALA -->
+              <div class="tab-pane fade" id="hala" role="tabpanel" aria-labelledby="hala-tab">
+                <div class="card mb-4">
+                  <div class="card-header d-flex justify-content-start align-items-center">
+                    <i class="fas fa-ring me-2"></i>
+                    <h3 class="mb-0  fs-5">Data Hala</h3>
+                  </div>
+                  <div class="card-body">
+                    <div class="table-container">
+                      <table class="table table-hover">
+                        <thead>
+                          <tr>
+                            <th>No</th>
+                            <th>Jenis</th>
+                            <th class="text-center">Jumlah</th>
+                            <th class="text-center">Aksi</th>
+                            <th class="text-center">Riwayat</th>
+                          </tr>
+                        </thead>
+                        <tbody id="hala-table-body">
+                          <!-- Data Hala diisi oleh JS -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- TAB STOK KOMPUTER -->
+              <div class="tab-pane fade" id="stok-komputer" role="tabpanel" aria-labelledby="stok-komputer-tab">
+                <div class="card mb-4">
+                  <div class="card-header d-flex justify-content-start align-items-center">
+                    <i class="fas fa-desktop me-2"></i>
+                    <h3 class="mb-0 fs-5">Data Stok Komputer</h3>
+                  </div>
+                  <div class="card-body">
+                    <div class="table-container">
+                      <table class="table table-hover">
+                        <thead>
+                          <tr>
+                            <th>No</th>
+                            <th>Jenis Barang</th>
+                            <th class="text-center">Jumlah</th>
+                            <th class="text-center">Aksi</th>
+                          </tr>
+                        </thead>
+                        <tbody id="stok-komputer-table-body">
+                          <!-- Data Stok Komputer diisi oleh JS -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- END TAB-CONTENT -->
+            </div>
 
+            <!-- Modal Tambah Stok -->
+            <div class="modal fade" id="modalTambahStok" tabindex="-1" aria-labelledby="modalTambahStokLabel" aria-hidden="true">
+              <div class="modal-dialog">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title" id="modalTambahStokLabel">Tambah Stok</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                  </div>
+                  <div class="modal-body">
+                    <form id="formTambahStok">
+                      <div class="mb-3">
+                        <label for="jenisTambah" class="form-label">Jenis</label>
+                        <select class="form-select" id="jenisTambah" required>
+                          <option value="">Pilih Jenis</option>
+                          <option value="stok brankas">Stok Brankas</option>
+                          <option value="posting">Posting</option>
+                          <option value="display">Display</option>
+                          <option value="rusak">Rusak</option>
+                          <option value="batu lepas">Batu Lepas</option>
+                          <option value="manual">Manual</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </div>
+                      <div class="mb-3">
+                        <label for="jumlahTambah" class="form-label">Jumlah</label>
+                        <input type="number" class="form-control" id="jumlahTambah" min="1" required />
+                      </div>
+                      <div class="mb-3">
+                        <label for="penambahStok" class="form-label">Penambah Stok</label>
+                        <input type="text" class="form-control" id="penambahStok" required />
+                      </div>
+                      <button type="submit" class="btn btn-primary w-100">Simpan</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Modal Kurangi Stok -->
+            <div class="modal fade" id="modalKurangiStok" tabindex="-1" aria-labelledby="modalKurangiStokLabel" aria-hidden="true">
+              <div class="modal-dialog">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title" id="modalKurangiStokLabel">Kurangi Stok</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                  </div>
+                  <div class="modal-body">
+                    <form id="formKurangiStok">
+                      <div class="mb-3">
+                        <label for="jenisKurangi" class="form-label">Jenis</label>
+                        <select class="form-select" id="jenisKurangi" required>
+                          <option value="">Pilih Jenis</option>
+                          <option value="stok brankas">Stok Brankas</option>
+                          <option value="posting">Posting</option>
+                          <option value="display">Display</option>
+                          <option value="rusak">Rusak</option>
+                          <option value="batu lepas">Batu Lepas</option>
+                          <option value="manual">Manual</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </div>
+                      <div class="mb-3">
+                        <label for="jumlahKurangi" class="form-label">Jumlah</label>
+                        <input type="number" class="form-control" id="jumlahKurangi" min="1" required />
+                      </div>
+                      <div class="mb-3">
+                        <label for="pengurangStok" class="form-label">Pengurang Stok</label>
+                        <input type="text" class="form-control" id="pengurangStok" required />
+                      </div>
+                      <div class="mb-3">
+                        <label for="keteranganKurangi" class="form-label">Keterangan</label>
+                        <textarea class="form-control" id="keteranganKurangi" rows="2"></textarea>
+                      </div>
+                      <button type="submit" class="btn btn-warning w-100">Simpan</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- END CONTENT WRAPPER -->
+          </div>
+        </div>
+      </main>
+    </div>
     <!-- Scripts -->
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/manajemenStok.js"></script>
