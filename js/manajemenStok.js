@@ -10,33 +10,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
 // === Konstanta dan Mapping ===
-const mainCategories = [
-  "KALUNG",
-  "LIONTIN",
-  "ANTING",
-  "CINCIN",
-  "HALA",
-  "GELANG",
-  "GIWANG",
-];
-const subCategories = [
-  "Stok Brankas",
-  "Belum Posting",
-  "Display",
-  "Rusak",
-  "Batu Lepas",
-  "Manual",
-  "Admin",
-];
-const summaryCategories = [
-  "brankas",
-  "posting",
-  "barang-display",
-  "barang-rusak",
-  "batu-lepas",
-  "manual",
-  "admin",
-];
+const mainCategories = ["KALUNG", "LIONTIN", "ANTING", "CINCIN", "HALA", "GELANG", "GIWANG"];
+const subCategories = ["Stok Brankas", "Belum Posting", "Display", "Rusak", "Batu Lepas", "Manual", "Admin"];
+const summaryCategories = ["brankas", "posting", "barang-display", "barang-rusak", "batu-lepas", "manual", "admin"];
 const categoryMapping = {
   "Stok Brankas": "brankas",
   "Belum Posting": "posting",
@@ -133,11 +109,7 @@ async function fetchStockData(forceRefresh = false) {
     "stok-komputer",
   ];
   try {
-    if (
-      !forceRefresh &&
-      Object.keys(stockData).length > 0 &&
-      categories.every(isCacheValid)
-    ) {
+    if (!forceRefresh && Object.keys(stockData).length > 0 && categories.every(isCacheValid)) {
       return stockData;
     }
     const fetchPromises = categories.map(async (category) => {
@@ -197,10 +169,10 @@ async function saveData(category, type) {
 function formatDate(date) {
   if (!date) return "-";
   const d = new Date(date);
-  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()} ${d
-    .getHours()
+  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()} ${d.getHours().toString().padStart(2, "0")}:${d
+    .getMinutes()
     .toString()
-    .padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+    .padStart(2, "0")}`;
 }
 function getCategoryKey(subCategory) {
   return categoryMapping[subCategory] || "";
@@ -221,6 +193,7 @@ function populateStokKomputerTable() {
       <td class="text-center">
         <button class="btn btn-sm btn-primary edit-komputer-btn" data-main="${mainCat}"><i class="fas fa-edit"></i> Update</button>
       </td>
+      <td class="text-center text-muted small">${formatDate(item.lastUpdated)}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -238,25 +211,48 @@ export async function populateTables() {
         stockData[categoryKey] && stockData[categoryKey][mainCat]
           ? stockData[categoryKey][mainCat]
           : { quantity: 0, lastUpdated: null, history: [] };
+
       const tr = document.createElement("tr");
+
+      // Cek apakah kategori adalah Display atau Manual untuk menggunakan tombol Update
+      const isDisplayOrManual = subCat === "Display" || subCat === "Manual";
+
+      let actionColumn;
+      if (isDisplayOrManual) {
+        // Untuk Display dan Manual, gunakan tombol Update langsung
+        actionColumn = `
+          <td class="text-center">
+            <button class="btn btn-success btn-sm update-stock-btn" data-main="${mainCat}" data-category="${categoryKey}" data-subcategory="${subCat}">
+              <i class="fas fa-edit"></i> Update
+            </button>
+          </td>
+        `;
+      } else {
+        // Untuk kategori lainnya, gunakan dropdown seperti biasa
+        actionColumn = `
+          <td class="text-center">
+            <div class="dropdown">
+              <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                Aksi
+              </button>
+              <ul class="dropdown-menu">
+                <li><a class="dropdown-item add-stock-btn" href="#" data-main="${mainCat}" data-category="${categoryKey}">Tambah</a></li>
+                <li><a class="dropdown-item reduce-stock-btn" href="#" data-main="${mainCat}" data-category="${categoryKey}">Kurangi</a></li>
+              </ul>
+            </div>
+          </td>
+        `;
+      }
+
       tr.innerHTML = `
         <td>${idx + 1}</td>
         <td>${subCat}</td>
         <td class="text-center">${stockItem.quantity}</td>
-        <td class="text-center">
-          <div class="dropdown">
-            <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
-              Aksi
-            </button>
-            <ul class="dropdown-menu">
-              <li><a class="dropdown-item add-stock-btn" href="#" data-main="${mainCat}" data-category="${categoryKey}">Tambah</a></li>
-              <li><a class="dropdown-item reduce-stock-btn" href="#" data-main="${mainCat}" data-category="${categoryKey}">Kurangi</a></li>
-            </ul>
-          </div>
-        </td>
+        ${actionColumn}
         <td class="text-center">
           <button class="btn btn-info btn-sm show-history-btn" data-main="${mainCat}" data-category="${categoryKey}"><i class="fas fa-clock-rotate-left"></i></button>
         </td>
+        <td class="text-center text-muted small">${formatDate(stockItem.lastUpdated)}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -268,16 +264,17 @@ export async function populateTables() {
 // --- Handler edit komputer
 let komputerEditMainCat = "";
 
-document.body.addEventListener("click", function(e) {
+document.body.addEventListener("click", function (e) {
   if (e.target.classList.contains("edit-komputer-btn")) {
     komputerEditMainCat = e.target.dataset.main;
-    document.getElementById("updateKomputerJumlah").value = stockData["stok-komputer"][komputerEditMainCat]?.quantity || 0;
+    document.getElementById("updateKomputerJumlah").value =
+      stockData["stok-komputer"][komputerEditMainCat]?.quantity || 0;
     document.getElementById("updateKomputerJenis").value = komputerEditMainCat;
-    $('#modalUpdateKomputer').modal('show');
+    $("#modalUpdateKomputer").modal("show");
   }
 });
 
-document.getElementById("formUpdateKomputer").onsubmit = async function(e) {
+document.getElementById("formUpdateKomputer").onsubmit = async function (e) {
   e.preventDefault();
   const jumlah = document.getElementById("updateKomputerJumlah").value;
   const jenis = document.getElementById("updateKomputerJenis").value;
@@ -286,7 +283,7 @@ document.getElementById("formUpdateKomputer").onsubmit = async function(e) {
     return;
   }
   await updateStokKomputer(jenis, jumlah);
-  $('#modalUpdateKomputer').modal('hide');
+  $("#modalUpdateKomputer").modal("hide");
 };
 
 async function updateStokKomputer(jenis, jumlah) {
@@ -301,13 +298,60 @@ async function updateStokKomputer(jenis, jumlah) {
   await populateTables();
 }
 
+// === Update Stok Display/Manual ===
+async function updateStokDisplayManual(category, mainCat, newQuantity, petugas, keterangan) {
+  await fetchStockData();
+  if (!stockData[category] || !stockData[category][mainCat]) {
+    // Inisialisasi jika belum ada
+    if (!stockData[category]) stockData[category] = {};
+    stockData[category][mainCat] = { quantity: 0, lastUpdated: null, history: [] };
+  }
+
+  const item = stockData[category][mainCat];
+  const oldQuantity = item.quantity;
+  const newQty = parseInt(newQuantity);
+
+  // Update quantity
+  item.quantity = newQty;
+  item.lastUpdated = new Date().toISOString();
+
+  // Determine action type
+  let actionType, quantityDiff;
+  if (newQty > oldQuantity) {
+    actionType = "Update (Tambah)";
+    quantityDiff = newQty - oldQuantity;
+  } else if (newQty < oldQuantity) {
+    actionType = "Update (Kurangi)";
+    quantityDiff = oldQuantity - newQty;
+  } else {
+    actionType = "Update (Tetap)";
+    quantityDiff = 0;
+  }
+
+  // Add to history
+  item.history.unshift({
+    date: item.lastUpdated,
+    action: actionType,
+    quantity: quantityDiff,
+    oldQuantity: oldQuantity,
+    newQuantity: newQty,
+    petugas,
+    keterangan: keterangan || "Update stok langsung",
+  });
+
+  // Keep only last 10 records
+  if (item.history.length > 10) item.history = item.history.slice(0, 10);
+
+  await saveData(category, mainCat);
+  await populateTables();
+}
+
 // === Update Status Ringkasan ===
 function updateSummaryTotals() {
   mainCategories.forEach((mainCat) => {
     let total = 0;
     summaryCategories.forEach((cat) => {
-      if (stockData[cat] && stockData[cat][mainCat])
-        total += parseInt(stockData[cat][mainCat].quantity) || 0;
+      if (stockData[cat] && stockData[cat][mainCat]) total += parseInt(stockData[cat][mainCat].quantity) || 0;
     });
     let komputer = 0;
     if (stockData["stok-komputer"] && stockData["stok-komputer"][mainCat])
@@ -399,7 +443,12 @@ function showHistoryModal(category, mainCat) {
   tbody.innerHTML = "";
   info.textContent = "";
 
-  if (!stockData[category] || !stockData[category][mainCat] || !stockData[category][mainCat].history || stockData[category][mainCat].history.length === 0) {
+  if (
+    !stockData[category] ||
+    !stockData[category][mainCat] ||
+    !stockData[category][mainCat].history ||
+    stockData[category][mainCat].history.length === 0
+  ) {
     tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Tidak ada riwayat</td></tr>`;
     return modal.show();
   }
@@ -407,17 +456,39 @@ function showHistoryModal(category, mainCat) {
   const history = stockData[category][mainCat].history.slice(0, 10);
   history.forEach((record, i) => {
     const tr = document.createElement("tr");
+
+    // Determine action badge color and text
+    let actionBadge;
+    if (record.action === "Tambah") {
+      actionBadge = '<span class="badge bg-success">Tambah</span>';
+    } else if (record.action === "Kurangi") {
+      actionBadge = '<span class="badge bg-danger">Kurangi</span>';
+    } else if (record.action.includes("Update")) {
+      if (record.action.includes("Tambah")) {
+        actionBadge = '<span class="badge bg-info">Update (+)</span>';
+      } else if (record.action.includes("Kurangi")) {
+        actionBadge = '<span class="badge bg-warning">Update (-)</span>';
+      } else {
+        actionBadge = '<span class="badge bg-secondary">Update</span>';
+      }
+    } else {
+      actionBadge = `<span class="badge bg-primary">${record.action}</span>`;
+    }
+
+    // Handle quantity display for update actions
+    let quantityDisplay;
+    if (record.oldQuantity !== undefined && record.newQuantity !== undefined) {
+      quantityDisplay = `<small>${record.oldQuantity} → ${record.newQuantity}</small><br><span class="badge bg-primary">${record.quantity}</span>`;
+    } else {
+      quantityDisplay = `<span class="badge bg-primary">${record.quantity}</span>`;
+    }
+
     tr.innerHTML = `
       <td>${i + 1}</td>
       <td>${formatDate(record.date)}</td>
-      <td>
-        ${record.action === "Tambah"
-          ? '<span class="badge bg-success">Tambah</span>'
-          : '<span class="badge bg-danger">Kurangi</span>'
-        }
-      </td>
-      <td><span class="badge bg-primary">${record.quantity}</span></td>
-      <td>${record.adder || record.pengurang || "-"}</td>
+      <td>${actionBadge}</td>
+      <td>${quantityDisplay}</td>
+      <td>${record.adder || record.pengurang || record.petugas || "-"}</td>
       <td>${record.keterangan || record.receiver || "-"}</td>
     `;
     tbody.appendChild(tr);
@@ -442,7 +513,7 @@ document.body.addEventListener("click", function (e) {
     // Reset form
     document.getElementById("formTambahStok").reset();
     // Optionally, set jenis default sesuai kategori
-    $('#modalTambahStok').modal('show');
+    $("#modalTambahStok").modal("show");
   }
   // Kurangi stok
   if (e.target.classList.contains("reduce-stock-btn")) {
@@ -450,7 +521,28 @@ document.body.addEventListener("click", function (e) {
     currentMainCat = e.target.dataset.main;
     currentCategory = e.target.dataset.category;
     document.getElementById("formKurangiStok").reset();
-    $('#modalKurangiStok').modal('show');
+    $("#modalKurangiStok").modal("show");
+  }
+  // Update stok Display/Manual
+  if (e.target.classList.contains("update-stock-btn") || e.target.closest(".update-stock-btn")) {
+    e.preventDefault();
+    const btn = e.target.classList.contains("update-stock-btn") ? e.target : e.target.closest(".update-stock-btn");
+    const mainCat = btn.dataset.main;
+    const categoryKey = btn.dataset.category;
+    const subCategory = btn.dataset.subcategory;
+
+    // Populate modal with current data
+    const stockItem =
+      stockData[categoryKey] && stockData[categoryKey][mainCat] ? stockData[categoryKey][mainCat] : { quantity: 0 };
+
+    document.getElementById("updateStokMainCat").value = mainCat;
+    document.getElementById("updateStokCategory").value = categoryKey;
+    document.getElementById("updateStokJenis").value = `${mainCat} - ${subCategory}`;
+    document.getElementById("updateStokJumlah").value = stockItem.quantity;
+    document.getElementById("updateStokPetugas").value = "";
+    document.getElementById("updateStokKeterangan").value = "";
+
+    $("#modalUpdateStok").modal("show");
   }
 });
 
@@ -464,8 +556,9 @@ document.getElementById("formTambahStok").onsubmit = async function (e) {
     return;
   }
   await addStock(currentCategory, currentMainCat, jumlah, penambah);
-  $('#modalTambahStok').modal('hide');
+  $("#modalTambahStok").modal("hide");
 };
+
 document.getElementById("formKurangiStok").onsubmit = async function (e) {
   e.preventDefault();
   const jumlah = document.getElementById("jumlahKurangi").value;
@@ -476,7 +569,25 @@ document.getElementById("formKurangiStok").onsubmit = async function (e) {
     return;
   }
   await reduceStock(currentCategory, currentMainCat, jumlah, pengurang, keterangan);
-  $('#modalKurangiStok').modal('hide');
+  $("#modalKurangiStok").modal("hide");
+};
+
+// === Handler Submit Modal Update Stok Display/Manual ===
+document.getElementById("formUpdateStok").onsubmit = async function (e) {
+  e.preventDefault();
+  const mainCat = document.getElementById("updateStokMainCat").value;
+  const category = document.getElementById("updateStokCategory").value;
+  const jumlah = document.getElementById("updateStokJumlah").value;
+  const petugas = document.getElementById("updateStokPetugas").value;
+  const keterangan = document.getElementById("updateStokKeterangan").value;
+
+  if (!mainCat || !category || jumlah === "" || !petugas) {
+    alert("Semua field yang wajib harus diisi.");
+    return;
+  }
+
+  await updateStokDisplayManual(category, mainCat, jumlah, petugas, keterangan);
+  $("#modalUpdateStok").modal("hide");
 };
 
 // === Real-time listener (optional) ===

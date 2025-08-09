@@ -598,6 +598,7 @@
                             <th class="text-center">Jumlah</th>
                             <th class="text-center">Aksi</th>
                             <th class="text-center">Riwayat</th>
+                            <th class="text-center">Terakhir Update</th>
                           </tr>
                         </thead>
                         <tbody id="kalung-table-body">
@@ -625,6 +626,7 @@
                             <th class="text-center">Jumlah</th>
                             <th class="text-center">Aksi</th>
                             <th class="text-center">Riwayat</th>
+                            <th class="text-center">Terakhir Update</th>
                           </tr>
                         </thead>
                         <tbody id="liontin-table-body">
@@ -652,6 +654,7 @@
                             <th class="text-center">Jumlah</th>
                             <th class="text-center">Aksi</th>
                             <th class="text-center">Riwayat</th>
+                            <th class="text-center">Terakhir Update</th>
                           </tr>
                         </thead>
                         <tbody id="anting-table-body">
@@ -679,6 +682,7 @@
                             <th class="text-center">Jumlah</th>
                             <th class="text-center">Aksi</th>
                             <th class="text-center">Riwayat</th>
+                            <th class="text-center">Terakhir Update</th>
                           </tr>
                         </thead>
                         <tbody id="cincin-table-body">
@@ -706,6 +710,7 @@
                             <th class="text-center">Jumlah</th>
                             <th class="text-center">Aksi</th>
                             <th class="text-center">Riwayat</th>
+                            <th class="text-center">Terakhir Update</th>
                           </tr>
                         </thead>
                         <tbody id="gelang-table-body">
@@ -733,6 +738,7 @@
                             <th class="text-center">Jumlah</th>
                             <th class="text-center">Aksi</th>
                             <th class="text-center">Riwayat</th>
+                            <th class="text-center">Terakhir Update</th>
                           </tr>
                         </thead>
                         <tbody id="giwang-table-body">
@@ -760,6 +766,7 @@
                             <th class="text-center">Jumlah</th>
                             <th class="text-center">Aksi</th>
                             <th class="text-center">Riwayat</th>
+                            <th class="text-center">Terakhir Update</th>
                           </tr>
                         </thead>
                         <tbody id="hala-table-body">
@@ -786,6 +793,7 @@
                             <th>Jenis Barang</th>
                             <th class="text-center">Jumlah</th>
                             <th class="text-center">Aksi</th>
+                            <th class="text-center">Terakhir Update</th>
                           </tr>
                         </thead>
                         <tbody id="stok-komputer-table-body">
@@ -920,6 +928,8 @@
             </div>
             <!-- END CONTENT WRAPPER -->
           </div>
+
+          <!-- Modal Riwayat -->
           <div
             class="modal fade"
             id="modalRiwayat"
@@ -957,41 +967,51 @@
               </div>
             </div>
           </div>
-          <!-- ... sebelum </body> -->
+
+          <!-- Modal Update Stok Display/Manual -->
           <div
             class="modal fade"
-            id="modalRiwayat"
+            id="modalUpdateStok"
             tabindex="-1"
-            aria-labelledby="modalRiwayatLabel"
+            aria-labelledby="modalUpdateStokLabel"
             aria-hidden="true"
           >
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog">
               <div class="modal-content">
-                <div class="modal-header">
-                  <h5 class="modal-title" id="modalRiwayatLabel">
-                    Riwayat Stok
-                    <span id="riwayat-title"></span>
-                  </h5>
-                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
-                </div>
-                <div class="modal-body">
-                  <div class="table-responsive">
-                    <table class="table table-bordered table-hover">
-                      <thead>
-                        <tr>
-                          <th>No</th>
-                          <th>Tanggal</th>
-                          <th>Status</th>
-                          <th>Jumlah</th>
-                          <th>Petugas</th>
-                          <th>Keterangan</th>
-                        </tr>
-                      </thead>
-                      <tbody id="riwayat-table-body"></tbody>
-                    </table>
+                <form id="formUpdateStok">
+                  <div class="modal-header">
+                    <h5 class="modal-title" id="modalUpdateStokLabel">Update Stok</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                   </div>
-                  <div id="riwayat-info" class="text-muted small mt-1"></div>
-                </div>
+                  <div class="modal-body">
+                    <input type="hidden" id="updateStokMainCat" />
+                    <input type="hidden" id="updateStokCategory" />
+                    <div class="mb-3">
+                      <label for="updateStokJenis" class="form-label">Jenis</label>
+                      <input type="text" class="form-control" id="updateStokJenis" readonly />
+                    </div>
+                    <div class="mb-3">
+                      <label for="updateStokJumlah" class="form-label">Jumlah</label>
+                      <input type="number" class="form-control" id="updateStokJumlah" min="0" required />
+                    </div>
+                    <div class="mb-3">
+                      <label for="updateStokPetugas" class="form-label">Petugas</label>
+                      <input type="text" class="form-control" id="updateStokPetugas" required />
+                    </div>
+                    <div class="mb-3">
+                      <label for="updateStokKeterangan" class="form-label">Keterangan</label>
+                      <textarea
+                        class="form-control"
+                        id="updateStokKeterangan"
+                        rows="2"
+                        placeholder="Keterangan update stok..."
+                      ></textarea>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary w-100">Update Stok</button>
+                  </div>
+                </form>
               </div>
             </div>
           </div>
