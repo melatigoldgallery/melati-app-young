@@ -526,7 +526,7 @@ const returnHandler = {
   },
 
   // NEW: Update stock in stokAksesoris collection
-  async updateStockAfterReturn(kode, jumlahReturn) {
+  async updateStockAfterReturn(kode, jumlahChange) {
     try {
       const stockRef = collection(firestore, "stokAksesoris");
       const stockQuery = query(stockRef, where("kode", "==", kode));
@@ -536,14 +536,18 @@ const returnHandler = {
         const stockDoc = snapshot.docs[0];
         const currentData = stockDoc.data();
         const currentStok = parseInt(currentData.stok) || parseInt(currentData.stokAkhir) || 0;
-        const newStok = currentStok + jumlahReturn;
+
+        // PERBAIKAN: jumlahChange bisa positif (tambah) atau negatif (kurang)
+        const newStok = Math.max(0, currentStok + jumlahChange);
 
         // Update stok
         await updateDoc(doc(firestore, "stokAksesoris", stockDoc.id), {
           stok: newStok,
           stokAkhir: newStok,
+          lastUpdate: serverTimestamp(),
         });
 
+        console.log(`✅ Stock updated for ${kode}: ${currentStok} -> ${newStok} (change: ${jumlahChange})`);
         return true;
       }
       return false;
@@ -562,31 +566,36 @@ const returnHandler = {
 
         if (currentStock) {
           const stokSebelum = parseInt(currentStock.stok) || parseInt(currentStock.stokAkhir) || 0;
-          // PERBAIKAN: Return menambah stok, bukan mengurangi
-          const stokSesudah = stokSebelum + item.jumlah;
+          // PERBAIKAN: Return mengurangi stok (barang rusak keluar)
+          const stokSesudah = Math.max(0, stokSebelum - item.jumlah);
 
-          // Prepare transaction data
+          // PERBAIKAN: Return disimpan sebagai transaksi "return" dengan pengurangan stok
           const transaksiData = {
             isScantiLock: false,
-            jenis: "return", // PENTING: Jenis return untuk identifikasi
-            jumlah: item.jumlah, // Jumlah positif (barang masuk kembali)
+            jenis: "return", // Tetap "return" untuk identifikasi
+            jumlah: item.jumlah, // Jumlah positif (yang dikurangi dari stok)
             kategori: currentStock.kategori || returnData.jenisReturn,
-            keterangan: `Return barang oleh ${returnData.namaSales}${item.keterangan ? ` - ${item.keterangan}` : ""}`,
+            keterangan: `Return barang rusak oleh ${returnData.namaSales}${
+              item.keterangan ? ` - ${item.keterangan}` : ""
+            }`,
             kode: item.kode,
             nama: item.namaBarang,
             stokAkhir: stokSesudah,
             stokSebelum: stokSebelum,
             stokSesudah: stokSesudah,
             timestamp: serverTimestamp(),
+            // Flag untuk identifikasi return
+            isReturn: true,
+            returnType: "damaged", // Barang rusak
           };
 
           // Save to stokAksesorisTransaksi
           await addDoc(collection(firestore, "stokAksesorisTransaksi"), transaksiData);
 
-          // Update stock in stokAksesoris
-          await this.updateStockAfterReturn(item.kode, item.jumlah);
+          // PERBAIKAN: Update stock dengan pengurangan
+          await this.updateStockAfterReturn(item.kode, -item.jumlah); // Negatif untuk mengurangi
 
-          console.log(`✅ Return transaction saved for ${item.kode}: +${item.jumlah} stok`);
+          console.log(`✅ Return transaction saved for ${item.kode}: -${item.jumlah} stok (barang rusak)`);
         } else {
           console.warn(`⚠️ Stock data not found for ${item.kode}`);
         }
@@ -605,7 +614,6 @@ const returnHandler = {
       this.isSaving = true;
       $("#btnSimpanReturn").prop("disabled", true);
 
-      // Prepare return data
       const selectedDate = $("#tanggalReturn").val();
 
       const returnData = {
@@ -630,15 +638,51 @@ const returnHandler = {
       console.log("Saving return data:", returnData);
 
       // Save to returnBarang collection
-      await addDoc(collection(firestore, "returnBarang"), returnData);
+      const returnDocRef = await addDoc(collection(firestore, "returnBarang"), returnData);
 
-      // Save to stokAksesorisTransaksi collection and update stock
-      await this.saveToStokTransaksi(returnData);
+      // PERBAIKAN: Save return transactions dan update stock dengan pengurangan
+      for (const item of returnData.detailReturn) {
+        const currentStock = await this.getCurrentStockData(item.kode);
+
+        if (currentStock) {
+          const stokSebelum = parseInt(currentStock.stok) || parseInt(currentStock.stokAkhir) || 0;
+          const stokSesudah = Math.max(0, stokSebelum - item.jumlah);
+
+          // Save return transaction
+          const transaksiData = {
+            isScantiLock: false,
+            jenis: "return", // Jenis return untuk identifikasi
+            jumlah: item.jumlah,
+            kategori: currentStock.kategori || returnData.jenisReturn,
+            keterangan: `Return barang rusak oleh ${returnData.namaSales}${
+              item.keterangan ? ` - ${item.keterangan}` : ""
+            }`,
+            kode: item.kode,
+            nama: item.namaBarang,
+            stokAkhir: stokSesudah,
+            stokSebelum: stokSebelum,
+            stokSesudah: stokSesudah,
+            timestamp: serverTimestamp(),
+            isReturn: true,
+            returnId: returnDocRef.id,
+            returnType: "damaged",
+          };
+
+          await addDoc(collection(firestore, "stokAksesorisTransaksi"), transaksiData);
+
+          // Update stock dengan pengurangan
+          await updateDoc(doc(firestore, "stokAksesoris", currentStock.id), {
+            stok: stokSesudah,
+            stokAkhir: stokSesudah,
+            lastUpdate: serverTimestamp(),
+          });
+
+          console.log(`✅ Return processed for ${item.kode}: ${stokSebelum} -> ${stokSesudah} (-${item.jumlah})`);
+        }
+      }
 
       showAlert("Data return berhasil disimpan dan stok telah diperbarui", "Sukses", "success");
       this.resetForm();
-
-      // Refresh data if needed
       await this.loadRiwayatReturn();
     } catch (error) {
       console.error("Error saving return:", error);
@@ -750,38 +794,41 @@ const returnHandler = {
 
         if (currentStock) {
           const currentStok = parseInt(currentStock.stok) || parseInt(currentStock.stokAkhir) || 0;
-          const newStok = currentStok - item.jumlah; // Kurangi stok karena return dibatalkan
+          // PERBAIKAN: Return dibatalkan = stok kembali naik
+          const newStok = currentStok + item.jumlah;
 
-          // Update stock in stokAksesoris
+          // Update stock directly
           await updateDoc(doc(firestore, "stokAksesoris", currentStock.id), {
-            stok: Math.max(0, newStok), // Pastikan stok tidak negatif
-            stokAkhir: Math.max(0, newStok),
+            stok: newStok,
+            stokAkhir: newStok,
+            lastUpdate: serverTimestamp(),
           });
 
-          // Create reverse transaction entry
+          // PERBAIKAN: Buat transaksi reverse_return
           const reverseTransaksiData = {
             isScantiLock: false,
             jenis: "reverse_return",
-            jumlah: -item.jumlah, // Negatif untuk menandakan pengurangan
+            jumlah: item.jumlah, // Positif (barang kembali masuk)
             kategori: currentStock.kategori || returnData.jenisReturn,
             keterangan: `Pembatalan return - ${returnData.namaSales}`,
             kode: item.kode,
             nama: item.namaBarang,
-            stokAkhir: Math.max(0, newStok),
+            stokAkhir: newStok,
             stokSebelum: currentStok,
-            stokSesudah: Math.max(0, newStok),
+            stokSesudah: newStok,
             timestamp: serverTimestamp(),
+            isReverseReturn: true,
+            originalReturnId: returnData.id,
           };
 
           // Save reverse transaction
           await addDoc(collection(firestore, "stokAksesorisTransaksi"), reverseTransaksiData);
 
-          console.log(`✅ Stock reversed for ${item.kode}`);
+          console.log(`✅ Stock reversed for ${item.kode}: ${currentStok} -> ${newStok} (+${item.jumlah})`);
         }
       }
     } catch (error) {
       console.error("Error reversing stock changes:", error);
-      // Don't throw error here to avoid blocking the delete operation
     }
   },
 
