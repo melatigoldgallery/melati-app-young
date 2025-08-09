@@ -562,13 +562,14 @@ const returnHandler = {
 
         if (currentStock) {
           const stokSebelum = parseInt(currentStock.stok) || parseInt(currentStock.stokAkhir) || 0;
+          // PERBAIKAN: Return menambah stok, bukan mengurangi
           const stokSesudah = stokSebelum + item.jumlah;
 
           // Prepare transaction data
           const transaksiData = {
             isScantiLock: false,
-            jenis: "return", // Menandakan ini adalah transaksi return
-            jumlah: item.jumlah,
+            jenis: "return", // PENTING: Jenis return untuk identifikasi
+            jumlah: item.jumlah, // Jumlah positif (barang masuk kembali)
             kategori: currentStock.kategori || returnData.jenisReturn,
             keterangan: `Return barang oleh ${returnData.namaSales}${item.keterangan ? ` - ${item.keterangan}` : ""}`,
             kode: item.kode,
@@ -585,7 +586,7 @@ const returnHandler = {
           // Update stock in stokAksesoris
           await this.updateStockAfterReturn(item.kode, item.jumlah);
 
-          console.log(`✅ Transaction saved for ${item.kode}`);
+          console.log(`✅ Return transaction saved for ${item.kode}: +${item.jumlah} stok`);
         } else {
           console.warn(`⚠️ Stock data not found for ${item.kode}`);
         }
