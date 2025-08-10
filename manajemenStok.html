@@ -27,181 +27,11 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/pages/absensi-modern.css" />
+    <link rel="stylesheet" href="css/pages/manajemenStok.css" />
     <!-- Favicon sederhana -->
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
     <title>Manajemen Stok - Melati Gold Shop</title>
-    <style>
-      .table-container {
-        max-height: 500px;
-        overflow-y: auto;
-      }
-      .stock-summary {
-        background-color: #f8f9fa;
-        border-radius: 8px;
-        padding: 15px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-      }
-      .stock-card {
-        border-radius: 8px;
-        padding: 15px;
-        margin-bottom: 15px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        transition: all 0.3s ease;
-      }
-      .stock-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-      }
-      .stock-card h3 {
-        font-size: 1.1rem;
-        margin-bottom: 10px;
-        font-weight: 600;
-      }
-      .stock-card .number {
-        font-size: 1.8rem;
-        font-weight: 700;
-        color: #3a3a3a;
-      }
-
-      .table-container {
-        max-height: 500px;
-        overflow-y: auto;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      }
-
-      .table tbody td {
-        vertical-align: middle;
-        padding: 12px;
-      }
-
-      /* Perbaikan card */
-      .card {
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        border: none;
-      }
-
-      .card-header {
-        background: linear-gradient(135deg, #5966e0 0%, #f4f6ff 100%);
-        color: white;
-        border-radius: 12px 12px 0 0 !important;
-        border: none;
-      }
-
-      .card-header h2 {
-        margin: 0;
-        font-size: 1.25rem;
-      }
-
-      /* Perbaikan button */
-      .btn {
-        border-radius: 8px;
-        font-weight: 500;
-        transition: all 0.3s ease;
-      }
-
-      .btn:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-      }
-
-      /* Perbaikan tab */
-      .nav-tabs .nav-link {
-        border-radius: 8px 8px 0 0;
-        font-weight: 500;
-        color: #6c757d;
-      }
-
-      .nav-tabs .nav-link.active {
-        background-color: #495057;
-        color: white;
-        border-color: #495057;
-      }
-
-      /* Perbaikan stock summary */
-      .stock-summary {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border-radius: 12px;
-        padding: 20px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        border: 1px solid #dee2e6;
-      }
-
-      .stock-card {
-        border-radius: 12px;
-        padding: 20px;
-        margin-bottom: 15px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        transition: all 0.3s ease;
-      }
-
-      .stock-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
-      }
-
-      /* Enhanced colors */
-      .kalung-card {
-        background: linear-gradient(135deg, #e3f2fd 0%, #9cd1fc 100%);
-      }
-      .liontin-card {
-        background: linear-gradient(135deg, #e8f5e9 0%, #adffb0 100%);
-      }
-      .anting-card {
-        background: linear-gradient(135deg, #fff3e0 0%, #ffcc02 100%);
-      }
-      .cincin-card {
-        background: linear-gradient(135deg, #f7f3f8 0%, #ee8dff 100%);
-      }
-      .hala-card {
-        background: linear-gradient(135deg, #e0f7fa 0%, #88e8f5 100%);
-      }
-      .gelang-card {
-        background: linear-gradient(135deg, #fff8e1 0%, #fd907c 100%);
-      }
-      .giwang-card {
-        background: linear-gradient(135deg, #f1f8e9 0%, #b3fc60 100%);
-      }
-      /* Styling untuk status perbandingan */
-      .number.text-success {
-        padding: 5px 10px;
-        border-radius: 5px;
-        font-weight: bold;
-      }
-
-      .number.text-danger {
-        padding: 5px 10px;
-        border-radius: 5px;
-        font-weight: bold;
-      }
-
-      .number.text-warning {
-        padding: 5px 10px;
-        border-radius: 5px;
-        font-weight: bold;
-        color: #856404 !important;
-      }
-
-      /* Modal styling */
-      .modal-header {
-        background: #5966e0;
-        color: #fff;
-        border-radius: 12px 12px 0 0;
-        border: none;
-      }
-      .modal-content {
-        border-radius: 12px;
-      }
-      .dropdown-toggle::after {
-        margin-left: 0.5em;
-      }
-      .dropdown-action {
-        min-width: 110px;
-      }
-    </style>
+    <style></style>
   </head>
   <body>
     <div class="app-container">
@@ -364,21 +194,38 @@
         </header>
         <div class="page-content">
           <div class="page-header">
-            <h1>Manajemen Stok</h1>
-            <nav aria-label="breadcrumb">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h1 class="mb-2">
+                  <i class="fas fa-boxes-stacked me-3" style="color: #5966e0"></i>
+                  Manajemen Stok
+                </h1>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary btn-sm" onclick="location.reload()">
+                  <i class="fas fa-sync-alt"></i>
+                  Refresh
+                </button>
+              </div>
+            </div>
+            <nav aria-label="breadcrumb" class="mt-3">
               <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="dashboard.html">Home</a></li>
+                <li class="breadcrumb-item">
+                  <a href="dashboard.html">
+                    <i class="fas fa-home"></i>
+                    Home
+                  </a>
+                </li>
                 <li class="breadcrumb-item">Aksesoris</li>
                 <li class="breadcrumb-item active" aria-current="page">Manajemen Stok</li>
               </ol>
             </nav>
           </div>
-
           <div class="content-wrapper">
             <!-- Stock Summary Section -->
             <div class="card mb-4">
               <div class="card-header">
-                <h2>
+                <h2 class="text-white fs-5">
                   <i class="fas fa-chart-pie me-2"></i>
                   Ringkasan Total Stok
                 </h2>
@@ -387,7 +234,7 @@
                 <div class="stock-summary">
                   <div class="row">
                     <div class="col-md-3 col-sm-6">
-                      <div class="stock-card kalung-card">
+                      <div class="stock-card kalung-card text-dark">
                         <h3>
                           <i class="fas fa-link me-2"></i>
                           KALUNG
@@ -397,7 +244,7 @@
                       </div>
                     </div>
                     <div class="col-md-3 col-sm-6">
-                      <div class="stock-card liontin-card">
+                      <div class="stock-card liontin-card text-dark">
                         <h3>
                           <i class="fas fa-gem me-2"></i>
                           LIONTIN
@@ -407,7 +254,7 @@
                       </div>
                     </div>
                     <div class="col-md-3 col-sm-6">
-                      <div class="stock-card anting-card">
+                      <div class="stock-card anting-card text-dark">
                         <h3>
                           <i class="fas fa-dot-circle me-2"></i>
                           ANTING
@@ -417,7 +264,7 @@
                       </div>
                     </div>
                     <div class="col-md-3 col-sm-6">
-                      <div class="stock-card cincin-card">
+                      <div class="stock-card cincin-card text-dark">
                         <h3>
                           <i class="fas fa-circle me-2"></i>
                           CINCIN
@@ -429,7 +276,7 @@
                   </div>
                   <div class="row mt-3">
                     <div class="col-md-3 col-sm-6">
-                      <div class="stock-card hala-card">
+                      <div class="stock-card hala-card text-dark">
                         <h3>
                           <i class="fas fa-ring me-2"></i>
                           HALA
@@ -439,7 +286,7 @@
                       </div>
                     </div>
                     <div class="col-md-3 col-sm-6">
-                      <div class="stock-card gelang-card">
+                      <div class="stock-card gelang-card text-dark">
                         <h3>
                           <i class="fas fa-circle-notch me-2"></i>
                           GELANG
@@ -449,7 +296,7 @@
                       </div>
                     </div>
                     <div class="col-md-3 col-sm-6">
-                      <div class="stock-card giwang-card">
+                      <div class="stock-card giwang-card text-dark">
                         <h3>
                           <i class="fas fa-dot-circle me-2"></i>
                           GIWANG
@@ -853,17 +700,15 @@
                   <div class="modal-body">
                     <form id="formTambahStok">
                       <div class="mb-3">
-                        <label for="jenisTambah" class="form-label">Jenis</label>
-                        <select class="form-select" id="jenisTambah" required>
-                          <option value="">Pilih Jenis</option>
-                          <option value="stok brankas">Stok Brankas</option>
-                          <option value="posting">Posting</option>
-                          <option value="display">Display</option>
-                          <option value="rusak">Rusak</option>
-                          <option value="batu lepas">Batu Lepas</option>
-                          <option value="manual">Manual</option>
-                          <option value="admin">Admin</option>
-                        </select>
+                        <label for="jenisTambahDisplay" class="form-label">Jenis Barang</label>
+                        <input
+                          type="text"
+                          class="form-control"
+                          id="jenisTambahDisplay"
+                          readonly
+                          style="background-color: #f8f9fa"
+                        />
+                        <input type="hidden" id="jenisTambah" />
                       </div>
                       <div class="mb-3">
                         <label for="jumlahTambah" class="form-label">Jumlah</label>
@@ -879,6 +724,160 @@
                 </div>
               </div>
             </div>
+
+            <!-- Modal Tambah Stok HALA -->
+            <div
+              class="modal fade"
+              id="modalTambahStokHala"
+              tabindex="-1"
+              aria-labelledby="modalTambahStokHalaLabel"
+              aria-hidden="true"
+            >
+              <div class="modal-dialog">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title" id="modalTambahStokHalaLabel">Tambah Stok HALA</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                  </div>
+                  <div class="modal-body">
+                    <form id="formTambahStokHala">
+                      <div class="mb-3">
+                        <label for="jenisTambahHalaDisplay" class="form-label">Jenis Barang</label>
+                        <input
+                          type="text"
+                          class="form-control"
+                          id="jenisTambahHalaDisplay"
+                          readonly
+                          style="background-color: #f8f9fa"
+                        />
+                        <input type="hidden" id="jenisTambahHala" />
+                      </div>
+                      <div class="mb-3">
+                        <label for="jenisPerhiasanTambah" class="form-label">Jenis Perhiasan</label>
+                        <select class="form-select" id="jenisPerhiasanTambah" required>
+                          <option value="">Pilih Jenis Perhiasan</option>
+                          <option value="KA">KA - Kalung</option>
+                          <option value="LA">LA - Liontin</option>
+                          <option value="AN">AN - Anting</option>
+                          <option value="CA">CA - Cincin</option>
+                          <option value="SA">SA - Set A</option>
+                          <option value="GA">GA - Gelang</option>
+                        </select>
+                      </div>
+                      <div class="mb-3">
+                        <label for="jumlahTambahHala" class="form-label">Jumlah</label>
+                        <input type="number" class="form-control" id="jumlahTambahHala" min="1" required />
+                      </div>
+                      <div class="mb-3">
+                        <label for="penambahStokHala" class="form-label">Penambah Stok</label>
+                        <input type="text" class="form-control" id="penambahStokHala" required />
+                      </div>
+                      <button type="submit" class="btn btn-primary w-100">Simpan</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Modal Kurangi Stok HALA -->
+            <div
+              class="modal fade"
+              id="modalKurangiStokHala"
+              tabindex="-1"
+              aria-labelledby="modalKurangiStokHalaLabel"
+              aria-hidden="true"
+            >
+              <div class="modal-dialog">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title" id="modalKurangiStokHalaLabel">Kurangi Stok HALA</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                  </div>
+                  <div class="modal-body">
+                    <form id="formKurangiStokHala">
+                      <div class="mb-3">
+                        <label for="jenisKurangiHalaDisplay" class="form-label">Jenis Barang</label>
+                        <input
+                          type="text"
+                          class="form-control"
+                          id="jenisKurangiHalaDisplay"
+                          readonly
+                          style="background-color: #f8f9fa"
+                        />
+                        <input type="hidden" id="jenisKurangiHala" />
+                      </div>
+                      <div class="mb-3">
+                        <label for="jenisPerhiasanKurangi" class="form-label">Jenis Perhiasan</label>
+                        <select class="form-select" id="jenisPerhiasanKurangi" required>
+                          <option value="">Pilih Jenis Perhiasan</option>
+                          <option value="KA">KA - Kalung</option>
+                          <option value="LA">LA - Liontin</option>
+                          <option value="AN">AN - Anting</option>
+                          <option value="CA">CA - Cincin</option>
+                          <option value="SA">SA - Set A</option>
+                          <option value="GA">GA - Gelang</option>
+                        </select>
+                      </div>
+                      <div class="mb-3">
+                        <label for="jumlahKurangiHala" class="form-label">Jumlah</label>
+                        <input type="number" class="form-control" id="jumlahKurangiHala" min="1" required />
+                      </div>
+                      <div class="mb-3">
+                        <label for="pengurangStokHala" class="form-label">Pengurang Stok</label>
+                        <input type="text" class="form-control" id="pengurangStokHala" required />
+                      </div>
+                      <div class="mb-3">
+                        <label for="keteranganKurangiHala" class="form-label">Keterangan</label>
+                        <textarea class="form-control" id="keteranganKurangiHala" rows="2"></textarea>
+                      </div>
+                      <button type="submit" class="btn btn-warning w-100">Simpan</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Modal Detail HALA -->
+            <div
+              class="modal fade"
+              id="modalDetailHala"
+              tabindex="-1"
+              aria-labelledby="modalDetailHalaLabel"
+              aria-hidden="true"
+            >
+              <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title" id="modalDetailHalaLabel">Detail Stok HALA</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                  </div>
+                  <div class="modal-body">
+                    <div class="table-responsive">
+                      <table class="table table-hover">
+                        <thead>
+                          <tr>
+                            <th>No</th>
+                            <th>Jenis Perhiasan</th>
+                            <th>Kode</th>
+                            <th class="text-center">Jumlah</th>
+                          </tr>
+                        </thead>
+                        <tbody id="hala-detail-table-body">
+                          <!-- Data detail HALA akan diisi oleh JS -->
+                        </tbody>
+                        <tfoot>
+                          <tr class="table-active">
+                            <th colspan="3" class="text-end">Total:</th>
+                            <th class="text-center" id="hala-detail-total">0</th>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Modal Kurangi Stok -->
             <div
               class="modal fade"
@@ -896,17 +895,15 @@
                   <div class="modal-body">
                     <form id="formKurangiStok">
                       <div class="mb-3">
-                        <label for="jenisKurangi" class="form-label">Jenis</label>
-                        <select class="form-select" id="jenisKurangi" required>
-                          <option value="">Pilih Jenis</option>
-                          <option value="stok brankas">Stok Brankas</option>
-                          <option value="posting">Posting</option>
-                          <option value="display">Display</option>
-                          <option value="rusak">Rusak</option>
-                          <option value="batu lepas">Batu Lepas</option>
-                          <option value="manual">Manual</option>
-                          <option value="admin">Admin</option>
-                        </select>
+                        <label for="jenisKurangiDisplay" class="form-label">Jenis Barang</label>
+                        <input
+                          type="text"
+                          class="form-control"
+                          id="jenisKurangiDisplay"
+                          readonly
+                          style="background-color: #f8f9fa"
+                        />
+                        <input type="hidden" id="jenisKurangi" />
                       </div>
                       <div class="mb-3">
                         <label for="jumlahKurangi" class="form-label">Jumlah</label>
@@ -955,7 +952,7 @@
                           <th>Tanggal</th>
                           <th>Status</th>
                           <th>Jumlah</th>
-                          <th>Petugas</th>
+                          <th>Nama Staff</th>
                           <th>Keterangan</th>
                         </tr>
                       </thead>
@@ -995,17 +992,8 @@
                       <input type="number" class="form-control" id="updateStokJumlah" min="0" required />
                     </div>
                     <div class="mb-3">
-                      <label for="updateStokPetugas" class="form-label">Petugas</label>
+                      <label for="updateStokPetugas" class="form-label">Nama Staf</label>
                       <input type="text" class="form-control" id="updateStokPetugas" required />
-                    </div>
-                    <div class="mb-3">
-                      <label for="updateStokKeterangan" class="form-label">Keterangan</label>
-                      <textarea
-                        class="form-control"
-                        id="updateStokKeterangan"
-                        rows="2"
-                        placeholder="Keterangan update stok..."
-                      ></textarea>
                     </div>
                   </div>
                   <div class="modal-footer">
