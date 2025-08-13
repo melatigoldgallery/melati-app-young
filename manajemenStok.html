@@ -31,7 +31,13 @@
     <!-- Favicon sederhana -->
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
     <title>Manajemen Stok - Melati Gold Shop</title>
-    <style></style>
+    <style>
+      /* --- fix dropdown/menu ketiban tombol lain di dalam tabel --- */
+.table-container, .table { overflow: visible !important; }     /* jangan dipotong/clip */
+.table .dropdown, .table .btn-group { position: relative; }    /* tetapkan konteks posisi */
+.table .dropdown-menu { z-index: 2000 !important; }            /* di atas elemen baris lain */
+
+    </style>
   </head>
   <body>
     <div class="app-container">
@@ -760,7 +766,7 @@
                           <option value="LA">LA - Liontin</option>
                           <option value="AN">AN - Anting</option>
                           <option value="CA">CA - Cincin</option>
-                          <option value="SA">SA - Set A</option>
+                          <option value="SA">SA - Giwang</option>
                           <option value="GA">GA - Gelang</option>
                         </select>
                       </div>
@@ -814,7 +820,7 @@
                           <option value="LA">LA - Liontin</option>
                           <option value="AN">AN - Anting</option>
                           <option value="CA">CA - Cincin</option>
-                          <option value="SA">SA - Set A</option>
+                          <option value="SA">SA - Giwang</option>
                           <option value="GA">GA - Gelang</option>
                         </select>
                       </div>

@@ -140,7 +140,7 @@
 
       .page-title h1 {
         font-family: "Playfair Display", serif;
-        font-size: 2rem;
+        font-size: 2.5rem;
         font-weight: 700;
         color: var(--dark-brown);
         margin-bottom: 0.5rem;
@@ -163,7 +163,9 @@
         overflow: hidden;
         box-shadow: var(--shadow-soft);
         transition: transform 0.3s ease, box-shadow 0.3s ease;
-        height: 100%;
+        height: 400px;
+        width: 490px;
+        max-width: 98vw;
         border: none;
         position: relative;
       }
@@ -202,7 +204,7 @@
 
       .queue-card-header h2 {
         font-family: "Playfair Display", serif;
-        font-size: 1.3rem;
+        font-size: 1.8rem;
         font-weight: 600;
         margin: 0;
         color: var(--dark-brown);
@@ -250,8 +252,40 @@
         display: inline-block;
         text-align: center;
         width: 100%;
-        font-size: 4.5rem;
         line-height: 1.2;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        transition: font-size 0.3s ease;
+      }
+
+      /* Default size untuk queue number */
+      .queue-number {
+        font-size: 8rem;
+      }
+
+      /* Responsive text sizes untuk delayed queue */
+      .delayed-queue {
+        font-size: 7rem; /* Default size */
+      }
+      
+      .delayed-queue.text-xs {
+        font-size: 2.5rem;
+      }
+      
+      .delayed-queue.text-sm {
+        font-size: 3.5rem;
+      }
+      
+      .delayed-queue.text-md {
+        font-size: 4.5rem;
+      }
+      
+      .delayed-queue.text-lg {
+        font-size: 5.5rem;
+      }
+      
+      .delayed-queue.text-xl {
+        font-size: 7rem;
       }
 
       /* Garis bawah untuk nomor antrian */
@@ -304,15 +338,15 @@
 
       /* Promo Carousel */
       .promo-carousel {
-        margin-top: 1rem;
-        margin-bottom: 1rem;
+        margin-top: 0.5rem;
+        margin-bottom: 0.5rem;
         border-radius: 15px;
         overflow: hidden;
         box-shadow: var(--shadow-gold);
       }
 
       .carousel-item {
-        height: 200px;
+        height: 100px;
         background-size: cover;
         background-position: center;
         position: relative;
@@ -327,9 +361,9 @@
         margin: 0 auto;
       }
 
-      .carousel-caption h3 {
+      .carousel-caption h2 {
         font-family: "Playfair Display", serif;
-        font-size: 1.8rem;
+        font-size: 2.2rem;
         color: var(--dark-brown);
       }
       .carousel-caption p {
@@ -479,10 +513,12 @@
               <h1 class="brand-name"><a href="admin.html" class="text-decoration-none">Melati Gold Shop</a></h1>
             </div>
           </div>
-          <div class="col-md-6">
+          <div class="col-md-6 d-flex justify-content-end align-items-center">
             <div class="date-time">
               <div class="current-date" id="current-date"></div>
               <div class="current-time" id="current-time"></div>
+            <div class="display-promosi">
+              <a href="promosi-display.html"><i class="fas fa-desktop text-white"></i></a>
             </div>
           </div>
         </div>
@@ -490,14 +526,14 @@
     </header>
 
     <!-- Main Content -->
-    <main class="container">
+  <main class="container-fluid" style="max-width:1800px; margin:0 auto;">
       <!-- Page Title -->
       <div class="page-title" data-aos="fade-up" data-aos-delay="100">
         <h1>SISTEM ANTRIAN PELAYANAN</h1>
       </div>
 
       <!-- Queue Cards -->
-      <div class="row g-4">
+  <div class="row justify-content-center" style="gap: 2.5rem 0;">
         <!-- Ubah struktur HTML untuk Delayed Queue Card -->
         <div class="col-md-4" data-aos="fade-up" data-aos-delay="200">
           <div class="queue-card card-delayed gold-border">
@@ -579,11 +615,7 @@
               ></path>
             </svg>
             <div class="carousel-caption" style="z-index: 1">
-              <h3>Selamat Datang di Melati Gold Shop</h3>
-              <p>
-                Terima kasih telah memilih berbelanja di toko kami. Kami berkomitmen memberikan pelayanan terbaik untuk
-                Anda.
-              </p>
+              <h2>Selamat Datang di Melati Gold Shop</h2>
             </div>
           </div>
           <!-- Slide 2: Appreciation -->
@@ -600,11 +632,7 @@
               <circle cx="1200" cy="100" r="120" fill="#d4af37" />
             </svg>
             <div class="carousel-caption" style="z-index: 1">
-              <h3>Kepuasan Anda Prioritas Kami</h3>
-              <p>
-                Kami sangat menghargai kepercayaan Anda. Nikmati pengalaman berbelanja yang nyaman dan aman di Melati
-                Gold Shop.
-              </p>
+              <h2>Kepuasan Anda Prioritas Kami</h2>
             </div>
           </div>
           <!-- Slide 3: Loyalty -->
@@ -621,8 +649,7 @@
               <rect x="0" y="200" width="1440" height="120" fill="#d4af37" rx="60" />
             </svg>
             <div class="carousel-caption" style="z-index: 1">
-              <h3>Terima Kasih atas Kunjungan Anda</h3>
-              <p>Semoga hari Anda menyenangkan dan menemukan perhiasan impian di toko kami! Selamat berbelanja</p>
+              <h2>Terima Kasih atas Kunjungan Anda</h2>
             </div>
           </div>
           <!-- Slide 4: Service -->
@@ -639,8 +666,7 @@
               <ellipse cx="300" cy="220" rx="180" ry="80" fill="#d4af37" />
             </svg>
             <div class="carousel-caption" style="z-index: 1">
-              <h3>Layanan Ramah & Profesional</h3>
-              <p>Staff kami siap membantu Anda dengan sepenuh hati. Jangan ragu untuk bertanya atau berkonsultasi.</p>
+              <h2>Slahkan mengambil Nomor Antrian Di Tempat Yang Sudah Disediakan</h2>
             </div>
           </div>
         </div>
@@ -656,24 +682,20 @@
     </main>
 
     <!-- Footer -->
-    <footer class="footer">
+    <footer class="footer d-none">
       <div class="container">
         <div class="social-links">
           <a href="#"><i class="fab fa-instagram"></i></a>
-          <a href="#"><i class="fab fa-tiktok"></i></a>
+          <a href="#"><i class="fab fa-facebook"></i></a>
           <a href="#"><i class="fab fa-whatsapp"></i></a>
         </div>
-        <p>&copy; 2025 Melati Gold Shop.</p>
+        <p>&copy; 2025 Melati Gold Shop. All rights reserved.</p>
       </div>
     </footer>
 
     <!-- AOS Animation Library -->
     <script src="https://unpkg.com/aos@next/dist/aos.js"></script>
-    <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
-      import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
-      import { database } from "./js/configFirebase.js";
-    </script>
+    <script type="module" src="js/display.js"></script>
     <script>
       function updateDateTime() {
         const now = new Date();
@@ -703,14 +725,24 @@
         // Reset class
         element.classList.remove("text-xs", "text-sm", "text-md", "text-lg", "text-xl");
 
-        // Tentukan class berdasarkan panjang teks
-        const length = String(text).length;
+        // Hitung total karakter (termasuk koma dan spasi)
+        const totalLength = String(text).length;
+        
+        // Hitung jumlah nomor antrian
+        const numberOfQueues = String(text).split(",").length;
 
-        if (length <= 3) element.classList.add("text-xl");
-        else if (length <= 5) element.classList.add("text-lg");
-        else if (length <= 10) element.classList.add("text-md");
-        else if (length <= 15) element.classList.add("text-sm");
-        else element.classList.add("text-xs");
+        // Tentukan class berdasarkan panjang teks dan jumlah antrian
+        if (numberOfQueues <= 1) {
+          element.classList.add("text-xl");
+        } else if (numberOfQueues <= 2) {
+          element.classList.add(totalLength > 7 ? "text-lg" : "text-xl");
+        } else if (numberOfQueues <= 3) {
+          element.classList.add(totalLength > 11 ? "text-md" : "text-lg");
+        } else if (numberOfQueues <= 4) {
+          element.classList.add(totalLength > 15 ? "text-sm" : "text-md");
+        } else {
+          element.classList.add("text-xs");
+        }
       }
 
       // Animasi saat nomor antrian berubah

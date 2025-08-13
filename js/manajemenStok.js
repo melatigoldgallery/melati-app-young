@@ -21,7 +21,7 @@ const halaJewelryMapping = {
   "LA": "Liontin", 
   "AN": "Anting",
   "CA": "Cincin",
-  "SA": "Set A",
+  "SA": "Giwang",
   "GA": "Gelang"
 };
 const categoryMapping = {
@@ -266,18 +266,29 @@ function populateStokKomputerTable() {
     tbody.appendChild(tr);
   });
 }
-// === Populate Table ===
+
+// === Populate Table (FIXED) ===
 export async function populateTables() {
   try {
-    // Show loading state for specific tables
+    // CSS pelindung (disuntik sekali)
+    injectDropdownFixCssOnce();
+
+    // Tampilkan skeleton/loading khusus tabel
     showTableLoading();
-    
+
+    // Ambil data stok (gunakan cache jika valid)
     await fetchStockData();
-    
+
+    // Render setiap main category
     mainCategories.forEach((mainCat) => {
       const tbody = document.getElementById(mainCategoryToId[mainCat]);
       if (!tbody) return;
+
+      // pastikan kontainer tabel tidak memotong dropdown
+      tbody.style.overflow = "visible";
+
       tbody.innerHTML = "";
+
       subCategories.forEach((subCat, idx) => {
         const categoryKey = getCategoryKey(subCat);
         const stockItem =
@@ -285,76 +296,123 @@ export async function populateTables() {
             ? stockData[categoryKey][mainCat]
             : { quantity: 0, lastUpdated: null, history: [] };
 
-        const tr = document.createElement("tr");
-
-        // Cek apakah kategori adalah Display atau Manual untuk menggunakan tombol Update
         const isDisplayOrManual = subCat === "Display" || subCat === "Manual";
 
-         let actionColumn;
-        if (isDisplayOrManual) {
-          actionColumn = `
+        const tr = document.createElement("tr");
+
+        // Kolom aksi
+        const actionColumn = isDisplayOrManual
+          ? `
             <td class="text-center">
-              <button class="btn btn-success btn-sm update-stock-btn" data-main="${mainCat}" data-category="${categoryKey}" data-subcategory="${subCat}">
+              <button class="btn btn-success btn-sm update-stock-btn"
+                      data-main="${mainCat}"
+                      data-category="${categoryKey}"
+                      data-subcategory="${subCat}">
                 <i class="fas fa-edit"></i> Update
               </button>
             </td>
-          `;
-        } else {
-          // Perbaikan: Tambahkan data-bs-display="static"
-          actionColumn = `
+          `
+          : `
             <td class="text-center">
-              <div class="dropdown">
-                <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-display="static">
+              <div class="dropdown position-relative">
+                <button class="btn btn-secondary btn-sm dropdown-toggle" type="button"
+                        data-bs-toggle="dropdown"
+                        data-bs-display="static"
+                        data-bs-boundary="viewport">
                   <i class="fas fa-cog"></i> Aksi
                 </button>
-                <ul class="dropdown-menu">
-                  <li><a class="dropdown-item add-stock-btn" href="#" data-main="${mainCat}" data-category="${categoryKey}"><i class="fas fa-plus"></i> Tambah</a></li>
-                  <li><a class="dropdown-item reduce-stock-btn" href="#" data-main="${mainCat}" data-category="${categoryKey}"><i class="fas fa-minus"></i> Kurangi</a></li>
+                <ul class="dropdown-menu shadow" style="z-index: 2000;">
+                  <li>
+                    <a class="dropdown-item add-stock-btn" href="#"
+                       data-main="${mainCat}" data-category="${categoryKey}">
+                       <i class="fas fa-plus"></i> Tambah
+                    </a>
+                  </li>
+                  <li>
+                    <a class="dropdown-item reduce-stock-btn" href="#"
+                       data-main="${mainCat}" data-category="${categoryKey}">
+                       <i class="fas fa-minus"></i> Kurangi
+                    </a>
+                  </li>
                 </ul>
               </div>
-              ${mainCat === "HALA" ? `<button class="btn btn-outline-primary btn-sm ms-1 detail-hala-btn" data-main="${mainCat}" data-category="${categoryKey}" title="Detail HALA"><i class="fas fa-eye"></i></button>` : ''}
             </td>
           `;
-        }
 
         tr.innerHTML = `
           <td class="fw-bold">${idx + 1}</td>
-          <td class="fw-medium">${subCat}</td>
-          <td class="text-center"><span class="badge bg-primary fs-6 px-3 py-2">${stockItem.quantity}</span></td>
+          <td class="fw-medium d-flex justify-content-between">${subCat} ${mainCat === "HALA" ? `<button class="btn btn-outline-primary btn-sm ms-1 detail-hala-btn" data-main="${mainCat}" data-category="${categoryKey}" title="Detail HALA"><i class="fas fa-eye"></i></button>` : ''}</td>
+          <td class="text-center">
+            <span class="badge bg-primary fs-6 px-3 py-2">${stockItem.quantity}</span>
+          </td>
           ${actionColumn}
           <td class="text-center">
-            <button class="btn btn-info btn-sm show-history-btn" data-main="${mainCat}" data-category="${categoryKey}" title="Lihat Riwayat"><i class="fas fa-history"></i></button>
+            <button class="btn btn-info btn-sm show-history-btn"
+                    data-main="${mainCat}"
+                    data-category="${categoryKey}"
+                    title="Lihat Riwayat">
+              <i class="fas fa-history"></i>
+            </button>
           </td>
           <td class="text-center text-muted small">${formatDate(stockItem.lastUpdated)}</td>
         `;
-        
-        // Add fade-in animation
-        tr.style.opacity = '0';
-        tr.style.transform = 'translateY(20px)';
+
+        // Animasi masuk: opacity saja (tanpa transform → tidak bikin stacking context)
+        tr.style.opacity = "0";
+        tr.style.transition = "opacity .25s ease";
         tbody.appendChild(tr);
-        
-        // Trigger animation
-        setTimeout(() => {
-          tr.style.transition = 'all 0.3s ease';
-          tr.style.opacity = '1';
-          tr.style.transform = 'translateY(0)';
-        }, idx * 50);
+        requestAnimationFrame(() => {
+          tr.style.opacity = "1";
+        });
       });
     });
-    
+
+    // Tabel stok komputer & ringkasan
     populateStokKomputerTable();
     updateSummaryTotals();
-    
-    // Hide loading state
+
+    // Listener sekali untuk mengangkat z-index baris yang dropdown-nya dibuka
+    if (!populateTables._dropdownRowElevatorBound) {
+      document.body.addEventListener("shown.bs.dropdown", (ev) => {
+        const row = ev.target.closest("tr");
+        if (row) {
+          row.style.position = "relative";
+          row.style.zIndex = "3000"; // di atas baris lain & card
+        }
+      });
+      document.body.addEventListener("hidden.bs.dropdown", (ev) => {
+        const row = ev.target.closest("tr");
+        if (row) {
+          row.style.zIndex = "";
+          row.style.position = "";
+        }
+      });
+      populateTables._dropdownRowElevatorBound = true;
+    }
+
+    // Sembunyikan loading + notifikasi
     hideTableLoading();
-    
-    // Show success feedback
     showSuccessNotification("Data berhasil dimuat");
-    
   } catch (error) {
-    console.error("Error populating tables:", error);
+    console.error("Error populating tables (fixed):", error);
     hideTableLoading();
     showErrorMessage("Gagal memuat data tabel");
+  }
+
+  // ---- helper local: inject CSS sekali ---
+  function injectDropdownFixCssOnce() {
+    if (document.getElementById("dropdown-fix-css")) return;
+    const style = document.createElement("style");
+    style.id = "dropdown-fix-css";
+    style.textContent = `
+      /* cegah menu terpotong / ketiban */
+      .table, .table-container, .tab-pane, .card, .card-body, .content-wrapper {
+        overflow: visible !important;
+      }
+      .table .dropdown { position: relative; }
+      .table .dropdown-menu { z-index: 2000 !important; }
+    `;
+    document.head.appendChild(style);
   }
 }
 
@@ -543,7 +601,7 @@ function updateSummaryTotals() {
       if (total === komputer) {
         totalEl.className = "number text-success";
         if (statusEl) {
-          statusEl.innerHTML = `<i class="fas fa-check-circle me-1"></i>Sesuai Sistem`;
+          statusEl.innerHTML = `<i class="fas fa-check-circle me-1"></i>Sesuai Sistem (klop)`;
           statusEl.className = "text-dark fw-bold";
         }
       } else if (total < komputer) {
@@ -553,7 +611,7 @@ function updateSummaryTotals() {
           statusEl.className = "text-dark fw-bold";
         }
       } else {
-        totalEl.className = "number text-warning";
+        totalEl.className = "number text-primary";
         if (statusEl) {
           statusEl.innerHTML = `<i class="fas fa-arrow-up me-1"></i>Lebih ${total - komputer}`;
           statusEl.className = "text-dark fw-bold";
@@ -564,21 +622,7 @@ function updateSummaryTotals() {
 }
 
 function animateNumberChange(element, newValue) {
-  const currentValue = parseInt(element.textContent) || 0;
-  const increment = newValue > currentValue ? 1 : -1;
-  const stepTime = Math.abs(Math.floor(200 / (newValue - currentValue))) || 1;
-  
-  if (currentValue !== newValue) {
-    const timer = setInterval(() => {
-      const current = parseInt(element.textContent) || 0;
-      if ((increment > 0 && current >= newValue) || (increment < 0 && current <= newValue)) {
-        element.textContent = newValue;
-        clearInterval(timer);
-      } else {
-        element.textContent = current + increment;
-      }
-    }, stepTime);
-  }
+  element.textContent = newValue; // langsung update angka tanpa animasi
 }
 
 // === Add/Reduce Stock Universal Handler ===
@@ -1217,58 +1261,6 @@ function initializeUIEnhancements() {
       this.style.transform = 'translateY(0)';
     });
   });
-
-  // Add ripple effect for buttons
-  addRippleEffect();
-}
-
-function addRippleEffect() {
-  const buttons = document.querySelectorAll('.btn');
-  buttons.forEach(button => {
-    button.addEventListener('click', function(e) {
-      const ripple = document.createElement('span');
-      const rect = this.getBoundingClientRect();
-      const size = Math.max(rect.width, rect.height);
-      const x = e.clientX - rect.left - size / 2;
-      const y = e.clientY - rect.top - size / 2;
-      
-      ripple.style.cssText = `
-        position: absolute;
-        width: ${size}px;
-        height: ${size}px;
-        left: ${x}px;
-        top: ${y}px;
-        background: rgba(255, 255, 255, 0.4);
-        border-radius: 50%;
-        transform: scale(0);
-        animation: ripple 0.6s linear;
-        pointer-events: none;
-      `;
-      
-      this.style.position = 'relative';
-      this.style.overflow = 'hidden';
-      this.appendChild(ripple);
-      
-      setTimeout(() => {
-        ripple.remove();
-      }, 600);
-    });
-  });
-  
-  // Add CSS for ripple animation
-  if (!document.querySelector('#ripple-styles')) {
-    const style = document.createElement('style');
-    style.id = 'ripple-styles';
-    style.textContent = `
-      @keyframes ripple {
-        to {
-          transform: scale(2);
-          opacity: 0;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-  }
 }
   
   // Reset on hide
