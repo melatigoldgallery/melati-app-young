@@ -433,23 +433,19 @@ async handleRealtimeUpdate() {
     // Recalculate with fresh data
     await this.calculateStockForDate(this.currentSelectedDate, true);
     
-    // Refresh return data
+    // PERBAIKAN: Refresh return data hanya untuk display
     await this.fetchReturnData(this.currentSelectedDate);
 
-    // Recalculate final stock with return data
+    // FIXED: Recalculate final stock WITHOUT subtracting return again
     this.filteredStockData = this.filteredStockData.map(item => {
       const returnAmount = this.returnData.get(item.kode) || 0;
+      
+      // PERBAIKAN: stokAkhir sudah benar dari calculateStockForDate
+      // Hanya update kolom return untuk display
       return {
         ...item,
-        return: returnAmount,
-        stokAkhir: Math.max(0, 
-          item.stokAwal + 
-          item.tambahStok - 
-          item.laku - 
-          item.free - 
-          item.gantiLock - 
-          returnAmount
-        )
+        return: returnAmount, // Update kolom return untuk display saja
+        // stokAkhir TIDAK diubah karena sudah benar
       };
     });
 
@@ -566,7 +562,8 @@ async handleRealtimeUpdate() {
   }
 
   // Calculate stock for specific date
-  async calculateStockForDate(selectedDate, forceRefresh = false) {
+  // Calculate stock for specific date - FIXED VERSION
+async calculateStockForDate(selectedDate, forceRefresh = false) {
   const dateStr = this.formatDate(selectedDate).replace(/\//g, "-");
   const cacheKey = `stock_${dateStr}`;
 
@@ -584,7 +581,7 @@ async handleRealtimeUpdate() {
   try {
     console.log(`📊 Calculating stock for ${dateStr} (force: ${forceRefresh}, today: ${isToday})`);
 
-    // 1. Get base snapshot
+    // 1. Get base snapshot dengan prioritas yang tepat
     console.log("🔍 Getting base snapshot...");
     const baseSnapshot = await this.getSnapshotAsBase(selectedDate);
     console.log(`📅 Base snapshot size: ${baseSnapshot.size}`);
@@ -598,7 +595,7 @@ async handleRealtimeUpdate() {
     const previousStockMap = await this.calculateStockFromBase(baseSnapshot, previousDate);
     console.log(`📊 Previous stock map size: ${previousStockMap.size}`);
 
-    // 3. Get today's transactions (termasuk return)
+    // 3. Get today's transactions only
     const startOfDay = new Date(selectedDate);
     startOfDay.setUTCHours(0, 0, 0, 0);
     const endOfDay = new Date(selectedDate);
@@ -608,7 +605,12 @@ async handleRealtimeUpdate() {
     const todayTransactions = await this.getTransactionsForDate(startOfDay, endOfDay);
     console.log(`📊 Today's transactions size: ${todayTransactions.size}`);
 
-    // 4. PERBAIKAN: Combine data dengan return yang sudah ada di transaksi
+    // 4. PERBAIKAN: Fetch return data hanya untuk display, tidak untuk perhitungan
+    console.log("🔄 Fetching return data for display...");
+    await this.fetchReturnData(selectedDate);
+    console.log(`✅ Return data loaded: ${this.returnData.size} items`);
+
+    // 5. FIXED: Combine data WITHOUT subtracting return from stokAkhir
     console.log("🔄 Combining data...");
     this.filteredStockData = this.stockData.map((item) => {
       const kode = item.kode;
@@ -618,13 +620,16 @@ async handleRealtimeUpdate() {
         laku: 0,
         free: 0,
         gantiLock: 0,
-        return: 0, // Return sudah ada di transaksi
       };
 
-      // PERBAIKAN: Return sudah masuk di todayTrans.return
+      // Get return data for display ONLY (tidak ikut perhitungan stokAkhir)
+      const returnAmount = this.returnData.get(kode) || 0;
+
+      // PERBAIKAN UTAMA: Return sudah masuk ke transaksi, jangan kurangi lagi
       const stokAkhir = Math.max(
         0,
-        stokAwal + todayTrans.tambahStok - todayTrans.laku - todayTrans.free - todayTrans.gantiLock - todayTrans.return
+        stokAwal + todayTrans.tambahStok - todayTrans.laku - todayTrans.free - todayTrans.gantiLock
+        // TIDAK DIKURANGI returnAmount karena sudah masuk ke transaksi
       );
 
       const result = {
@@ -634,7 +639,7 @@ async handleRealtimeUpdate() {
         laku: todayTrans.laku,
         free: todayTrans.free,
         gantiLock: todayTrans.gantiLock,
-        return: todayTrans.return, // Return dari transaksi
+        return: returnAmount, // Hanya untuk display di kolom return
         stokAkhir: stokAkhir,
       };
 
@@ -645,25 +650,28 @@ async handleRealtimeUpdate() {
         todayTrans.laku > 0 ||
         todayTrans.free > 0 ||
         todayTrans.gantiLock > 0 ||
-        todayTrans.return > 0
+        returnAmount > 0
       ) {
         console.log(
-          `📊 ${kode}: ${stokAwal} +${todayTrans.tambahStok} -${todayTrans.laku} -${todayTrans.free} -${todayTrans.gantiLock} -${todayTrans.return} = ${stokAkhir}`
+          `📊 ${kode}: stok=${stokAwal} +tamb=${todayTrans.tambahStok} -laku=${todayTrans.laku} -free=${todayTrans.free} -gantiLock=${todayTrans.gantiLock} | return=${returnAmount} (display) = akhir=${stokAkhir}`
         );
       }
 
       return result;
     });
 
-    // 5. Add items that exist in transactions but not in master
+    // 6. FIXED: Add items that exist in transactions but not in master
     todayTransactions.forEach((trans, kode) => {
       const exists = this.filteredStockData.find((item) => item.kode === kode);
       if (!exists) {
         const stokAwal = previousStockMap.get(kode) || 0;
+        const returnAmount = this.returnData.get(kode) || 0;
         
+        // PERBAIKAN: Tidak kurangi returnAmount dari stokAkhir
         const stokAkhir = Math.max(
           0,
-          stokAwal + trans.tambahStok - trans.laku - trans.free - trans.gantiLock - trans.return
+          stokAwal + trans.tambahStok - trans.laku - trans.free - trans.gantiLock
+          // TIDAK DIKURANGI returnAmount
         );
 
         this.filteredStockData.push({
@@ -675,13 +683,13 @@ async handleRealtimeUpdate() {
           laku: trans.laku,
           free: trans.free,
           gantiLock: trans.gantiLock,
-          return: trans.return,
+          return: returnAmount, // Hanya untuk display
           stokAkhir: stokAkhir,
         });
       }
     });
 
-    // 6. Sort data
+    // 7. Sort data
     this.filteredStockData.sort((a, b) => {
       if (a.kategori !== b.kategori) {
         return a.kategori === "kotak" ? -1 : 1;
@@ -689,14 +697,23 @@ async handleRealtimeUpdate() {
       return a.kode.localeCompare(b.kode);
     });
 
-    // Cache the result
+    // Cache the result (with appropriate TTL)
     const ttl = isToday ? this.CACHE_TTL_TODAY : this.CACHE_TTL_STANDARD;
     this.setCache(cacheKey, [...this.filteredStockData], ttl);
 
     console.log(`✅ Stock calculated for ${dateStr}: ${this.filteredStockData.length} items`);
 
-    // HAPUS: fetchReturnData karena return sudah ada di transaksi
-    this.returnData = new Map(); // Clear return data yang tidak diperlukan
+    // Debug: Log summary
+    const nonZeroItems = this.filteredStockData.filter(
+      (item) =>
+        item.stokAwal > 0 ||
+        item.tambahStok > 0 ||
+        item.laku > 0 ||
+        item.free > 0 ||
+        item.gantiLock > 0 ||
+        item.return > 0
+    );
+    console.log(`📊 Items with non-zero values: ${nonZeroItems.length}/${this.filteredStockData.length}`);
     
   } catch (error) {
     console.error("❌ Error calculating stock for date:", error);
@@ -988,7 +1005,6 @@ async handleRealtimeUpdate() {
           laku: 0,
           free: 0,
           gantiLock: 0,
-          return: 0, // TAMBAH: Field return
           nama: data.nama || "",
           kategori: data.kategori || "",
         });
@@ -1012,14 +1028,15 @@ async handleRealtimeUpdate() {
           trans.gantiLock += jumlah;
           break;
         case "return":
-          // PERBAIKAN: Return mengurangi stok (barang rusak keluar)
-          trans.return += jumlah;
-          console.log(`🔄 Return transaction: ${kode} += ${jumlah} to return column`);
+          // PERBAIKAN: Return mengurangi stok laku (karena barang kembali)
+          // Tapi di laporan akan tetap muncul di kolom return untuk info
+          trans.laku -= jumlah; // Mengurangi laku karena barang dikembalikan
+          console.log(`🔄 Return transaction: ${kode} -= ${jumlah} from laku`);
           break;
         case "reverse_return":
-          // Handle pembatalan return (barang kembali masuk)
-          trans.return -= Math.abs(jumlah);
-          console.log(`↩️ Reverse return transaction: ${kode} -= ${Math.abs(jumlah)} from return column`);
+          // Handle pembatalan return
+          trans.laku += Math.abs(jumlah); // Menambah kembali ke laku
+          console.log(`↩️ Reverse return transaction: ${kode} += ${Math.abs(jumlah)} to laku`);
           break;
         default:
           console.warn(`⚠️ Unknown transaction type: ${data.jenis} for ${kode}`);
@@ -1051,7 +1068,6 @@ async handleRealtimeUpdate() {
             laku: 0,
             free: 0,
             gantiLock: 0,
-            return: 0,
             nama: item.nama || "",
             kategori: "",
           });
@@ -1066,6 +1082,13 @@ async handleRealtimeUpdate() {
     this.setCache(cacheKey, transactionMap, ttl);
 
     console.log(`📋 Loaded transactions: ${transactionMap.size} items`);
+
+    // Debug: Log sample transactions
+    if (transactionMap.size > 0) {
+      const sampleTrans = Array.from(transactionMap.entries()).slice(0, 3);
+      console.log("🔍 Sample transaction data:", sampleTrans);
+    }
+
     return transactionMap;
   } catch (error) {
     console.error("❌ Error getting transactions for date:", error);
