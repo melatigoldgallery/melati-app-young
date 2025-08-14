@@ -1,5 +1,5 @@
 // Import Firebase modules
-import app, { db, rtdb, auth } from "./configFirebase.js";
+import app, { database } from "./configFirebase.js";
 import {
   getDatabase,
   ref,
@@ -100,21 +100,21 @@ function initializeDisplayPageWithFirebase() {
   }
 
   // Listen for settings changes
-  const settingsRef = ref(rtdb, "settings/promotion");
+  const settingsRef = ref(database, "settings/promotion");
   onValue(settingsRef, (snapshot) => {
     const settings = snapshot.val() || {};
     applySettings(settings);
   });
 
   // Listen for content changes
-  const contentRef = ref(rtdb, "content/promotion");
+  const contentRef = ref(database, "content/promotion");
   onValue(contentRef, (snapshot) => {
     const content = snapshot.val() || {};
     updateCarouselContent(content);
   });
 
   // Handle connection state
-  const connectedRef = ref(rtdb, ".info/connected");
+  const connectedRef = ref(database, ".info/connected");
   onValue(connectedRef, (snap) => {
     if (snap.val() === true) {
       console.log("Connected to Firebase");
@@ -366,7 +366,7 @@ function updateCarouselContent(content) {
   }
 
   // Get settings and apply them
-  const settingsRef = ref(rtdb, "settings/promotion");
+  const settingsRef = ref(database, "settings/promotion");
   get(settingsRef)
     .then((snapshot) => {
       const settings = snapshot.val() || {};
@@ -566,14 +566,14 @@ async function handleCustomFormSubmit(e) {
     }
     // Jika edit mode, update data lama
     if (form.dataset.mode === "edit" && form.dataset.editId) {
-      const itemRef = ref(rtdb, `content/promotion/customItems/${form.dataset.editId}`);
+      const itemRef = ref(database, `content/promotion/customItems/${form.dataset.editId}`);
       await set(itemRef, customData);
       form.dataset.mode = "";
       form.dataset.editId = "";
       submitBtn.textContent = "Simpan Konten";
     } else {
       // Save to Firebase (tambah baru)
-      const customItemsRef = ref(rtdb, "content/promotion/customItems");
+      const customItemsRef = ref(database, "content/promotion/customItems");
       const newItemRef = push(customItemsRef);
       await set(newItemRef, customData);
     }
@@ -613,7 +613,7 @@ async function handleSettingsFormSubmit(e) {
     };
 
     // Save to Firebase
-    const settingsRef = ref(rtdb, "settings/promotion");
+    const settingsRef = ref(database, "settings/promotion");
     await set(settingsRef, settingsData);
 
     // Show success message
@@ -736,7 +736,7 @@ function removeGalleryItem(itemId) {
 
 // Load settings from Firebase
 function loadSettingsFromFirebase() {
-  const settingsRef = ref(rtdb, "settings/promotion");
+  const settingsRef = ref(database, "settings/promotion");
 
   get(settingsRef)
     .then((snapshot) => {
@@ -763,7 +763,7 @@ function loadSettingsFromFirebase() {
 
 // Refresh custom content list
 function refreshCustomList() {
-  const customItemsRef = ref(rtdb, "content/promotion/customItems");
+  const customItemsRef = ref(database, "content/promotion/customItems");
 
   get(customItemsRef)
     .then((snapshot) => {
@@ -825,7 +825,7 @@ function refreshCustomList() {
 
 // Edit custom item
 function editCustomItem(itemId) {
-  const itemRef = ref(rtdb, `content/promotion/customItems/${itemId}`);
+  const itemRef = ref(database, `content/promotion/customItems/${itemId}`);
   get(itemRef)
     .then((snapshot) => {
       const item = snapshot.val();
@@ -891,7 +891,7 @@ function editCustomItem(itemId) {
 // Delete custom item
 function deleteCustomItem(itemId) {
   if (confirm("Apakah Anda yakin ingin menghapus konten ini?")) {
-    const itemRef = ref(rtdb, `content/promotion/customItems/${itemId}`);
+    const itemRef = ref(database, `content/promotion/customItems/${itemId}`);
 
     remove(itemRef)
       .then(() => {
