@@ -159,9 +159,15 @@ function createPasswordModal() {
 
 // Initialize when document is ready
 $(document).ready(function () {
-  checkLoginStatus();
+  // Only run auth check on dashboard and other main pages, not on promosi.html
+  const currentPage = window.location.pathname.split('/').pop();
+  
+  if (currentPage !== 'promosi.html' && currentPage !== 'promosi-display.html') {
+    checkLoginStatus();
+  }
+  
   setupMenuAccess();
-   setupPasswordVerification();
+  setupPasswordVerification();
 });
 
 // Export global functions

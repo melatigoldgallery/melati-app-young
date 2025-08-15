@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Authentication</title>
+</head>
+<body>
+    <h1>Test Authentication</h1>
+    <p>Testing session storage auth system...</p>
+    
+    <button onclick="setTestUser()">Set Test User</button>
+    <button onclick="checkAuthStatus()">Check Auth Status</button>
+    <button onclick="clearUser()">Clear User</button>
+    <button onclick="goToPromosi()">Go to Promosi</button>
+    
+    <div id="result"></div>
+    
+    <script type="module">
+        import { authService } from './js/configFirebase.js';
+        
+        window.setTestUser = function() {
+            const testUser = { id: 1, username: 'admin', role: 'admin' };
+            authService.setCurrentUser(testUser);
+            document.getElementById('result').innerHTML = 'Test user set';
+        };
+        
+        window.checkAuthStatus = async function() {
+            const user = await authService.getCurrentUser();
+            document.getElementById('result').innerHTML = `User: ${user ? JSON.stringify(user) : 'Not logged in'}`;
+        };
+        
+        window.clearUser = function() {
+            authService.logout();
+            document.getElementById('result').innerHTML = 'User cleared';
+        };
+        
+        window.goToPromosi = function() {
+            window.location.href = 'promosi.html';
+        };
+    </script>
+</body>
+</html>

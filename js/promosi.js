@@ -1,5 +1,5 @@
 // Import Firebase modules
-import app, { database } from "./configFirebase.js";
+import app, { database, authService } from "./configFirebase.js";
 import {
   getDatabase,
   ref,
@@ -49,13 +49,7 @@ document.addEventListener("DOMContentLoaded", function () {
 // Check if user is authenticated
 async function checkAuth() {
   try {
-    const user = await new Promise((resolve) => {
-      const unsubscribe = auth.onAuthStateChanged((user) => {
-        unsubscribe();
-        resolve(user);
-      });
-    });
-
+    const user = await authService.getCurrentUser();
     return !!user;
   } catch (error) {
     console.error("Auth check error:", error);
@@ -907,15 +901,13 @@ function deleteCustomItem(itemId) {
 
 // Handle logout
 function handleLogout() {
-  auth
-    .signOut()
-    .then(() => {
-      window.location.href = "index.html";
-    })
-    .catch((error) => {
-      console.error("Error signing out:", error);
-      showToast("Gagal logout: " + error.message, "danger");
-    });
+  try {
+    authService.logout();
+    window.location.href = "index.html";
+  } catch (error) {
+    console.error("Error signing out:", error);
+    showToast("Gagal logout: " + error.message, "danger");
+  }
 }
 
 // Show toast notification
@@ -954,3 +946,4 @@ window.editCustomItem = editCustomItem;
 window.deleteCustomItem = deleteCustomItem;
 window.addGalleryImage = addGalleryImage;
 window.removeGalleryItem = removeGalleryItem;
+window.handleLogout = handleLogout;

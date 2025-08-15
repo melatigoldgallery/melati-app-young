@@ -460,7 +460,7 @@
       <aside class="sidebar">
         <div class="sidebar-header">
           <img src="img/Melati.jfif" alt="Logo" class="logo" />
-          <h1 class="brand-name">Melati Gold Shop</h1>
+          <h1 class="brand-name">Melati Gold Young</h1>
         </div>
         <div class="sidebar-menu">
           <ul class="nav flex-column" id="sidebarAccordion">
@@ -476,7 +476,53 @@
                 <span class="menu-text">Buyback</span>
               </a>
             </li>
-            <!-- Antrian dropdown menu -->
+            <li class="nav-item">
+              <a class="nav-link" href="manajemenStok.html">
+                <i class="fa-solid fa-boxes-stacked"></i>
+                <span class="menu-text">Manajemen Stok</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="mutasiKode.html">
+                <i class="fa-solid fa-calendar-xmark"></i>
+                <span class="menu-text">Mutasi Kode</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link active" href="maintenance.html">
+                <i class="fas fa-tools"></i>
+                <span class="menu-text">Maintenance</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a
+                class="nav-link collapsed"
+                href="#"
+                data-bs-toggle="collapse"
+                data-bs-target="#promosiSubmenu"
+                aria-expanded="false"
+              >
+                <i class="fas fa-ad"></i>
+                <span class="menu-text">Promosi</span>
+                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
+              </a>
+              <div class="collapse" id="promosiSubmenu" data-bs-parent="#sidebarAccordion">
+                <ul class="nav flex-column ms-3">
+                  <li class="nav-item">
+                    <a class="nav-link" href="promosi.html">
+                      <i class="fas fa-cog"></i>
+                      <span class="menu-text">Setting Promosi</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="promosi-display.html">
+                      <i class="fas fa-desktop"></i>
+                      <span class="menu-text">Display Promosi</span>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </li>
             <li class="nav-item">
               <a
                 class="nav-link collapsed"
@@ -512,102 +558,42 @@
                 </ul>
               </div>
             </li>
-            <!-- Absensi dropdown menu -->
             <li class="nav-item">
               <a
                 class="nav-link collapsed"
                 href="#"
                 data-bs-toggle="collapse"
-                data-bs-target="#absensiSubmenu"
+                data-bs-target="#aksesorisSubmenu"
                 aria-expanded="false"
               >
-                <i class="fas fa-clipboard-check"></i>
-                <span class="menu-text">Absensi</span>
+                <i class="fas fa-gem"></i>
+                <span class="menu-text">Aksesoris</span>
                 <i class="fas fa-angle-down ms-auto submenu-icon"></i>
               </a>
-              <div class="collapse" id="absensiSubmenu" data-bs-parent="#sidebarAccordion">
+              <div class="collapse" id="aksesorisSubmenu" data-bs-parent="#sidebarAccordion">
                 <ul class="nav flex-column ms-3">
                   <li class="nav-item">
-                    <a class="nav-link" href="sistemAbsensi.html">
-                      <i class="fas fa-user-check"></i>
-                      <span class="menu-text">Kehadiran</span>
+                    <a class="nav-link" href="tambahAksesoris.html">
+                      <i class="fas fa-plus-circle"></i>
+                      <span class="menu-text">Tambah Aksesoris</span>
                     </a>
                   </li>
                   <li class="nav-item">
-                    <a class="nav-link" href="pengajuan-izin.html">
-                      <i class="fas fa-calendar-plus"></i>
-                      <span class="menu-text">Pengajuan Izin</span>
+                    <a class="nav-link" href="dataPenjualan.html">
+                      <i class="fas fa-shopping-cart"></i>
+                      <span class="menu-text">Penjualan Aksesoris</span>
                     </a>
                   </li>
                   <li class="nav-item">
-                    <a class="nav-link" href="laporan-kehadiran.html">
-                      <i class="fas fa-file-alt"></i>
-                      <span class="menu-text">Laporan Kehadiran</span>
+                    <a class="nav-link" href="laporanPenjualan.html">
+                      <i class="fas fa-chart-line"></i>
+                      <span class="menu-text">Laporan Penjualan</span>
                     </a>
                   </li>
                   <li class="nav-item">
-                    <a class="nav-link" href="laporan-izin.html">
-                      <i class="fas fa-file-medical"></i>
-                      <span class="menu-text">Laporan Izin</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a
-                      class="nav-link collapsed supervisor-toggle"
-                      href="#"
-                      data-bs-toggle="collapse"
-                      data-bs-target="#supervisorSubmenu"
-                      aria-expanded="false"
-                    >
-                      <i class="fas fa-user-tie"></i>
-                      <span class="menu-text">Supervisor</span>
-                      <i class="fas fa-chevron-down submenu-icon"></i>
-                    </a>
-                    <div class="collapse supervisor-menu" id="supervisorSubmenu">
-                      <ul class="nav flex-column ms-3">
-                        <li class="nav-item">
-                          <a class="nav-link" href="supervisor.html">
-                            <i class="fas fa-desktop"></i>
-                            <span class="menu-text">Status Pengajuan Izin</span>
-                          </a>
-                        </li>
-                        <li class="nav-item">
-                          <a class="nav-link" href="tambah-pengguna.html">
-                            <i class="fas fa-user-cog"></i>
-                            <span class="menu-text">Tambah Pengguna</span>
-                          </a>
-                        </li>
-                      </ul>
-                    </div>
-                  </li>
-                </ul>
-              </div>
-            </li>
-
-            <li class="nav-item">
-              <a
-                class="nav-link collapsed"
-                href="#"
-                data-bs-toggle="collapse"
-                data-bs-target="#promosiSubmenu"
-                aria-expanded="false"
-              >
-                <i class="fas fa-ad"></i>
-                <span class="menu-text">Promosi</span>
-                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
-              </a>
-              <div class="collapse" id="promosiSubmenu" data-bs-parent="#sidebarAccordion">
-                <ul class="nav flex-column ms-3">
-                  <li class="nav-item">
-                    <a class="nav-link" href="promosi.html">
-                      <i class="fas fa-cog"></i>
-                      <span class="menu-text">Setting Promosi</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="promosi-display.html">
-                      <i class="fas fa-desktop"></i>
-                      <span class="menu-text">Display Promosi</span>
+                    <a class="nav-link" href="laporanStok.html">
+                      <i class="fas fa-boxes"></i>
+                      <span class="menu-text">Laporan Stok</span>
                     </a>
                   </li>
                 </ul>
@@ -641,7 +627,7 @@
               </div>
               <ul class="dropdown-menu dropdown-menu-end">
                 <li>
-                  <button class="dropdown-item" id="logoutBtn" onclick="handleLogout()">
+                  <button class="dropdown-item" id="logoutBtn">
                     <i class="fas fa-sign-out-alt"></i>
                     Logout
                   </button>
@@ -885,7 +871,6 @@
     <!-- Toast notification container -->
     <div class="toast-container position-fixed top-0 end-0 p-3"></div>
 
-    <script type="module" src="js/melati.js"></script>
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/promosi.js"></script>
   </body>
