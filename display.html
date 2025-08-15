@@ -204,7 +204,7 @@
 
       .queue-card-header h2 {
         font-family: "Playfair Display", serif;
-        font-size: 1.8rem;
+        font-size: 2.25rem;
         font-weight: 600;
         margin: 0;
         color: var(--dark-brown);
@@ -219,15 +219,12 @@
       }
 
       .queue-card-body {
-        padding: 2rem;
         background-color: var(--white);
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        min-height: 250px;
         position: relative;
-        overflow: hidden; /* Mencegah overflow teks */
       }
 
       /* Khusus untuk delayed queue container */
@@ -249,23 +246,17 @@
         margin-bottom: 1.5rem;
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
         position: relative;
-        display: inline-block;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         text-align: center;
         width: 100%;
-        line-height: 1.2;
+        height: 100%;
+        line-height: 1.1;
         word-wrap: break-word;
         overflow-wrap: break-word;
         transition: font-size 0.3s ease;
-      }
-
-      /* Default size untuk queue number */
-      .queue-number {
-        font-size: 8rem;
-      }
-
-      /* Responsive text sizes untuk delayed queue */
-      .delayed-queue {
-        font-size: 7rem; /* Default size */
+        font-size: 14rem;
       }
       
       .delayed-queue.text-xs {
@@ -546,7 +537,6 @@
             <div class="queue-card-body">
               <div class="delayed-queue-container">
                 <div class="delayed-queue text-xl" id="delayQueueNumber">-</div>
-                <p class="queue-label">Silahkan langsung menyerahkan nomor antrian kepada staff</p>
               </div>
             </div>
           </div>
@@ -563,7 +553,6 @@
             </div>
             <div class="queue-card-body">
               <div class="queue-number active" id="queueNumber">-</div>
-              <p class="queue-label">Bersiap Dipanggil</p>
             </div>
           </div>
         </div>
@@ -579,7 +568,6 @@
             </div>
             <div class="queue-card-body">
               <div class="queue-number" id="nextQueueNumber">-</div>
-              <p class="queue-label">Antrian Selanjutnya</p>
             </div>
           </div>
         </div>
