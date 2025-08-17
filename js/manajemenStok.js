@@ -296,12 +296,13 @@ export async function populateTables() {
             ? stockData[categoryKey][mainCat]
             : { quantity: 0, lastUpdated: null, history: [] };
 
-        const isDisplayOrManual = subCat === "Display" || subCat === "Manual";
+        // Kondisi untuk menampilkan tombol Update
+        const showUpdateButton = subCat === "Display" || subCat === "Manual" || subCat === "Admin";
 
         const tr = document.createElement("tr");
 
         // Kolom aksi
-        const actionColumn = isDisplayOrManual
+        const actionColumn = showUpdateButton
           ? `
             <td class="text-center">
               <button class="btn btn-success btn-sm update-stock-btn"
@@ -341,7 +342,7 @@ export async function populateTables() {
 
         tr.innerHTML = `
           <td class="fw-bold">${idx + 1}</td>
-          <td class="fw-medium d-flex justify-content-between">${subCat} ${mainCat === "HALA" ? `<button class="btn btn-outline-primary btn-sm ms-1 detail-hala-btn" data-main="${mainCat}" data-category="${categoryKey}" title="Detail HALA"><i class="fas fa-eye"></i></button>` : ''}</td>
+          <td class="fw-medium jenis-column">${subCat} ${mainCat === "HALA" ? `<button class="btn btn-outline-primary btn-sm detail-hala-btn btn-hala" data-main="${mainCat}" data-category="${categoryKey}" title="Detail HALA"><i class="fas fa-eye"></i></button>` : ''}</td>
           <td class="text-center">
             <span class="badge bg-primary fs-6 px-3 py-2">${stockItem.quantity}</span>
           </td>
@@ -531,7 +532,7 @@ async function updateStokKomputer(jenis, jumlah) {
 }
 
 // === Update Stok Display/Manual ===
-async function updateStokDisplayManual(category, mainCat, newQuantity, petugas, keterangan) {
+async function updateStokDisplayManual(category, mainCat, newQuantity, petugas) {
   await fetchStockData();
   if (!stockData[category] || !stockData[category][mainCat]) {
     // Inisialisasi jika belum ada
@@ -567,8 +568,7 @@ async function updateStokDisplayManual(category, mainCat, newQuantity, petugas, 
     quantity: quantityDiff,
     oldQuantity: oldQuantity,
     newQuantity: newQty,
-    petugas,
-    keterangan: keterangan || "Update stok langsung",
+    petugas
   });
 
   // Keep only last 10 records
@@ -1108,7 +1108,7 @@ document.getElementById("formKurangiStokHala").onsubmit = async function (e) {
       throw new Error("Semua field harus diisi.");
     }
     
-    const success = await reduceStockHala(currentCategory, currentMainCat, jewelryType, jumlah, pengurang, keterangan);
+    const success = await reduceStockHala(currentCategory, currentMainCat, jewelryType, jumlah, pengurang);
     
     if (success) {
       // Success feedback
@@ -1153,14 +1153,13 @@ document.getElementById("formUpdateStok").onsubmit = async function (e) {
   const category = document.getElementById("updateStokCategory").value;
   const jumlah = document.getElementById("updateStokJumlah").value;
   const petugas = document.getElementById("updateStokPetugas").value;
-  const keterangan = document.getElementById("updateStokKeterangan").value;
 
   if (!mainCat || !category || jumlah === "" || !petugas) {
     alert("Semua field yang wajib harus diisi.");
     return;
   }
 
-  await updateStokDisplayManual(category, mainCat, jumlah, petugas, keterangan);
+  await updateStokDisplayManual(category, mainCat, jumlah, petugas);
   $("#modalUpdateStok").modal("hide");
 };
 
