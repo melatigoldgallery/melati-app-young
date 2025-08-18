@@ -211,21 +211,44 @@
               </a>
             </li>
             <li class="nav-item">
+              <a
+                class="nav-link collapsed"
+                href="#"
+                data-bs-toggle="collapse"
+                data-bs-target="#barangSubmenu"
+                aria-expanded="false"
+              >
+                <i class="fa-solid fa-boxes-stacked"></i>
+                <span class="menu-text">Inventory Barang</span>
+                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
+              </a>
+              <div class="collapse" id="barangSubmenu" data-bs-parent="#sidebarAccordion">
+                <ul class="nav flex-column ms-3">
+                  <li class="nav-item">
+                    <a class="nav-link" href="manajemenStok.html">
+                      <i class="fa-solid fa-boxes-stacked"></i>
+                      <span class="menu-text">Manajemen Stok</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="laporanStokHarian.html">
+                      <i class="fa-solid fa-calendar-xmark"></i>
+                      <span class="menu-text">Laporan Stok Harian</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="mutasiKode.html">
+                      <i class="fa-solid fa-calendar-xmark"></i>
+                      <span class="menu-text">Mutasi Kode</span>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </li>
+            <li class="nav-item d-none">
               <a class="nav-link" href="buyback.html">
                 <i class="fas fa-exchange-alt"></i>
                 <span class="menu-text">Buyback</span>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="manajemenStok.html">
-                <i class="fa-solid fa-boxes-stacked"></i>
-                <span class="menu-text">Manajemen Stok</span>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="mutasiKode.html">
-                <i class="fa-solid fa-calendar-xmark"></i>
-                <span class="menu-text">Mutasi Kode</span>
               </a>
             </li>
             <li class="nav-item">
@@ -406,8 +429,8 @@
                     <i class="fas fa-exchange-alt"></i>
                   </div>
                   <div class="stat-card-info">
-                    <h4>Sistem Buyback</h4>
-                    <p>Hitung harga penerimaan buyback</p>
+                    <h4>Admin Antrain</h4>
+                    <p>Panggil customer sesuai nomor antrian</p>
                   </div>
                 </div>
                 <div class="stat-card">
@@ -415,8 +438,8 @@
                     <i class="fas fa-code-branch"></i>
                   </div>
                   <div class="stat-card-info">
-                    <h4>Mutasi Kode</h4>
-                    <p>Kelola perubahan kode produk</p>
+                    <h4>Display Catalog</h4>
+                    <p>Menampilkan katalog produk</p>
                   </div>
                 </div>
                 <div class="stat-card">
@@ -447,15 +470,15 @@
                       </a>
                     </div>
                     <div class="col-md-3 mb-3">
-                      <a href="buyback.html" class="btn btn-warning w-100 py-3">
+                      <a href="admin.html" class="btn btn-warning w-100 py-3">
                         <i class="fas fa-exchange-alt me-2"></i>
-                        Buyback
+                        Admin Antrain
                       </a>
                     </div>
                     <div class="col-md-3 mb-3">
-                      <a href="mutasiKode.html" class="btn btn-info w-100 py-3">
+                      <a href="promosi-display.html" class="btn btn-info w-100 py-3">
                         <i class="fas fa-user-cog me-2"></i>
-                        Mutasi Kode
+                        Display Catalog
                       </a>
                     </div>
                     <div class="col-md-3 mb-3">

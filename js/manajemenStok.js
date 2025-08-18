@@ -11,18 +11,37 @@ import {
 
 // === Konstanta dan Mapping ===
 const mainCategories = ["KALUNG", "LIONTIN", "ANTING", "CINCIN", "HALA", "GELANG", "GIWANG"];
-const subCategories = ["Stok Brankas", "Belum Posting", "Display", "Rusak", "Batu Lepas", "Manual", "Admin"];
-const summaryCategories = ["brankas", "posting", "barang-display", "barang-rusak", "batu-lepas", "manual", "admin"];
+const subCategories = [
+  "Stok Brankas",
+  "Belum Posting",
+  "Display",
+  "Rusak",
+  "Batu Lepas",
+  "Manual",
+  "Admin",
+  "Contoh Custom",
+];
+// Tambah 'contoh-custom' agar ikut dimuat & (opsional) dihitung dalam ringkasan
+const summaryCategories = [
+  "brankas",
+  "posting",
+  "barang-display",
+  "barang-rusak",
+  "batu-lepas",
+  "manual",
+  "admin",
+  "contoh-custom",
+];
 
 // Jenis perhiasan khusus untuk HALA
 const halaJewelryTypes = ["KA", "LA", "AN", "CA", "SA", "GA"];
 const halaJewelryMapping = {
-  "KA": "Kalung",
-  "LA": "Liontin", 
-  "AN": "Anting",
-  "CA": "Cincin",
-  "SA": "Giwang",
-  "GA": "Gelang"
+  KA: "Kalung",
+  LA: "Liontin",
+  AN: "Anting",
+  CA: "Cincin",
+  SA: "Giwang",
+  GA: "Gelang",
 };
 const categoryMapping = {
   "Stok Brankas": "brankas",
@@ -32,6 +51,7 @@ const categoryMapping = {
   "Batu Lepas": "batu-lepas",
   Manual: "manual",
   Admin: "admin",
+  "Contoh Custom": "contoh-custom",
 };
 
 // Mapping terbalik untuk display nama kategori
@@ -43,6 +63,7 @@ const reverseCategoryMapping = {
   "batu-lepas": "Batu Lepas",
   manual: "Manual",
   admin: "Admin",
+  "contoh-custom": "Contoh Custom",
 };
 const mainCategoryToId = {
   KALUNG: "kalung-table-body",
@@ -128,6 +149,7 @@ async function fetchStockData(forceRefresh = false) {
     "batu-lepas",
     "manual",
     "admin",
+    "contoh-custom", // pastikan dokumen custom ikut dimuat
     "stok-komputer",
   ];
   try {
@@ -151,14 +173,14 @@ async function fetchStockData(forceRefresh = false) {
         });
         await setDoc(categoryRef, categoryData);
       }
-      
+
       // Inisialisasi khusus untuk HALA di semua kategori
       if (categoryData.HALA) {
         initializeHalaStructure(categoryData, "HALA");
         // Update quantity total untuk HALA
         categoryData.HALA.quantity = calculateHalaTotal(categoryData, "HALA");
       }
-      
+
       stockData[category] = categoryData;
       stockCache.set(category, categoryData);
       stockCacheMeta.set(category, Date.now());
@@ -215,21 +237,21 @@ function initializeHalaStructure(categoryData, mainCat) {
       quantity: 0,
       lastUpdated: null,
       history: [],
-      details: {}
+      details: {},
     };
   }
-  
+
   // Inisialisasi detail untuk setiap jenis perhiasan jika belum ada
   if (!categoryData[mainCat].details) {
     categoryData[mainCat].details = {};
   }
-  
-  halaJewelryTypes.forEach(type => {
+
+  halaJewelryTypes.forEach((type) => {
     if (!categoryData[mainCat].details[type]) {
       categoryData[mainCat].details[type] = 0;
     }
   });
-  
+
   return categoryData[mainCat];
 }
 
@@ -237,12 +259,12 @@ function calculateHalaTotal(categoryData, mainCat) {
   if (!categoryData[mainCat] || !categoryData[mainCat].details) {
     return 0;
   }
-  
+
   let total = 0;
-  halaJewelryTypes.forEach(type => {
+  halaJewelryTypes.forEach((type) => {
     total += parseInt(categoryData[mainCat].details[type] || 0);
   });
-  
+
   return total;
 }
 
@@ -342,9 +364,13 @@ export async function populateTables() {
 
         tr.innerHTML = `
           <td class="fw-bold">${idx + 1}</td>
-          <td class="fw-medium jenis-column">${subCat} ${mainCat === "HALA" ? `<button class="btn btn-outline-primary btn-sm detail-hala-btn btn-hala" data-main="${mainCat}" data-category="${categoryKey}" title="Detail HALA"><i class="fas fa-eye"></i></button>` : ''}</td>
+          <td class="fw-medium jenis-column">${subCat} ${
+          mainCat === "HALA"
+            ? `<button class="btn btn-outline-primary btn-sm detail-hala-btn btn-hala" data-main="${mainCat}" data-category="${categoryKey}" title="Detail HALA"><i class="fas fa-eye"></i></button>`
+            : ""
+        }</td>
           <td class="text-center">
-            <span class="badge bg-primary fs-6 px-3 py-2">${stockItem.quantity}</span>
+            <span class="badge bg-success fs-6 px-2 py-2">${stockItem.quantity}</span>
           </td>
           ${actionColumn}
           <td class="text-center">
@@ -418,7 +444,7 @@ export async function populateTables() {
 }
 
 function showTableLoading() {
-  mainCategories.forEach(mainCat => {
+  mainCategories.forEach((mainCat) => {
     const tbody = document.getElementById(mainCategoryToId[mainCat]);
     if (tbody) {
       tbody.innerHTML = `
@@ -439,17 +465,17 @@ function hideTableLoading() {
 
 function showSuccessNotification(message) {
   // Create toast notification
-  const toast = document.createElement('div');
-  toast.className = 'toast-notification success';
+  const toast = document.createElement("div");
+  toast.className = "toast-notification success";
   toast.innerHTML = `
     <i class="fas fa-check-circle"></i>
     <span>${message}</span>
   `;
-  
+
   // Add toast styles if not exists
-  if (!document.querySelector('#toast-styles')) {
-    const style = document.createElement('style');
-    style.id = 'toast-styles';
+  if (!document.querySelector("#toast-styles")) {
+    const style = document.createElement("style");
+    style.id = "toast-styles";
     style.textContent = `
       .toast-notification {
         position: fixed;
@@ -481,15 +507,15 @@ function showSuccessNotification(message) {
     `;
     document.head.appendChild(style);
   }
-  
+
   document.body.appendChild(toast);
-  
+
   // Show toast
-  setTimeout(() => toast.classList.add('show'), 100);
-  
+  setTimeout(() => toast.classList.add("show"), 100);
+
   // Hide toast after 3 seconds
   setTimeout(() => {
-    toast.classList.remove('show');
+    toast.classList.remove("show");
     setTimeout(() => toast.remove(), 300);
   }, 3000);
 }
@@ -568,7 +594,7 @@ async function updateStokDisplayManual(category, mainCat, newQuantity, petugas) 
     quantity: quantityDiff,
     oldQuantity: oldQuantity,
     newQuantity: newQty,
-    petugas
+    petugas,
   });
 
   // Keep only last 10 records
@@ -588,15 +614,15 @@ function updateSummaryTotals() {
     let komputer = 0;
     if (stockData["stok-komputer"] && stockData["stok-komputer"][mainCat])
       komputer = parseInt(stockData["stok-komputer"][mainCat].quantity) || 0;
-    
+
     // Update DOM
     const totalEl = document.getElementById(totalCardId[mainCat]);
     const statusEl = document.getElementById(statusCardId[mainCat]);
-    
+
     if (totalEl) {
       // Add animated number counting effect
       animateNumberChange(totalEl, total);
-      
+
       // Add status badge and styling
       if (total === komputer) {
         totalEl.className = "number text-success";
@@ -628,14 +654,20 @@ function animateNumberChange(element, newValue) {
 // === Add/Reduce Stock Universal Handler ===
 async function addStock(category, mainCat, quantity, adder) {
   await fetchStockData();
-  if (!stockData[category] || !stockData[category][mainCat]) return;
+  // Inisialisasi struktur jika belum ada (memungkinkan kategori baru seperti 'contoh-custom')
+  if (!stockData[category]) {
+    stockData[category] = {};
+  }
+  if (!stockData[category][mainCat]) {
+    stockData[category][mainCat] = { quantity: 0, lastUpdated: null, history: [] };
+  }
   const item = stockData[category][mainCat];
-  item.quantity += parseInt(quantity);
+  item.quantity += parseInt(quantity) || 0;
   item.lastUpdated = new Date().toISOString();
   item.history.unshift({
     date: item.lastUpdated,
     action: "Tambah",
-    quantity: parseInt(quantity),
+    quantity: parseInt(quantity) || 0,
     adder,
   });
   if (item.history.length > 10) item.history = item.history.slice(0, 10);
@@ -644,7 +676,14 @@ async function addStock(category, mainCat, quantity, adder) {
 }
 async function reduceStock(category, mainCat, quantity, pengurang, keterangan) {
   await fetchStockData();
-  if (!stockData[category] || !stockData[category][mainCat]) return false;
+  if (!stockData[category]) {
+    alert("Kategori belum ada data.");
+    return false;
+  }
+  if (!stockData[category][mainCat]) {
+    alert("Belum ada stok untuk dikurangi.");
+    return false;
+  }
   const item = stockData[category][mainCat];
   if (item.quantity < quantity) {
     alert("Stok tidak cukup.");
@@ -670,22 +709,22 @@ function showHalaDetail(category, mainCat) {
   const modal = new bootstrap.Modal(document.getElementById("modalDetailHala"));
   const tbody = document.getElementById("hala-detail-table-body");
   const totalEl = document.getElementById("hala-detail-total");
-  
+
   tbody.innerHTML = "";
-  
+
   if (!stockData[category] || !stockData[category][mainCat] || !stockData[category][mainCat].details) {
     tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Tidak ada data detail</td></tr>`;
     totalEl.textContent = "0";
     return modal.show();
   }
-  
+
   const details = stockData[category][mainCat].details;
   let total = 0;
-  
+
   halaJewelryTypes.forEach((type, index) => {
     const quantity = parseInt(details[type] || 0);
     total += quantity;
-    
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${index + 1}</td>
@@ -695,12 +734,14 @@ function showHalaDetail(category, mainCat) {
     `;
     tbody.appendChild(tr);
   });
-  
+
   totalEl.textContent = total;
-  
+
   // Update modal title dengan kategori
-  document.getElementById("modalDetailHalaLabel").textContent = `Detail Stok ${mainCat} - ${reverseCategoryMapping[category]}`;
-  
+  document.getElementById(
+    "modalDetailHalaLabel"
+  ).textContent = `Detail Stok ${mainCat} - ${reverseCategoryMapping[category]}`;
+
   modal.show();
 }
 
@@ -708,57 +749,57 @@ function showHalaDetail(category, mainCat) {
 async function addStockHala(category, mainCat, jewelryType, quantity, adder) {
   try {
     await fetchStockData();
-    
+
     // Pastikan struktur category ada
     if (!stockData[category]) {
       stockData[category] = {};
     }
-    
+
     // Inisialisasi struktur HALA jika belum ada
     if (!stockData[category][mainCat]) {
       stockData[category][mainCat] = {
         quantity: 0,
         lastUpdated: null,
         history: [],
-        details: {}
+        details: {},
       };
     }
-    
+
     const item = stockData[category][mainCat];
-    
+
     // Pastikan details ada dan semua jenis perhiasan diinisialisasi
     if (!item.details) {
       item.details = {};
     }
-    
+
     // Inisialisasi semua jenis perhiasan jika belum ada
-    halaJewelryTypes.forEach(type => {
+    halaJewelryTypes.forEach((type) => {
       if (!item.details[type]) {
         item.details[type] = 0;
       }
     });
-    
+
     // Tambah stok untuk jenis perhiasan spesifik
     item.details[jewelryType] += parseInt(quantity);
-  
-  // Update total quantity
-  item.quantity = calculateHalaTotal(stockData[category], mainCat);
-  item.lastUpdated = new Date().toISOString();
-  
-  // Tambah history
-  item.history.unshift({
-    date: item.lastUpdated,
-    action: "Tambah",
-    quantity: parseInt(quantity),
-    jewelryType: jewelryType,
-    jewelryName: halaJewelryMapping[jewelryType],
-    adder,
-  });
-  
-  if (item.history.length > 10) item.history = item.history.slice(0, 10);
-  
-  await saveData(category, mainCat);
-  await populateTables();
+
+    // Update total quantity
+    item.quantity = calculateHalaTotal(stockData[category], mainCat);
+    item.lastUpdated = new Date().toISOString();
+
+    // Tambah history
+    item.history.unshift({
+      date: item.lastUpdated,
+      action: "Tambah",
+      quantity: parseInt(quantity),
+      jewelryType: jewelryType,
+      jewelryName: halaJewelryMapping[jewelryType],
+      adder,
+    });
+
+    if (item.history.length > 10) item.history = item.history.slice(0, 10);
+
+    await saveData(category, mainCat);
+    await populateTables();
   } catch (error) {
     console.error("Error in addStockHala:", error);
     alert("Terjadi kesalahan saat menambah stok HALA. Silakan coba lagi.");
@@ -769,57 +810,59 @@ async function addStockHala(category, mainCat, jewelryType, quantity, adder) {
 async function reduceStockHala(category, mainCat, jewelryType, quantity, pengurang, keterangan) {
   try {
     await fetchStockData();
-  
-  // Pastikan struktur category ada
-  if (!stockData[category]) {
-    stockData[category] = {};
-  }
-  
-  // Inisialisasi struktur HALA jika belum ada
-  if (!stockData[category][mainCat]) {
-    initializeHalaStructure(stockData[category], mainCat);
-  }
-  
-  const item = stockData[category][mainCat];
-  
-  // Pastikan details ada
-  if (!item.details) {
-    item.details = {};
-    halaJewelryTypes.forEach(type => {
-      item.details[type] = 0;
+
+    // Pastikan struktur category ada
+    if (!stockData[category]) {
+      stockData[category] = {};
+    }
+
+    // Inisialisasi struktur HALA jika belum ada
+    if (!stockData[category][mainCat]) {
+      initializeHalaStructure(stockData[category], mainCat);
+    }
+
+    const item = stockData[category][mainCat];
+
+    // Pastikan details ada
+    if (!item.details) {
+      item.details = {};
+      halaJewelryTypes.forEach((type) => {
+        item.details[type] = 0;
+      });
+    }
+
+    const currentJewelryStock = parseInt(item.details[jewelryType] || 0);
+
+    if (currentJewelryStock < quantity) {
+      alert(
+        `Stok ${halaJewelryMapping[jewelryType]} (${jewelryType}) tidak cukup. Stok saat ini: ${currentJewelryStock}`
+      );
+      return false;
+    }
+
+    // Kurangi stok untuk jenis perhiasan spesifik
+    item.details[jewelryType] -= parseInt(quantity);
+
+    // Update total quantity
+    item.quantity = calculateHalaTotal(stockData[category], mainCat);
+    item.lastUpdated = new Date().toISOString();
+
+    // Tambah history
+    item.history.unshift({
+      date: item.lastUpdated,
+      action: "Kurangi",
+      quantity: parseInt(quantity),
+      jewelryType: jewelryType,
+      jewelryName: halaJewelryMapping[jewelryType],
+      pengurang,
+      keterangan,
     });
-  }
-  
-  const currentJewelryStock = parseInt(item.details[jewelryType] || 0);
-  
-  if (currentJewelryStock < quantity) {
-    alert(`Stok ${halaJewelryMapping[jewelryType]} (${jewelryType}) tidak cukup. Stok saat ini: ${currentJewelryStock}`);
-    return false;
-  }
-  
-  // Kurangi stok untuk jenis perhiasan spesifik
-  item.details[jewelryType] -= parseInt(quantity);
-  
-  // Update total quantity
-  item.quantity = calculateHalaTotal(stockData[category], mainCat);
-  item.lastUpdated = new Date().toISOString();
-  
-  // Tambah history
-  item.history.unshift({
-    date: item.lastUpdated,
-    action: "Kurangi",
-    quantity: parseInt(quantity),
-    jewelryType: jewelryType,
-    jewelryName: halaJewelryMapping[jewelryType],
-    pengurang,
-    keterangan,
-  });
-  
-  if (item.history.length > 10) item.history = item.history.slice(0, 10);
-  
-  await saveData(category, mainCat);
-  await populateTables();
-  return true;
+
+    if (item.history.length > 10) item.history = item.history.slice(0, 10);
+
+    await saveData(category, mainCat);
+    await populateTables();
+    return true;
   } catch (error) {
     console.error("Error in reduceStockHala:", error);
     alert("Terjadi kesalahan saat mengurangi stok HALA. Silakan coba lagi.");
@@ -885,7 +928,7 @@ function showHistoryModal(category, mainCat) {
     } else {
       quantityDisplay = `<span class="badge bg-primary">${record.quantity}</span>`;
     }
-    
+
     // Tambahan info untuk HALA
     let jewelryInfo = "";
     if (record.jewelryType && record.jewelryName) {
@@ -934,7 +977,7 @@ document.body.addEventListener("click", function (e) {
     $("#modalTambahStokHala").modal("show");
     return;
   }
-  
+
   // Kurangi stok HALA (khusus)
   if (e.target.classList.contains("reduce-stock-btn") && e.target.dataset.main === "HALA") {
     e.preventDefault();
@@ -955,7 +998,7 @@ document.body.addEventListener("click", function (e) {
     $("#modalKurangiStokHala").modal("show");
     return;
   }
-  
+
   // Detail HALA
   if (e.target.classList.contains("detail-hala-btn") || e.target.closest(".detail-hala-btn")) {
     e.preventDefault();
@@ -965,7 +1008,7 @@ document.body.addEventListener("click", function (e) {
     showHalaDetail(categoryKey, mainCat);
     return;
   }
-  
+
   // Tambah stok (umum, bukan HALA)
   if (e.target.classList.contains("add-stock-btn")) {
     e.preventDefault();
@@ -1055,28 +1098,28 @@ document.getElementById("formKurangiStok").onsubmit = async function (e) {
 // === Handler Submit Modal HALA ===
 document.getElementById("formTambahStokHala").onsubmit = async function (e) {
   e.preventDefault();
-  
+
   const submitBtn = this.querySelector('button[type="submit"]');
   const originalText = submitBtn.innerHTML;
-  
+
   try {
     // Show loading state
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
-    
+
     const jumlah = document.getElementById("jumlahTambahHala").value;
     const penambah = document.getElementById("penambahStokHala").value;
     const jewelryType = document.getElementById("jenisPerhiasanTambah").value;
-    
+
     if (!jumlah || !penambah || !currentCategory || !currentMainCat || !jewelryType) {
       throw new Error("Semua field harus diisi.");
     }
-    
+
     await addStockHala(currentCategory, currentMainCat, jewelryType, jumlah, penambah);
-    
+
     // Success feedback
     showSuccessNotification(`Berhasil menambah ${jumlah} stok ${halaJewelryMapping[jewelryType]} (${jewelryType})`);
-    
+
     $("#modalTambahStokHala").modal("hide");
   } catch (error) {
     console.error("Error submitting tambah stok HALA:", error);
@@ -1090,26 +1133,26 @@ document.getElementById("formTambahStokHala").onsubmit = async function (e) {
 
 document.getElementById("formKurangiStokHala").onsubmit = async function (e) {
   e.preventDefault();
-  
+
   const submitBtn = this.querySelector('button[type="submit"]');
   const originalText = submitBtn.innerHTML;
-  
+
   try {
     // Show loading state
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
-    
+
     const jumlah = document.getElementById("jumlahKurangiHala").value;
     const pengurang = document.getElementById("pengurangStokHala").value;
     const keterangan = document.getElementById("keteranganKurangiHala").value;
     const jewelryType = document.getElementById("jenisPerhiasanKurangi").value;
-    
+
     if (!jumlah || !pengurang || !currentCategory || !currentMainCat || !jewelryType) {
       throw new Error("Semua field harus diisi.");
     }
-    
+
     const success = await reduceStockHala(currentCategory, currentMainCat, jewelryType, jumlah, pengurang);
-    
+
     if (success) {
       // Success feedback
       showSuccessNotification(`Berhasil mengurangi ${jumlah} stok ${halaJewelryMapping[jewelryType]} (${jewelryType})`);
@@ -1127,21 +1170,21 @@ document.getElementById("formKurangiStokHala").onsubmit = async function (e) {
 
 function showErrorNotification(message) {
   // Create error toast notification
-  const toast = document.createElement('div');
-  toast.className = 'toast-notification error';
+  const toast = document.createElement("div");
+  toast.className = "toast-notification error";
   toast.innerHTML = `
     <i class="fas fa-exclamation-circle"></i>
     <span>${message}</span>
   `;
-  
+
   document.body.appendChild(toast);
-  
+
   // Show toast
-  setTimeout(() => toast.classList.add('show'), 100);
-  
+  setTimeout(() => toast.classList.add("show"), 100);
+
   // Hide toast after 4 seconds (longer for errors)
   setTimeout(() => {
-    toast.classList.remove('show');
+    toast.classList.remove("show");
     setTimeout(() => toast.remove(), 300);
   }, 4000);
 }
@@ -1187,15 +1230,15 @@ function setupRealtimeListener() {
 document.addEventListener("DOMContentLoaded", async function () {
   // Show loading state
   showLoadingState();
-  
+
   try {
     initializeCache();
     await populateTables();
     setupRealtimeListener();
-    
+
     // Initialize tooltips and smooth transitions
     initializeUIEnhancements();
-    
+
     // Hide loading state
     hideLoadingState();
   } catch (error) {
@@ -1208,18 +1251,18 @@ document.addEventListener("DOMContentLoaded", async function () {
 // === UI Enhancement Functions ===
 function showLoadingState() {
   // Add loading overlay to main content
-  const mainContent = document.querySelector('.content-wrapper');
-  if (mainContent && !mainContent.querySelector('.loading-overlay')) {
-    const loadingOverlay = document.createElement('div');
-    loadingOverlay.className = 'loading-overlay';
+  const mainContent = document.querySelector(".content-wrapper");
+  if (mainContent && !mainContent.querySelector(".loading-overlay")) {
+    const loadingOverlay = document.createElement("div");
+    loadingOverlay.className = "loading-overlay";
     loadingOverlay.innerHTML = '<div class="loading-spinner"></div>';
-    mainContent.style.position = 'relative';
+    mainContent.style.position = "relative";
     mainContent.appendChild(loadingOverlay);
   }
 }
 
 function hideLoadingState() {
-  const loadingOverlay = document.querySelector('.loading-overlay');
+  const loadingOverlay = document.querySelector(".loading-overlay");
   if (loadingOverlay) {
     loadingOverlay.remove();
   }
@@ -1232,17 +1275,17 @@ function showErrorMessage(message) {
 
 function initializeUIEnhancements() {
   // Add smooth transitions when switching tabs
-  const tabLinks = document.querySelectorAll('.nav-link');
-  tabLinks.forEach(link => {
-    link.addEventListener('click', function() {
+  const tabLinks = document.querySelectorAll(".nav-link");
+  tabLinks.forEach((link) => {
+    link.addEventListener("click", function () {
       // Add loading state for tab content
-      const targetId = this.getAttribute('data-bs-target');
+      const targetId = this.getAttribute("data-bs-target");
       if (targetId) {
         const targetTab = document.querySelector(targetId);
         if (targetTab) {
-          targetTab.style.opacity = '0.7';
+          targetTab.style.opacity = "0.7";
           setTimeout(() => {
-            targetTab.style.opacity = '1';
+            targetTab.style.opacity = "1";
           }, 200);
         }
       }
@@ -1250,40 +1293,177 @@ function initializeUIEnhancements() {
   });
 
   // Add hover effects for buttons
-  const buttons = document.querySelectorAll('.btn');
-  buttons.forEach(button => {
-    button.addEventListener('mouseenter', function() {
-      this.style.transform = 'translateY(-2px)';
+  const buttons = document.querySelectorAll(".btn");
+  buttons.forEach((button) => {
+    button.addEventListener("mouseenter", function () {
+      this.style.transform = "translateY(-2px)";
     });
-    
-    button.addEventListener('mouseleave', function() {
-      this.style.transform = 'translateY(0)';
+
+    button.addEventListener("mouseleave", function () {
+      this.style.transform = "translateY(0)";
     });
   });
 }
-  
-  // Reset on hide
-  document.addEventListener('hide.bs.dropdown', function(event) {
-    const dropdownMenu = event.target.nextElementSibling;
-    if (dropdownMenu && dropdownMenu.classList.contains('dropdown-menu')) {
-      // Reset styles
-      dropdownMenu.style.position = '';
-      dropdownMenu.style.left = '';
-      dropdownMenu.style.top = '';
-      dropdownMenu.style.minWidth = '';
+
+// Reset on hide
+document.addEventListener("hide.bs.dropdown", function (event) {
+  const dropdownMenu = event.target.nextElementSibling;
+  if (dropdownMenu && dropdownMenu.classList.contains("dropdown-menu")) {
+    // Reset styles
+    dropdownMenu.style.position = "";
+    dropdownMenu.style.left = "";
+    dropdownMenu.style.top = "";
+    dropdownMenu.style.minWidth = "";
+  }
+});
+
+// Handle window resize
+window.addEventListener("resize", function () {
+  const openDropdowns = document.querySelectorAll(".dropdown-menu.show");
+  openDropdowns.forEach((menu) => {
+    const toggle = menu.previousElementSibling;
+    if (toggle) {
+      const rect = toggle.getBoundingClientRect();
+      menu.style.left = rect.left + "px";
+      menu.style.top = rect.bottom + 5 + "px";
     }
   });
-  
-  // Handle window resize
-  window.addEventListener('resize', function() {
-    const openDropdowns = document.querySelectorAll('.dropdown-menu.show');
-    openDropdowns.forEach(menu => {
-      const toggle = menu.previousElementSibling;
-      if (toggle) {
-        const rect = toggle.getBoundingClientRect();
-        menu.style.left = rect.left + 'px';
-        menu.style.top = (rect.bottom + 5) + 'px';
+});
+
+// === DAILY SNAPSHOT (AUTO) INTEGRATION ===
+// Replikasi ringan logika di laporanStokHarian untuk memastikan snapshot tetap dibuat
+// bahkan bila halaman yang pertama dibuka adalah manajemen stok.
+
+function formatDateKeySnapshot(date) {
+  const d = new Date(date);
+  if (isNaN(d)) return null;
+  const m = (d.getMonth() + 1).toString().padStart(2, "0");
+  const day = d.getDate().toString().padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+function getNowInWita() {
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  return new Date(utc + 8 * 60 * 60000); // UTC+8
+}
+
+function computeCurrentSummarySnapshotForDaily() {
+  const result = {};
+  mainCategories.forEach((mainCat) => {
+    let total = 0;
+    summaryCategories.forEach((cat) => {
+      if (stockData[cat] && stockData[cat][mainCat]) {
+        total += parseInt(stockData[cat][mainCat].quantity) || 0;
       }
     });
+    let komputer = 0;
+    if (stockData["stok-komputer"] && stockData["stok-komputer"][mainCat]) {
+      komputer = parseInt(stockData["stok-komputer"][mainCat].quantity) || 0;
+    }
+    let status;
+    if (total === komputer) status = "Sesuai / Klop";
+    else if (total < komputer) status = `Kurang ${komputer - total}`;
+    else status = `Lebih ${total - komputer}`;
+    result[mainCat] = { total, komputer, status };
   });
+  return result;
+}
 
+async function loadDailySnapshotDoc(dateObj) {
+  const dateKey = formatDateKeySnapshot(dateObj);
+  if (!dateKey) return null;
+  try {
+    const ref = doc(firestore, "daily_stock_reports", dateKey);
+    const snap = await getDoc(ref);
+    return snap.exists() ? snap.data() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveDailySnapshotDoc(dateObj, { backfilled = false } = {}) {
+  const dateKey = formatDateKeySnapshot(dateObj);
+  if (!dateKey) return;
+  // Pastikan data stok mutakhir
+  await fetchStockData(true);
+  const payload = {
+    date: dateKey,
+    createdAt: new Date().toISOString(),
+    items: computeCurrentSummarySnapshotForDaily(),
+  };
+  if (backfilled) payload.backfilled = true;
+  const ref = doc(firestore, "daily_stock_reports", dateKey);
+  await setDoc(ref, payload, { merge: true });
+  return payload;
+}
+
+async function ensureYesterdaySnapshotIfMissingFromManagement() {
+  const nowWita = getNowInWita();
+  // Ambil "kemarin" di zona WITA
+  const yesterday = new Date(getNowInWita().getTime() - 24 * 60 * 60 * 1000);
+  const yesterdayKey = formatDateKeySnapshot(yesterday);
+  // Hanya lakukan jika snapshot kemarin belum ada
+  const existing = await loadDailySnapshotDoc(yesterday);
+  if (!existing) {
+    try {
+      await saveDailySnapshotDoc(yesterday, { backfilled: true });
+      showSuccessNotification(`Snapshot backfill (${yesterdayKey}) dibuat`);
+    } catch (e) {
+      console.warn("Gagal membuat snapshot backfill kemarin", e);
+    }
+  }
+}
+
+async function ensureTodaySnapshotIfPassedFromManagement() {
+  const nowWita = getNowInWita();
+  const target = new Date(nowWita);
+  target.setHours(23, 0, 0, 0);
+  if (nowWita >= target) {
+    const existing = await loadDailySnapshotDoc(nowWita);
+    if (!existing) {
+      try {
+        await saveDailySnapshotDoc(nowWita);
+        showSuccessNotification("Snapshot otomatis (23:00 WITA) dibuat");
+      } catch (e) {
+        console.warn("Gagal membuat snapshot otomatis hari ini", e);
+      }
+    }
+  }
+}
+
+function scheduleNextDailySnapshotFromManagement() {
+  const nowWita = getNowInWita();
+  const next = new Date(nowWita);
+  next.setHours(23, 0, 0, 0);
+  if (nowWita >= next) next.setDate(next.getDate() + 1);
+  const delay = next - nowWita;
+  setTimeout(async () => {
+    try {
+      await saveDailySnapshotDoc(getNowInWita());
+      showSuccessNotification("Snapshot otomatis (23:00 WITA) dibuat");
+    } catch (e) {
+      console.warn("Gagal snapshot terjadwal", e);
+    } finally {
+      scheduleNextDailySnapshotFromManagement();
+    }
+  }, delay);
+}
+
+async function triggerDailySnapshotsFromManagement() {
+  try {
+    await ensureYesterdaySnapshotIfMissingFromManagement();
+    await ensureTodaySnapshotIfPassedFromManagement();
+    scheduleNextDailySnapshotFromManagement();
+  } catch (e) {
+    console.warn("Gagal inisialisasi mekanisme snapshot harian", e);
+  }
+}
+
+// Jalankan setelah init utama selesai
+document.addEventListener("DOMContentLoaded", () => {
+  // Beri sedikit delay agar populateTables/fetch selesai lebih dulu (defensif)
+  setTimeout(() => {
+    triggerDailySnapshotsFromManagement();
+  }, 1500);
+});
