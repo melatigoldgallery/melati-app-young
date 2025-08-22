@@ -1,136 +1,49 @@
-.table-container {
-  max-height: 500px;
-  overflow-y: auto;
+/* Compact tab bar improvements for better UX */
+.nav-tabs.compact {
+  gap: 6px;
+  padding: 8px 12px;
+  align-items: center;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
-.stock-summary {
-  background-color: #f8f9fa;
+.nav-tabs.compact::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.08);
   border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-.stock-card {
-  border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 15px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
-}
-.stock-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-.stock-card h3 {
-  font-size: 1.1rem;
-  margin-bottom: 10px;
-  font-weight: 600;
-}
-.stock-card .number {
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: #3a3a3a;
-}
-
-.table-container {
-  max-height: 500px;
-  overflow-y: auto;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.table tbody td {
-  vertical-align: middle;
-  padding: 12px;
-}
-
-/* Perbaikan card */
-.card {
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  border: none;
-}
-
-.card-header {
-  background: linear-gradient(135deg, #5966e0 0%, #f4f6ff 100%);
-  color: white;
-  border-radius: 12px 12px 0 0 !important;
-  border: none;
-}
-
-.card-header h2 {
-  margin: 0;
-  font-size: 1.25rem;
-}
-
-/* Perbaikan button */
-.btn {
-  border-radius: 8px;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-.btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-/* Perbaikan tab */
-.nav-tabs .nav-link {
-  border-radius: 8px 8px 0 0;
-  font-weight: 500;
-  color: #6c757d;
-}
-
-.nav-tabs .nav-link.active {
-  background-color: #495057;
-  color: white;
-  border-color: #495057;
-}
-
-/* Perbaikan stock summary */
-.stock-summary {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  border: 1px solid #dee2e6;
-}
-
-.stock-card {
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 15px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s ease;
-}
-
-.stock-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
 }
 
 /* Enhanced colors */
 .kalung-card {
-  background: linear-gradient(135deg, #e3f2fd 0%, #9cd1fc 100%);
+  background: linear-gradient(135deg, #fff8e1 0%, #fd907c 100%);
 }
 .liontin-card {
-  background: linear-gradient(135deg, #e8f5e9 0%, #adffb0 100%);
+  background: linear-gradient(135deg, #f1f8e9 0%, #b3fc60 100%);
 }
 .anting-card {
   background: linear-gradient(135deg, #fff3e0 0%, #ffcc02 100%);
 }
 .cincin-card {
-  background: linear-gradient(135deg, #f7f3f8 0%, #ee8dff 100%);
+  background: linear-gradient(135deg, #eef7ff 0%, #9fd4ff 100%);
 }
 .hala-card {
-  background: linear-gradient(135deg, #e0f7fa 0%, #88e8f5 100%);
+  background: linear-gradient(135deg, #fff3e0 0%, #ffcc02 100%);
 }
 .gelang-card {
   background: linear-gradient(135deg, #fff8e1 0%, #fd907c 100%);
 }
 .giwang-card {
   background: linear-gradient(135deg, #f1f8e9 0%, #b3fc60 100%);
+}
+.kendari-card {
+  background: linear-gradient(135deg, #fff8e1 0%, #fd907c 100%);
+}
+.berlian-card {
+  background: linear-gradient(135deg, #eef7ff 0%, #9fd4ff 100%);
+}
+.sdw-card {
+  background: linear-gradient(135deg, #f1f8e9 0%, #b3fc60 100%);
+}
+.emas-bali-card {
+  background: linear-gradient(135deg, #fff3e0 0%, #ffcc02 100%);
 }
 /* Styling untuk status perbandingan */
 .number.text-success {
@@ -152,16 +65,7 @@
   color: #856404 !important;
 }
 
-/* Modal styling */
-.modal-header {
-  background: #5966e0;
-  color: #fff;
-  border-radius: 12px 12px 0 0;
-  border: none;
-}
-.modal-content {
-  border-radius: 12px;
-}
+/* dropdown tweaks kept */
 .dropdown-toggle::after {
   margin-left: 0.5em;
 }
@@ -470,15 +374,16 @@
   background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
   border-radius: 15px;
   padding: 5px;
-  margin-bottom: 20px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  margin-bottom: 10px;
   border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .stock-card {
+  width: 240px;
+  height: 140px;
   border-radius: 15px;
-  padding: 25px 20px;
-  margin-bottom: 20px;
+  padding: 15px 10px;
+  margin-bottom: 10px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -504,7 +409,7 @@
 .stock-card h3 {
   font-size: 1rem;
   margin-bottom: 15px;
-  font-weight: 700;
+  font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -512,13 +417,12 @@
 .stock-card .number {
   font-size: 2.2rem;
   font-weight: 800;
-  color: #2c3e50;
   margin-bottom: 8px;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .stock-card small {
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -530,6 +434,10 @@
   border-radius: 20px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
   overflow: hidden;
+}
+.modal-body .badge.bg-light.text-dark.border {
+  font-weight: 500;
+  background: #f8f9fa !important;
 }
 
 .modal-header {
@@ -723,25 +631,130 @@
   font-size: 1.9rem;
 }
 
-/* Responsive: extra compact on <576px */
-@media (max-width: 575.98px) {
-  .nav-tabs .nav-link {
-    padding: 5px 8px;
-    font-size: 0.65rem;
-  }
-  .tab-content .table thead th {
-    padding: 8px 6px !important;
-    font-size: 0.65rem;
-  }
-  .tab-content .table tbody td {
-    padding: 8px 6px !important;
-    font-size: 0.68rem;
-  }
-  .tab-content .table .btn.btn-sm {
-    padding: 3px 6px;
-    font-size: 0.6rem;
-  }
-  .tab-content .table .badge {
-    font-size: 0.6rem;
-  }
+/* ===== Compact Modal Styling (simpler, smaller, scoped) ===== */
+/* Target only the add/update/reduce modals to keep global modal styles intact */
+#modalTambahStok .modal-dialog,
+#modalKurangiStok .modal-dialog,
+#modalUpdateStok .modal-dialog,
+#modalTambahStokHala .modal-dialog,
+#modalKurangiStokHala .modal-dialog,
+#modalUpdateStokHala .modal-dialog,
+#modalUpdateKomputer .modal-dialog,
+#modalDetailHala .modal-dialog {
+  max-width: 400px;
+}
+
+#modalRiwayat .modal-dialog {
+  max-width: 750px;
+}
+
+/* HALA bulk modals may need slightly more width but still constrained */
+#modalKurangiStokHala .modal-dialog,
+#modalUpdateStokHala .modal-dialog {
+  max-width: 500px;
+}
+
+#modalTambahStok .modal-content,
+#modalKurangiStok .modal-content,
+#modalUpdateStok .modal-content,
+#modalTambahStokHala .modal-content,
+#modalKurangiStokHala .modal-content,
+#modalUpdateStokHala .modal-content,
+#modalUpdateKomputer .modal-content {
+  border-radius: 12px;
+}
+
+/* Reduce header/body/footer paddings and font sizes inside the targeted modals */
+#modalTambahStok .modal-header,
+#modalKurangiStok .modal-header,
+#modalUpdateStok .modal-header,
+#modalTambahStokHala .modal-header,
+#modalKurangiStokHala .modal-header,
+#modalUpdateStokHala .modal-header,
+#modalUpdateKomputer .modal-header {
+  padding: 10px 14px;
+}
+
+#modalTambahStok .modal-title,
+#modalKurangiStok .modal-title,
+#modalUpdateStok .modal-title,
+#modalTambahStokHala .modal-title,
+#modalKurangiStokHala .modal-title,
+#modalUpdateStokHala .modal-title,
+#modalUpdateKomputer .modal-title {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+#modalTambahStok .modal-body,
+#modalKurangiStok .modal-body,
+#modalUpdateStok .modal-body,
+#modalTambahStokHala .modal-body,
+#modalKurangiStokHala .modal-body,
+#modalUpdateStokHala .modal-body,
+#modalUpdateKomputer .modal-body {
+  padding: 12px 14px;
+  font-size: 0.95rem;
+}
+
+#modalTambahStok .modal-footer,
+#modalKurangiStok .modal-footer,
+#modalUpdateStok .modal-footer,
+#modalTambahStokHala .modal-footer,
+#modalKurangiStokHala .modal-footer,
+#modalUpdateStokHala .modal-footer,
+#modalUpdateKomputer .modal-footer {
+  padding: 10px 14px;
+}
+
+/* Smaller form labels & controls inside these modals */
+#modalTambahStok .form-label,
+#modalKurangiStok .form-label,
+#modalUpdateStok .form-label,
+#modalTambahStokHala .form-label,
+#modalKurangiStokHala .form-label,
+#modalUpdateStokHala .form-label,
+#modalUpdateKomputer .form-label {
+  font-size: 0.75rem;
+  margin-bottom: 0px;
+}
+
+#modalTambahStok .form-control,
+#modalKurangiStok .form-control,
+#modalUpdateStok .form-control,
+#modalTambahStokHala .form-control,
+#modalKurangiStokHala .form-control,
+#modalUpdateStokHala .form-control,
+#modalUpdateKomputer .form-control {
+  padding: 8px 10px;
+  font-size: 0.88rem;
+}
+
+/* === Bulk HALA Reduce Enhancements === */
+.hala-bulk-table .current-stock {
+  font-weight: 600;
+  color: #dc3545; /* emphasize current stock in reduce modal */
+}
+.hala-bulk-table .hala-reduce-qty-input:focus {
+  box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.35);
+  border-color: #ffc107;
+}
+
+/* Nonaktifkan scroll di kontainer modal saat terbuka */
+.modal,
+.modal-open .modal {
+  overflow: auto !important;
+}
+
+/* Pastikan bagian dalam modal tidak memicu scroll tersembunyi */
+.modal .modal-dialog,
+.modal .modal-content,
+.modal .modal-body {
+  overflow: visible !important;
+  max-height: none !important;
+}
+
+/* Table dalam modal tidak memunculkan scrollbar horizontal */
+.modal .table-responsive {
+  overflow: visible !important;      /* matikan overflow-x:auto bawaan */
 }

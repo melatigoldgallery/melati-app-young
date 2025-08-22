@@ -74,7 +74,7 @@
                 data-bs-target="#barangSubmenu"
                 aria-expanded="false"
               >
-                <i class="fa-solid fa-boxes-stacked"></i>
+                <i class="fa-solid fa-cubes"></i>
                 <span class="menu-text">Inventory Barang</span>
                 <i class="fas fa-angle-down ms-auto submenu-icon"></i>
               </a>
@@ -289,7 +289,7 @@
             <div class="card mb-4">
               <div class="card-header">
                 <h2 class="text-white fs-5">
-                  <i class="fas fa-chart-pie me-2"></i>
+                  <i class="fas fa-chart-pie me-2 text-white"></i>
                   Ringkasan Total Stok
                 </h2>
               </div>
@@ -339,16 +339,6 @@
                   </div>
                   <div class="row mt-3">
                     <div class="col-md-3 col-sm-6">
-                      <div class="stock-card hala-card text-dark">
-                        <h3>
-                          <i class="fas fa-ring me-2"></i>
-                          HALA
-                        </h3>
-                        <div class="number" id="total-hala">0</div>
-                        <small id="label-jenis-HALA">Status</small>
-                      </div>
-                    </div>
-                    <div class="col-md-3 col-sm-6">
                       <div class="stock-card gelang-card text-dark">
                         <h3>
                           <i class="fas fa-circle-notch me-2"></i>
@@ -368,13 +358,25 @@
                         <small id="label-jenis-GIWANG">Status</small>
                       </div>
                     </div>
+                    <div class="col-md-3 col-sm-6">
+                      <div class="stock-card hala-card text-dark">
+                        <h3>
+                          <i class="fas fa-ring me-2"></i>
+                          HALA
+                        </h3>
+                        <div class="number" id="total-hala">0</div>
+                        <small id="label-jenis-HALA">Status</small>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
             <!-- Tab Navigation -->
-            <ul class="nav nav-tabs mb-3" id="stockTabs" role="tablist">
+            <ul class="nav nav-tabs compact overflow-auto" id="stockTab" role="tablist">
+              <!-- compact class uses existing CSS to reduce padding; overflow-auto enables horizontal scroll on small screens -->
+
               <li class="nav-item" role="presentation">
                 <button
                   class="nav-link active"
@@ -803,46 +805,130 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                   </div>
                   <div class="modal-body">
-                    <form id="formTambahStokHala">
+                    <form id="formTambahStokHalaBulk">
                       <div class="mb-3">
-                        <label for="jenisTambahHalaDisplay" class="form-label">Jenis Barang</label>
+                        <label class="form-label">Jenis Barang</label>
                         <input
                           type="text"
-                          class="form-control"
                           id="jenisTambahHalaDisplay"
+                          class="form-control"
                           readonly
-                          style="background-color: #f8f9fa"
+                          style="background: #f8f9fa"
                         />
                         <input type="hidden" id="jenisTambahHala" />
                       </div>
                       <div class="mb-3">
-                        <label for="jenisPerhiasanTambah" class="form-label">Jenis Perhiasan</label>
-                        <select class="form-select" id="jenisPerhiasanTambah" required>
-                          <option value="">Pilih Jenis Perhiasan</option>
-                          <option value="KA">KA - Kalung</option>
-                          <option value="LA">LA - Liontin</option>
-                          <option value="AN">AN - Anting</option>
-                          <option value="CA">CA - Cincin</option>
-                          <option value="SA">SA - Giwang</option>
-                          <option value="GA">GA - Gelang</option>
-                        </select>
+                        <label class="form-label">Input Multi Jenis Perhiasan</label>
+                        <div class="table-responsive">
+                          <table class="table table-sm align-middle mb-2 hala-bulk-table">
+                            <thead>
+                              <tr>
+                                <th style="width: 35%">Jenis</th>
+                                <th style="width: 25%" class="text-center">Kode</th>
+                                <th style="width: 25%">Jumlah</th>
+                              </tr>
+                            </thead>
+                            <tbody id="bulkHalaTbody">
+                              <tr data-type="KA">
+                                <td>Kalung</td>
+                                <td class="text-center"><span class="badge bg-primary">KA</span></td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    class="form-control form-control-sm hala-qty-input"
+                                    data-type="KA"
+                                    placeholder="0"
+                                  />
+                                </td>
+                              </tr>
+                              <tr data-type="LA">
+                                <td>Liontin</td>
+                                <td class="text-center"><span class="badge bg-primary">LA</span></td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    class="form-control form-control-sm hala-qty-input"
+                                    data-type="LA"
+                                    placeholder="0"
+                                  />
+                                </td>
+                              </tr>
+                              <tr data-type="AN">
+                                <td>Anting</td>
+                                <td class="text-center"><span class="badge bg-primary">AN</span></td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    class="form-control form-control-sm hala-qty-input"
+                                    data-type="AN"
+                                    placeholder="0"
+                                  />
+                                </td>
+                              </tr>
+                              <tr data-type="CA">
+                                <td>Cincin</td>
+                                <td class="text-center"><span class="badge bg-primary">CA</span></td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    class="form-control form-control-sm hala-qty-input"
+                                    data-type="CA"
+                                    placeholder="0"
+                                  />
+                                </td>
+                              </tr>
+                              <tr data-type="SA">
+                                <td>Giwang</td>
+                                <td class="text-center"><span class="badge bg-primary">SA</span></td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    class="form-control form-control-sm hala-qty-input"
+                                    data-type="SA"
+                                    placeholder="0"
+                                  />
+                                </td>
+                              </tr>
+                              <tr data-type="GA">
+                                <td>Gelang</td>
+                                <td class="text-center"><span class="badge bg-primary">GA</span></td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    class="form-control form-control-sm hala-qty-input"
+                                    data-type="GA"
+                                    placeholder="0"
+                                  />
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                       <div class="mb-3">
-                        <label for="jumlahTambahHala" class="form-label">Jumlah</label>
-                        <input type="number" class="form-control" id="jumlahTambahHala" min="1" required />
+                        <label for="penambahStokHalaBulk" class="form-label">Penambah Stok</label>
+                        <input type="text" class="form-control" id="penambahStokHalaBulk" required />
                       </div>
-                      <div class="mb-3">
-                        <label for="penambahStokHala" class="form-label">Penambah Stok</label>
-                        <input type="text" class="form-control" id="penambahStokHala" required />
+                      <div class="d-flex gap-2">
+                        <button type="reset" class="btn btn-outline-secondary w-25" id="resetBulkHalaBtn">Reset</button>
+                        <button type="submit" class="btn btn-primary flex-grow-1" id="submitBulkHalaBtn">
+                          Simpan Semua
+                        </button>
                       </div>
-                      <button type="submit" class="btn btn-primary w-100">Simpan</button>
+                      <small class="text-muted d-block mt-2">Hanya jumlah > 0 yang akan diproses.</small>
                     </form>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Modal Kurangi Stok HALA -->
+            <!-- Modal Kurangi Stok HALA (Bulk) -->
             <div
               class="modal fade"
               id="modalKurangiStokHala"
@@ -850,14 +936,14 @@
               aria-labelledby="modalKurangiStokHalaLabel"
               aria-hidden="true"
             >
-              <div class="modal-dialog">
+              <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                   <div class="modal-header">
                     <h5 class="modal-title" id="modalKurangiStokHalaLabel">Kurangi Stok HALA</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                   </div>
                   <div class="modal-body">
-                    <form id="formKurangiStokHala">
+                    <form id="formKurangiStokHalaBulk">
                       <div class="mb-3">
                         <label for="jenisKurangiHalaDisplay" class="form-label">Jenis Barang</label>
                         <input
@@ -869,31 +955,128 @@
                         />
                         <input type="hidden" id="jenisKurangiHala" />
                       </div>
-                      <div class="mb-3">
-                        <label for="jenisPerhiasanKurangi" class="form-label">Jenis Perhiasan</label>
-                        <select class="form-select" id="jenisPerhiasanKurangi" required>
-                          <option value="">Pilih Jenis Perhiasan</option>
-                          <option value="KA">KA - Kalung</option>
-                          <option value="LA">LA - Liontin</option>
-                          <option value="AN">AN - Anting</option>
-                          <option value="CA">CA - Cincin</option>
-                          <option value="SA">SA - Giwang</option>
-                          <option value="GA">GA - Gelang</option>
-                        </select>
+                      <div class="table-responsive hala-bulk-table mb-3">
+                        <table class="table table-sm table-bordered align-middle">
+                          <thead class="table-warning">
+                            <tr>
+                              <th style="width: 35%">Jenis Perhiasan</th>
+                              <th style="width: 15%" class="text-center">Kode</th>
+                              <th style="width: 25%" class="text-center">Stok Saat Ini</th>
+                              <th style="width: 25%">Kurangi</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr data-type="KA">
+                              <td>Kalung</td>
+                              <td class="text-center"><span class="badge bg-warning text-dark">KA</span></td>
+                              <td class="text-center"><span class="current-stock" data-type="KA">0</span></td>
+                              <td>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  class="form-control form-control-sm hala-reduce-qty-input"
+                                  data-type="KA"
+                                  placeholder="0"
+                                />
+                              </td>
+                            </tr>
+                            <tr data-type="LA">
+                              <td>Liontin</td>
+                              <td class="text-center"><span class="badge bg-warning text-dark">LA</span></td>
+                              <td class="text-center"><span class="current-stock" data-type="LA">0</span></td>
+                              <td>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  class="form-control form-control-sm hala-reduce-qty-input"
+                                  data-type="LA"
+                                  placeholder="0"
+                                />
+                              </td>
+                            </tr>
+                            <tr data-type="AN">
+                              <td>Anting</td>
+                              <td class="text-center"><span class="badge bg-warning text-dark">AN</span></td>
+                              <td class="text-center"><span class="current-stock" data-type="AN">0</span></td>
+                              <td>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  class="form-control form-control-sm hala-reduce-qty-input"
+                                  data-type="AN"
+                                  placeholder="0"
+                                />
+                              </td>
+                            </tr>
+                            <tr data-type="CA">
+                              <td>Cincin</td>
+                              <td class="text-center"><span class="badge bg-warning text-dark">CA</span></td>
+                              <td class="text-center"><span class="current-stock" data-type="CA">0</span></td>
+                              <td>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  class="form-control form-control-sm hala-reduce-qty-input"
+                                  data-type="CA"
+                                  placeholder="0"
+                                />
+                              </td>
+                            </tr>
+                            <tr data-type="SA">
+                              <td>Giwang</td>
+                              <td class="text-center"><span class="badge bg-warning text-dark">SA</span></td>
+                              <td class="text-center"><span class="current-stock" data-type="SA">0</span></td>
+                              <td>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  class="form-control form-control-sm hala-reduce-qty-input"
+                                  data-type="SA"
+                                  placeholder="0"
+                                />
+                              </td>
+                            </tr>
+                            <tr data-type="GA">
+                              <td>Gelang</td>
+                              <td class="text-center"><span class="badge bg-warning text-dark">GA</span></td>
+                              <td class="text-center"><span class="current-stock" data-type="GA">0</span></td>
+                              <td>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  class="form-control form-control-sm hala-reduce-qty-input"
+                                  data-type="GA"
+                                  placeholder="0"
+                                />
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
                       <div class="mb-3">
-                        <label for="jumlahKurangiHala" class="form-label">Jumlah</label>
-                        <input type="number" class="form-control" id="jumlahKurangiHala" min="1" required />
+                        <label for="pengurangStokHalaBulk" class="form-label">Pengurang Stok</label>
+                        <input type="text" class="form-control" id="pengurangStokHalaBulk" required />
                       </div>
                       <div class="mb-3">
-                        <label for="pengurangStokHala" class="form-label">Pengurang Stok</label>
-                        <input type="text" class="form-control" id="pengurangStokHala" required />
+                        <label for="keteranganKurangiHalaBulk" class="form-label">Keterangan</label>
+                        <textarea
+                          class="form-control"
+                          id="keteranganKurangiHalaBulk"
+                          rows="2"
+                          placeholder="Opsional"
+                        ></textarea>
                       </div>
-                      <div class="mb-3">
-                        <label for="keteranganKurangiHala" class="form-label">Keterangan</label>
-                        <textarea class="form-control" id="keteranganKurangiHala" rows="2"></textarea>
+                      <div class="d-flex gap-2">
+                        <button type="reset" class="btn btn-outline-secondary w-25" id="resetBulkKurangiHalaBtn">
+                          Reset
+                        </button>
+                        <button type="submit" class="btn btn-warning flex-grow-1" id="submitBulkKurangiHalaBtn">
+                          Simpan Pengurangan
+                        </button>
                       </div>
-                      <button type="submit" class="btn btn-warning w-100">Simpan</button>
+                      <small class="text-muted d-block mt-2">
+                        Hanya jumlah > 0 yang akan diproses. Validasi stok dilakukan sebelum dikurangi.
+                      </small>
                     </form>
                   </div>
                 </div>
@@ -936,6 +1119,152 @@
                         </tfoot>
                       </table>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Modal Update Stok HALA (Bulk) -->
+            <div
+              class="modal fade"
+              id="modalUpdateStokHala"
+              tabindex="-1"
+              aria-labelledby="modalUpdateStokHalaLabel"
+              aria-hidden="true"
+            >
+              <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title" id="modalUpdateStokHalaLabel">Update Stok HALA</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                  </div>
+                  <div class="modal-body">
+                    <form id="formUpdateStokHalaBulk">
+                      <div class="mb-3">
+                        <label for="jenisUpdateHalaDisplay" class="form-label">Jenis Barang</label>
+                        <input
+                          type="text"
+                          class="form-control"
+                          id="jenisUpdateHalaDisplay"
+                          readonly
+                          style="background-color: #f8f9fa"
+                        />
+                        <input type="hidden" id="jenisUpdateHala" />
+                      </div>
+                      <div class="table-responsive hala-bulk-table mb-3">
+                        <table class="table table-sm table-bordered align-middle">
+                          <thead class="table-info">
+                            <tr>
+                              <th style="width: 35%">Jenis Perhiasan</th>
+                              <th style="width: 15%" class="text-center">Kode</th>
+                              <th style="width: 25%" class="text-center">Stok Saat Ini</th>
+                              <th style="width: 25%">Update Jadi</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr data-type="KA">
+                              <td>Kalung</td>
+                              <td class="text-center"><span class="badge bg-info text-dark">KA</span></td>
+                              <td class="text-center"><span class="current-stock" data-type="KA">0</span></td>
+                              <td>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  class="form-control form-control-sm hala-update-qty-input"
+                                  data-type="KA"
+                                  placeholder="(tetap)"
+                                />
+                              </td>
+                            </tr>
+                            <tr data-type="LA">
+                              <td>Liontin</td>
+                              <td class="text-center"><span class="badge bg-info text-dark">LA</span></td>
+                              <td class="text-center"><span class="current-stock" data-type="LA">0</span></td>
+                              <td>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  class="form-control form-control-sm hala-update-qty-input"
+                                  data-type="LA"
+                                  placeholder="(tetap)"
+                                />
+                              </td>
+                            </tr>
+                            <tr data-type="AN">
+                              <td>Anting</td>
+                              <td class="text-center"><span class="badge bg-info text-dark">AN</span></td>
+                              <td class="text-center"><span class="current-stock" data-type="AN">0</span></td>
+                              <td>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  class="form-control form-control-sm hala-update-qty-input"
+                                  data-type="AN"
+                                  placeholder="(tetap)"
+                                />
+                              </td>
+                            </tr>
+                            <tr data-type="CA">
+                              <td>Cincin</td>
+                              <td class="text-center"><span class="badge bg-info text-dark">CA</span></td>
+                              <td class="text-center"><span class="current-stock" data-type="CA">0</span></td>
+                              <td>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  class="form-control form-control-sm hala-update-qty-input"
+                                  data-type="CA"
+                                  placeholder="(tetap)"
+                                />
+                              </td>
+                            </tr>
+                            <tr data-type="SA">
+                              <td>Giwang</td>
+                              <td class="text-center"><span class="badge bg-info text-dark">SA</span></td>
+                              <td class="text-center"><span class="current-stock" data-type="SA">0</span></td>
+                              <td>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  class="form-control form-control-sm hala-update-qty-input"
+                                  data-type="SA"
+                                  placeholder="(tetap)"
+                                />
+                              </td>
+                            </tr>
+                            <tr data-type="GA">
+                              <td>Gelang</td>
+                              <td class="text-center"><span class="badge bg-info text-dark">GA</span></td>
+                              <td class="text-center"><span class="current-stock" data-type="GA">0</span></td>
+                              <td>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  class="form-control form-control-sm hala-update-qty-input"
+                                  data-type="GA"
+                                  placeholder="(tetap)"
+                                />
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <div class="mb-3">
+                        <label for="petugasUpdateStokHalaBulk" class="form-label">Nama Staf</label>
+                        <input type="text" class="form-control" id="petugasUpdateStokHalaBulk" required />
+                      </div>
+                      <div class="d-flex gap-2">
+                        <button type="reset" class="btn btn-outline-secondary w-25" id="resetBulkUpdateHalaBtn">
+                          Reset
+                        </button>
+                        <button type="submit" class="btn btn-primary flex-grow-1" id="submitBulkUpdateHalaBtn">
+                          Simpan Perubahan
+                        </button>
+                      </div>
+                      <small class="text-muted d-block mt-2">
+                        Kosongkan kolom jika tidak ingin mengubah jenis tersebut.
+                      </small>
+                    </form>
                   </div>
                 </div>
               </div>
@@ -1008,7 +1337,7 @@
                 </div>
                 <div class="modal-body">
                   <div class="table-responsive">
-                    <table class="table table-bordered table-hover">
+                    <table class="table table-bordered">
                       <thead>
                         <tr>
                           <th>No</th>
@@ -1057,6 +1386,10 @@
                     <div class="mb-3">
                       <label for="updateStokPetugas" class="form-label">Nama Staf</label>
                       <input type="text" class="form-control" id="updateStokPetugas" required />
+                    </div>
+                    <div class="mb-3">
+                      <label for="keteranganKurangi" class="form-label">Keterangan</label>
+                      <textarea class="form-control" id="keteranganKurangi" rows="2" placeholder="Opsional"></textarea>
                     </div>
                   </div>
                   <div class="modal-footer">

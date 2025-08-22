@@ -3,7 +3,15 @@ import { firestore } from "./configFirebase.js";
 import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
 // Copy subset constants (pastikan sinkron dengan manajemenStok.js)
-const mainCategories = ["KALUNG", "LIONTIN", "ANTING", "CINCIN", "HALA", "GELANG", "GIWANG"];
+const mainCategories = [
+  "KALUNG",
+  "LIONTIN",
+  "ANTING",
+  "CINCIN",
+  "HALA",
+  "GELANG",
+  "GIWANG"
+];
 const summaryCategories = ["brankas", "posting", "barang-display", "barang-rusak", "batu-lepas", "manual", "admin"];
 
 // Cache ringan untuk stok agar tidak fetch berulang via window.stockData jika halaman ini dibuka terpisah
@@ -54,7 +62,7 @@ function computeCurrentSummarySnapshot() {
       komputer = parseInt(stockDataSnapshot["stok-komputer"][mainCat].quantity) || 0;
     }
     let status;
-    if (total === komputer) status = "Sesuai / Klop";
+    if (total === komputer) status = "Klop";
     else if (total < komputer) status = `Kurang ${komputer - total}`;
     else status = `Lebih ${total - komputer}`;
     snapshot[mainCat] = { total, komputer, status };
@@ -114,33 +122,80 @@ async function ensureYesterdaySnapshotIfMissing() {
 
 function renderDailyReportTable(dataObj) {
   const tbody = document.getElementById("daily-report-table-body");
+  const table = document.getElementById("daily-report-table");
   const meta = document.getElementById("dailyReportMeta");
   if (!tbody) return;
-  tbody.innerHTML = "";
-  if (!dataObj || !dataObj.items) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Tidak ada data untuk tanggal ini</td></tr>';
-    if (meta) meta.textContent = "";
-    return;
-  }
-  const items = dataObj.items;
-  let i = 1;
-  mainCategories.forEach((mainCat) => {
-    const rowData = items[mainCat] || { total: 0, komputer: 0, status: "-" };
-    let statusClass = "text-primary";
-    if (rowData.status.startsWith("Kurang")) statusClass = "text-danger";
-    else if (rowData.status.startsWith("Lebih")) statusClass = "text-warning";
-    else if (rowData.status.toLowerCase().includes("klop")) statusClass = "text-success";
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${i++}</td>
-      <td>${mainCat}</td>
-      <td class="text-center"><span class="badge bg-primary">${rowData.total}</span></td>
-      <td class="text-center"><span class="badge bg-dark">${rowData.komputer}</span></td>
-      <td class="text-center ${statusClass}"><strong>${rowData.status}</strong></td>
-    `;
-    tbody.appendChild(tr);
-  });
-  if (meta) meta.textContent = `Snapshot tersimpan: ${dataObj.createdAt ? formatDate(dataObj.createdAt) : "-"}`;
+
+  // Add loading animation
+  tbody.innerHTML =
+    '<tr><td colspan="5" class="text-center py-4"><i class="fas fa-spinner fa-spin me-2"></i>Memuat data...</td></tr>';
+
+  setTimeout(() => {
+    tbody.innerHTML = "";
+    if (!dataObj || !dataObj.items) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center text-muted py-4">
+            <i class="fas fa-inbox fa-2x mb-2 d-block text-muted"></i>
+            <span>Tidak ada data untuk tanggal ini</span>
+          </td>
+        </tr>`;
+      if (meta) meta.textContent = "";
+      return;
+    }
+
+    const items = dataObj.items;
+    let i = 1;
+
+    mainCategories.forEach((mainCat) => {
+      const rowData = items[mainCat] || { total: 0, komputer: 0, status: "-" };
+      let statusClass = "text-primary";
+      let statusIcon = "fas fa-info-circle";
+
+      // Enhanced status styling
+      if (rowData.status.startsWith("Kurang")) {
+        statusClass = "status-kurang";
+      } else if (rowData.status.startsWith("Lebih")) {
+        statusClass = "status-lebih";
+      } else if (rowData.status.toLowerCase().includes("klop")) {
+        statusClass = "status-klop";
+        statusIcon = "fas fa-check-circle";
+      }
+
+      const tr = document.createElement("tr");
+      tr.style.height = "auto";
+      tr.innerHTML = `
+        <td class="text-center fw-bold text-muted">${i++}</td>
+        <td class="fw-semibold">${mainCat}</td>
+        <td class="text-center">
+          <span class="badge bg-success position-relative">
+            ${rowData.total}
+            <i class="fas fa-cube ms-1" style="font-size: 0.7rem;"></i>
+          </span>
+        </td>
+        <td class="text-center">
+          <span class="badge bg-primary position-relative">
+            ${rowData.komputer}
+            <i class="fas fa-desktop ms-1" style="font-size: 0.7rem;"></i>
+          </span>
+        </td>
+        <td class="text-center ${statusClass}">
+          <i class="${statusIcon} me-1"></i>
+          <strong>${rowData.status}</strong>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // Add animation class
+    table.classList.add("table-animate");
+    setTimeout(() => table.classList.remove("table-animate"), 500);
+
+    if (meta) {
+      const createdDate = dataObj.createdAt ? formatDate(dataObj.createdAt) : "-";
+      meta.innerHTML = `<i class="fas fa-clock me-1"></i>Snapshot: ${createdDate}`;
+    }
+  }, 300); // Small delay for better UX
 }
 
 function exportTableToCSV() {
@@ -212,10 +267,10 @@ function scheduleAutoSnapshot() {
 
 function initDailyReportPage() {
   const dateInput = document.getElementById("dailyReportDate");
-  const showBtn = document.getElementById("dailyReportShowBtn");
-  const exportBtn = document.getElementById("dailyReportExportBtn");
-  const statusInfo = document.getElementById("dailyReportStatusInfo");
   if (!dateInput) return;
+  const showBtn = document.getElementById("dailyReportShowBtn");
+  const exportBtn = document.getElementById("dailyReportExportBtn"); // may be null in some HTML variants
+  const statusInfo = document.getElementById("dailyReportStatusInfo");
   const todayKey = formatDateKey(new Date());
   dateInput.value = todayKey;
   // Disable future dates
@@ -225,32 +280,51 @@ function initDailyReportPage() {
   // Pastikan snapshot kemarin jika terlewat
   ensureYesterdaySnapshotIfMissing();
 
-  showBtn.addEventListener("click", async () => {
-    const val = dateInput.value;
-    if (!val) return alert("Pilih tanggal");
-    showBtn.disabled = true;
-    const original = showBtn.innerHTML;
-    showBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memuat...';
-    try {
-      const data = await loadDailyStockSnapshot(val);
-      if (data) {
-        renderDailyReportTable(data);
-        statusInfo.textContent = "Data snapshot";
-      } else {
-        await fetchStockSnapshot();
-        const current = { items: computeCurrentSummarySnapshot(), createdAt: null };
-        renderDailyReportTable(current);
+  if (showBtn) {
+    showBtn.addEventListener("click", async () => {
+      const val = dateInput.value;
+      if (!val) {
+        // Enhanced validation feedback
+        dateInput.focus();
+        dateInput.style.borderColor = "#dc3545";
+        setTimeout(() => {
+          dateInput.style.borderColor = "";
+        }, 2000);
+        showToast("Silakan pilih tanggal terlebih dahulu", "error");
+        return;
       }
-    } catch (e) {
-      console.error(e);
-      alert("Gagal memuat laporan");
-    } finally {
-      showBtn.disabled = false;
-      showBtn.innerHTML = original;
-    }
-  });
 
-  exportBtn.addEventListener("click", exportTableToCSV);
+      showBtn.disabled = true;
+      const original = showBtn.innerHTML;
+      showBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Memuat data...';
+
+      try {
+        const data = await loadDailyStockSnapshot(val);
+        if (data) {
+          renderDailyReportTable(data);
+        } else {
+          await fetchStockSnapshot();
+          const current = { items: computeCurrentSummarySnapshot(), createdAt: null };
+          renderDailyReportTable(current);
+        }
+        showToast("Data berhasil dimuat", "success");
+      } catch (e) {
+        console.error(e);
+        showToast("Gagal memuat laporan. Silakan coba lagi.", "error");
+      } finally {
+        showBtn.disabled = false;
+        showBtn.innerHTML = original;
+      }
+    });
+  } else {
+    console.warn("dailyReportShowBtn not found in DOM");
+  }
+
+  if (exportBtn) {
+    exportBtn.addEventListener("click", exportTableToCSV);
+  } else {
+    // export button is optional in the page; no-op if missing
+  }
 
   // Jalankan pengecekan apakah sudah lewat jam 23:00 dan snapshot belum ada.
   ensureTodaySnapshotIfPassed();
@@ -259,16 +333,45 @@ function initDailyReportPage() {
 }
 
 function showToast(message, type = "success") {
+  // Remove existing toasts
+  const existingToasts = document.querySelectorAll(".custom-toast");
+  existingToasts.forEach((toast) => toast.remove());
+
   let toast = document.createElement("div");
-  toast.className = `position-fixed top-0 end-0 m-3 px-3 py-2 rounded shadow text-white bg-${
-    type === "success" ? "success" : "danger"
-  }`;
+  toast.className = `custom-toast position-fixed top-0 end-0 m-3 px-4 py-3 rounded-3 shadow-lg text-white`;
   toast.style.zIndex = 9999;
-  toast.innerHTML = `<small>${message}</small>`;
+  toast.style.minWidth = "300px";
+  toast.style.transform = "translateX(100%)";
+  toast.style.transition = "all 0.3s ease";
+
+  const bgClass = type === "success" ? "bg-success" : "bg-danger";
+  const icon = type === "success" ? "fas fa-check-circle" : "fas fa-exclamation-triangle";
+
+  toast.classList.add(bgClass);
+  toast.innerHTML = `
+    <div class="d-flex align-items-center">
+      <i class="${icon} me-2 fs-5"></i>
+      <span class="fw-semibold">${message}</span>
+      <button class="btn-close btn-close-white ms-auto" onclick="this.parentElement.parentElement.remove()"></button>
+    </div>
+  `;
+
   document.body.appendChild(toast);
+
+  // Animate in
   setTimeout(() => {
-    toast.remove();
-  }, 3000);
+    toast.style.transform = "translateX(0)";
+  }, 10);
+
+  // Auto remove after 4 seconds
+  setTimeout(() => {
+    toast.style.transform = "translateX(100%)";
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.remove();
+      }
+    }, 300);
+  }, 4000);
 }
 
 document.addEventListener("DOMContentLoaded", initDailyReportPage);
