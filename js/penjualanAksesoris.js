@@ -41,93 +41,175 @@ const simpleCache = {
 
 // Utility functions
 const utils = {
-  showAlert: (message, title = "Informasi", type = "info") => {
-    return Swal.fire({
-      title,
-      text: message,
-      icon: type,
-      confirmButtonText: "OK",
-      confirmButtonColor: "#0d6efd",
-    });
-  },
-
-  showConfirm: (message, title = "Konfirmasi") => {
-    return Swal.fire({
-      title,
-      text: message,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: "Ya",
-      cancelButtonText: "Batal",
-      confirmButtonColor: "#0d6efd",
-      cancelButtonColor: "#6c757d",
-    }).then((result) => result.isConfirmed);
-  },
-
-  formatDate: (date) => {
-    if (!date) return "";
     try {
-      const d = date.toDate ? date.toDate() : date instanceof Date ? date : new Date(date);
-      const day = String(d.getDate()).padStart(2, "0");
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const year = d.getFullYear();
-      return `${day}/${month}/${year}`;
-    } catch (error) {
-      console.error("Error formatting date:", error);
-      return "";
-    }
-  },
+      // UI-level validation
+      const salesName = $("#sales").val().trim();
+      if (!salesName) {
+        utils.showAlert("Nama sales harus diisi!", "Validasi", "warning");
+        return;
+      }
 
-  parseDate: (dateString) => {
-    if (!dateString) return null;
-    try {
-      const parts = dateString.split("/");
-      return new Date(parts[2], parts[1] - 1, parts[0]);
-    } catch (error) {
-      console.error("Error parsing date:", error);
-      return null;
-    }
-  },
+      const salesType = $("#jenisPenjualan").val();
+      const tableSelector =
+        salesType === "aksesoris"
+          ? "#tableAksesorisDetail"
+          : salesType === "kotak"
+          ? "#tableKotakDetail"
+          : "#tableManualDetail";
 
-  formatRupiah: (angka) => {
-    if (!angka && angka !== 0) return "0";
-    const number = typeof angka === "string" ? parseInt(angka.replace(/\./g, "")) : angka;
-    return new Intl.NumberFormat("id-ID").format(number);
-  },
+      if ($(tableSelector + " tbody tr:not(.input-row)").length === 0) {
+        utils.showAlert("Tidak ada item untuk disimpan.", "Validasi", "warning");
+        return;
+      }
 
-  showLoading: (show) => {
-    const loader = document.getElementById("loadingIndicator");
-    if (loader) loader.style.display = show ? "flex" : "none";
-  },
+      const paymentMethod = $("#metodeBayar").val();
+      if (paymentMethod === "dp") {
+        // simple DP validation
+        const nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "")) || 0;
+        if (nominalDP <= 0) {
+          utils.showAlert("Nominal DP harus lebih dari 0 untuk metode DP.", "Validasi", "warning");
+          return;
+        }
+      }
 
-  isSameDate: (date1, date2) => {
-    if (!date1 || !date2) return false;
-    const d1 = date1 instanceof Date ? date1 : new Date(date1);
-    const d2 = date2 instanceof Date ? date2 : new Date(date2);
-    return d1.toDateString() === d2.toDateString();
-  },
+      utils.showLoading(true);
 
-  debounce: (func, wait) => {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
+      // Collect items data
+      const items = this.collectItemsData(salesType, tableSelector);
+
+      // Prepare transaction payload (no serverTimestamp here, will set on write)
+      const transactionData = {
+        jenisPenjualan: salesType,
+        tanggal: $("#tanggal").val(),
+        sales: salesName,
+        metodeBayar: paymentMethod,
+        totalHarga: parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0,
+        items: items,
       };
-      clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
-    };
-  },
-};
 
-// Enhanced reads monitor for Firestore optimization
-const readsMonitor = {
-  reads: {},
-  dailyLimit: 50000,
+      // Mark as ganti lock if applicable
+      if (salesType === "manual" && items.some((item) => item.kodeLock)) {
+        transactionData.isGantiLock = true;
+      }
 
-  increment(operation, count = 1) {
-    const today = new Date().toDateString();
-    if (!this.reads[today]) {
+      // Idempotency key (persist for current page session to survive retries)
+      if (!this.currentIdempotencyKey) {
+        const generateId = () =>
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9);
+        this.currentIdempotencyKey = generateId();
+      }
+
+      const idempotencyKey = this.currentIdempotencyKey;
+      const txId = `penjualanAksesoris_${idempotencyKey}`;
+      const txRef = doc(firestore, "penjualanAksesoris", txId);
+
+      // Use Firestore transaction to guarantee single write per idempotency key
+      const txResult = await runTransaction(firestore, async (t) => {
+        const existing = await t.get(txRef);
+        if (existing.exists()) {
+          // indicate duplicate
+          return { duplicate: true, id: txId };
+        }
+
+        // attach server timestamp and idempotency key
+        t.set(txRef, {
+          ...transactionData,
+          idempotencyKey,
+          createdAt: serverTimestamp(),
+        });
+
+        return { duplicate: false, id: txId };
+      });
+
+      if (txResult && txResult.duplicate) {
+        // Transaction already exists for this idempotency key — do not re-apply side effects
+        utils.showAlert("Transaksi sudah tersimpan sebelumnya (duplicate prevented).", "Info", "info");
+
+        // Try to load the existing doc to use for printing/caching
+        try {
+          const existingSnap = await getDoc(txRef);
+          const existingData = existingSnap.exists() ? { id: txRef.id, ...existingSnap.data() } : null;
+          if (existingData) {
+            currentTransactionData = {
+              id: existingData.id,
+              salesType: existingData.jenisPenjualan,
+              tanggal: existingData.tanggal,
+              sales: existingData.sales,
+              totalHarga: utils.formatRupiah(existingData.totalHarga || 0),
+              items: existingData.items || [],
+              metodeBayar: existingData.metodeBayar,
+            };
+
+            // Ensure cache contains the transaction (without duplicating)
+            this.salesData.unshift(existingData);
+            const dateKey = new Date().toISOString().split('T')[0];
+            simpleCache.set(`salesData_${dateKey}`, this.salesData);
+          }
+        } catch (err) {
+          console.warn("Failed to load existing transaction after duplicate detection:", err);
+        }
+
+        // cleanup idempotency for next new transaction
+        this.currentIdempotencyKey = null;
+        return txResult;
+      }
+
+      // If we reach here, transaction was created successfully. Apply side-effects.
+      readsMonitor.increment("Save Transaction", 1);
+
+      // Update stock
+      await this.updateStock(salesType, items);
+
+      // Duplikasi ke mutasiKode jika transaksi manual
+      if (transactionData.jenisPenjualan === "manual") {
+        // best-effort duplication, do not bubble errors
+        this.duplicateToMutasiKode(transactionData, txId).catch((e) => console.warn(e));
+      }
+
+      // Update local cache and printing data
+      const newTransaction = { id: txId, ...transactionData, idempotencyKey };
+      this.salesData.unshift(newTransaction);
+      const dateKey = new Date().toISOString().split('T')[0];
+      simpleCache.set(`salesData_${dateKey}`, this.salesData);
+
+      utils.showAlert("Transaksi berhasil disimpan!", "Sukses", "success");
+
+      currentTransactionData = {
+        id: txId,
+        salesType: salesType,
+        tanggal: $("#tanggal").val(),
+        sales: salesName,
+        totalHarga: $("#totalOngkos").val(),
+        items: items,
+        metodeBayar: paymentMethod,
+      };
+
+      // Reset idempotency key now that transaction completed
+      this.currentIdempotencyKey = null;
+
+      // Show print modal
+      $("#printModal").modal("show");
+
+      // Reset form after modal is closed (ensure only one handler)
+      $("#printModal").off("hidden.bs.modal").on("hidden.bs.modal", () => {
+        this.resetForm();
+      });
+      return { id: txId };
+    } catch (error) {
+      // special-case duplicate marker thrown from transaction or other sources
+      if (error && error.code === 'DUPLICATE_TRANSACTION') {
+        utils.showAlert("Transaksi sudah tersimpan sebelumnya (duplicate prevented).", "Info", "info");
+        return;
+      }
+
+      console.error("Error saving transaction:", error);
+      utils.showAlert("Terjadi kesalahan saat menyimpan transaksi: " + (error.message || error), "Error", "error");
+      throw error;
+    } finally {
+      utils.showLoading(false);
+    }
       this.reads[today] = {};
     }
     if (!this.reads[today][operation]) {
