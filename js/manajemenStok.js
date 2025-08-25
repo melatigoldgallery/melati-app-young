@@ -29,6 +29,7 @@ const subCategories = [
   "Batu Lepas",
   "Manual",
   "Admin",
+  "DP",
   "Contoh Custom",
 ];
 // Tambah 'contoh-custom' agar ikut dimuat & (opsional) dihitung dalam ringkasan
@@ -40,6 +41,7 @@ const summaryCategories = [
   "batu-lepas",
   "manual",
   "admin",
+  "DP",
   "contoh-custom",
 ];
 
@@ -61,6 +63,7 @@ const categoryMapping = {
   "Batu Lepas": "batu-lepas",
   Manual: "manual",
   Admin: "admin",
+  DP: "DP",
   "Contoh Custom": "contoh-custom",
 };
 
@@ -73,6 +76,7 @@ const reverseCategoryMapping = {
   "batu-lepas": "Batu Lepas",
   manual: "Manual",
   admin: "Admin",
+  DP: "DP",
   "contoh-custom": "Contoh Custom",
 };
 const mainCategoryToId = {
@@ -159,6 +163,7 @@ async function fetchStockData(forceRefresh = false) {
     "batu-lepas",
     "manual",
     "admin",
+    "DP",
     "contoh-custom",
     "stok-komputer",
   ];
@@ -331,7 +336,7 @@ export async function populateTables() {
         const tr = document.createElement("tr");
 
         // Untuk HALA dan KENDARI: tampilkan tombol Update multi-jenis pada baris tertentu
-        const halaUpdateSubcats = ["Display", "Rusak", "Batu Lepas", "Manual", "Admin", "Contoh Custom"];
+        const halaUpdateSubcats = ["Display", "Rusak", "Batu Lepas", "Manual", "Admin", "DP", "Contoh Custom"];
         let actionColumn = "";
         if (
           (mainCat === "HALA") &&
@@ -356,7 +361,7 @@ export async function populateTables() {
               subCat === "Manual" ||
               subCat === "Admin" ||
               (halaLikeUpdateMains.includes(mainCat) &&
-                (subCat === "Rusak" || subCat === "Batu Lepas" || subCat === "Contoh Custom"))) &&
+                (subCat === "Rusak" || subCat === "Batu Lepas" || subCat === "Contoh Custom" || subCat === "DP"))) &&
             mainCat !== "HALA";
 
           actionColumn = showUpdateButton
