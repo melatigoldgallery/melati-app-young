@@ -379,8 +379,8 @@
 }
 
 .stock-card {
-  width: 240px;
-  height: 140px;
+  width: 100%;
+  min-height: 140px;
   border-radius: 15px;
   padding: 15px 10px;
   margin-bottom: 10px;
