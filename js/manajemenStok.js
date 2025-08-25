@@ -184,8 +184,9 @@ async function fetchStockData(forceRefresh = false) {
         await setDoc(categoryRef, categoryData);
       }
 
-      // Inisialisasi khusus untuk HALA di semua kategori
-      if (categoryData.HALA) {
+      // Inisialisasi khusus untuk HALA (kecuali untuk kategori 'stok-komputer')
+      // Agar nilai HALA pada stok-komputer tidak di-reset menjadi 0
+      if (category !== "stok-komputer" && categoryData.HALA) {
         initializeHalaStructure(categoryData, "HALA");
         // Update quantity total untuk HALA
         categoryData.HALA.quantity = calculateHalaTotal(categoryData, "HALA");
@@ -207,23 +208,34 @@ async function fetchStockData(forceRefresh = false) {
     throw error;
   }
 }
+// Hapus nilai undefined secara rekursif (Firestore tidak menerima undefined)
+function sanitizeForFirestore(value) {
+  if (Array.isArray(value)) {
+    return value.filter((v) => v !== undefined).map((v) => sanitizeForFirestore(v));
+  }
+  if (value && typeof value === "object") {
+    const out = {};
+    Object.entries(value).forEach(([k, v]) => {
+      if (v === undefined) return; // skip undefined field
+      out[k] = sanitizeForFirestore(v);
+    });
+    return out;
+  }
+  return value;
+}
+
 async function saveData(category, type) {
   try {
     const categoryRef = doc(firestore, "stocks", category);
     const updateData = {};
-    updateData[type] = stockData[category][type];
-    await updateDoc(categoryRef, updateData);
+    updateData[type] = sanitizeForFirestore(stockData[category][type]);
+    // Gunakan merge agar aman untuk create/update dan tidak menimpa field lain
+    await setDoc(categoryRef, updateData, { merge: true });
     stockCacheMeta.set(category, Date.now());
     updateCache();
-  } catch (error) {
-    // Try create
-    try {
-      await setDoc(doc(firestore, "stocks", category), stockData[category]);
-      stockCacheMeta.set(category, Date.now());
-      updateCache();
-    } catch (e) {
-      alert("Gagal simpan data stok. Silakan coba lagi.");
-    }
+  } catch (e) {
+    console.error("Error saving data:", e);
+    throw e;
   }
 }
 
@@ -578,8 +590,13 @@ document.getElementById("formUpdateKomputer").onsubmit = async function (e) {
     alert("Semua field harus diisi.");
     return;
   }
-  await updateStokKomputer(jenis, jumlah);
+  // Tutup modal lebih dulu agar UI responsif
   $("#modalUpdateKomputer").modal("hide");
+  try {
+    await updateStokKomputer(jenis, jumlah);
+  } catch (err) {
+    showErrorNotification("Gagal menyimpan stok komputer");
+  }
 };
 
 async function updateStokKomputer(jenis, jumlah) {
@@ -591,6 +608,8 @@ async function updateStokKomputer(jenis, jumlah) {
   stockData["stok-komputer"][jenis].quantity = parseInt(jumlah);
   stockData["stok-komputer"][jenis].lastUpdated = new Date().toISOString();
   await saveData("stok-komputer", jenis);
+  // Refresh from server to ensure latest persisted data reflected immediately
+  await fetchStockData(true);
   await populateTables();
 }
 
@@ -624,21 +643,25 @@ async function updateStokDisplayManual(category, mainCat, newQuantity, petugas, 
     quantityDiff = 0;
   }
 
-  // Add to history (SIMPAN KETERANGAN)
-  item.history.unshift({
+  // Add to history (hindari undefined untuk Firestore)
+  const historyEntry = {
     date: item.lastUpdated,
     action: actionType,
     quantity: quantityDiff,
     oldQuantity: oldQuantity,
     newQuantity: newQty,
     petugas,
-    keterangan: keterangan || undefined, // opsional
-  });
+  };
+  if (keterangan && keterangan.trim() !== "") {
+    historyEntry.keterangan = keterangan.trim();
+  }
+  item.history.unshift(historyEntry);
 
   // Keep only last 10 records
   if (item.history.length > 10) item.history = item.history.slice(0, 10);
 
   await saveData(category, mainCat);
+  await fetchStockData(true);
   await populateTables();
 }
 
@@ -708,6 +731,7 @@ async function addStock(category, mainCat, quantity, adder) {
   });
   if (item.history.length > 10) item.history = item.history.slice(0, 10);
   await saveData(category, mainCat);
+  await fetchStockData(true);
   await populateTables();
 }
 async function reduceStock(category, mainCat, quantity, pengurang, keterangan) {
@@ -835,7 +859,8 @@ async function addStockHala(category, mainCat, jewelryType, quantity, adder) {
     if (item.history.length > 10) item.history = item.history.slice(0, 10);
 
     await saveData(category, mainCat);
-    await populateTables();
+  await fetchStockData(true);
+  await populateTables();
   } catch (error) {
     console.error("Error in addStockHala:", error);
     alert("Terjadi kesalahan saat menambah stok HALA. Silakan coba lagi.");
@@ -876,7 +901,8 @@ async function addStockHalaBulk(category, mainCat, items, adder) {
     });
     if (item.history.length > 10) item.history = item.history.slice(0, 10);
     await saveData(category, mainCat);
-    await populateTables();
+  await fetchStockData(true);
+  await populateTables();
   } catch (e) {
     console.error("Error bulk add HALA", e);
     throw e;
@@ -937,7 +963,8 @@ async function reduceStockHala(category, mainCat, jewelryType, quantity, pengura
     if (item.history.length > 10) item.history = item.history.slice(0, 10);
 
     await saveData(category, mainCat);
-    await populateTables();
+  await fetchStockData(true);
+  await populateTables();
     return true;
   } catch (error) {
     console.error("Error in reduceStockHala:", error);
@@ -1264,8 +1291,12 @@ document.getElementById("formTambahStok").onsubmit = async function (e) {
     alert("Semua field harus diisi.");
     return;
   }
-  await addStock(currentCategory, currentMainCat, jumlah, penambah);
   $("#modalTambahStok").modal("hide");
+  try {
+    await addStock(currentCategory, currentMainCat, jumlah, penambah);
+  } catch (err) {
+    showErrorNotification("Gagal menambah stok");
+  }
 };
 
 document.getElementById("formKurangiStok").onsubmit = async function (e) {
@@ -1277,8 +1308,12 @@ document.getElementById("formKurangiStok").onsubmit = async function (e) {
     alert("Semua field harus diisi.");
     return;
   }
-  await reduceStock(currentCategory, currentMainCat, jumlah, pengurang, keterangan);
   $("#modalKurangiStok").modal("hide");
+  try {
+    await reduceStock(currentCategory, currentMainCat, jumlah, pengurang, keterangan);
+  } catch (err) {
+    showErrorNotification("Gagal mengurangi stok");
+  }
 };
 
 // === Handler Submit Modal HALA (Bulk) ===
@@ -1300,11 +1335,9 @@ if (formTambahStokHalaBulk) {
         .map((inp) => ({ type: inp.dataset.type, qty: parseInt(inp.value || "0") }))
         .filter((it) => it.qty > 0);
       if (items.length === 0) throw new Error("Isi minimal satu jumlah > 0");
-      await addStockHalaBulk(currentCategory, currentMainCat, items, adder);
-      showSuccessNotification(
-        `Berhasil menambah ${items.length} jenis (total ${items.reduce((a, b) => a + b.qty, 0)})`
-      );
-      $("#modalTambahStokHala").modal("hide");
+  $("#modalTambahStokHala").modal("hide");
+  await addStockHalaBulk(currentCategory, currentMainCat, items, adder);
+  showSuccessNotification(`Berhasil menambah ${items.length} jenis (total ${items.reduce((a, b) => a + b.qty, 0)})`);
     } catch (err) {
       console.error("Bulk HALA error", err);
       showErrorNotification(err.message || "Gagal simpan bulk HALA");
@@ -1340,12 +1373,10 @@ if (formBulkReduce) {
         .map((inp) => ({ type: inp.dataset.type, qty: parseInt(inp.value || "0") }))
         .filter((it) => it.qty > 0);
       if (items.length === 0) throw new Error("Isi minimal satu jumlah > 0");
+      $("#modalKurangiStokHala").modal("hide");
       const success = await reduceStockHalaBulk(currentCategory, currentMainCat, items, pengurang, keterangan);
       if (success) {
-        showSuccessNotification(
-          `Berhasil mengurangi ${items.length} jenis (total ${items.reduce((a, b) => a + b.qty, 0)})`
-        );
-        $("#modalKurangiStokHala").modal("hide");
+        showSuccessNotification(`Berhasil mengurangi ${items.length} jenis (total ${items.reduce((a, b) => a + b.qty, 0)})`);
       }
     } catch (err) {
       console.error("Bulk reduce HALA error", err);
@@ -1539,7 +1570,8 @@ if (formUpdateHala) {
       if (item.history.length > 10) item.history = item.history.slice(0, 10);
 
       await saveData(category, mainCat);
-      await populateTables();
+  await fetchStockData(true);
+  await populateTables();
       showSuccessNotification("Update HALA berhasil");
       $("#modalUpdateStokHala").modal("hide");
     } catch (err) {
