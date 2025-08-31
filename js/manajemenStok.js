@@ -10,15 +10,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
 // === Konstanta dan Mapping ===
-const mainCategories = [
-  "KALUNG",
-  "LIONTIN",
-  "ANTING",
-  "CINCIN",
-  "HALA",
-  "GELANG",
-  "GIWANG"
-];
+const mainCategories = ["KALUNG", "LIONTIN", "ANTING", "CINCIN", "HALA", "GELANG", "GIWANG"];
 // Tidak ada lagi kategori ekstra terpisah; semua dianggap utama dengan tab
 const extraSummaryMainCategories = []; // dibiarkan kosong agar tidak double loop
 const subCategories = [
@@ -86,7 +78,7 @@ const mainCategoryToId = {
   CINCIN: "cincin-table-body",
   HALA: "hala-table-body",
   GELANG: "gelang-table-body",
-  GIWANG: "giwang-table-body"
+  GIWANG: "giwang-table-body",
 };
 const statusCardId = {
   KALUNG: "label-jenis-KALUNG",
@@ -95,7 +87,7 @@ const statusCardId = {
   CINCIN: "label-jenis-CINCIN",
   HALA: "label-jenis-HALA",
   GELANG: "label-jenis-GELANG",
-  GIWANG: "label-jenis-GIWANG"
+  GIWANG: "label-jenis-GIWANG",
 };
 const totalCardId = {
   KALUNG: "total-kalung",
@@ -104,7 +96,7 @@ const totalCardId = {
   CINCIN: "total-cincin",
   HALA: "total-hala",
   GELANG: "total-gelang",
-  GIWANG: "total-giwang"
+  GIWANG: "total-giwang",
 };
 
 // === Cache Management ===
@@ -350,10 +342,7 @@ export async function populateTables() {
         // Untuk HALA dan KENDARI: tampilkan tombol Update multi-jenis pada baris tertentu
         const halaUpdateSubcats = ["Display", "Rusak", "Batu Lepas", "Manual", "Admin", "DP", "Contoh Custom"];
         let actionColumn = "";
-        if (
-          (mainCat === "HALA") &&
-          halaUpdateSubcats.includes(subCat)
-        ) {
+        if (mainCat === "HALA" && halaUpdateSubcats.includes(subCat)) {
           actionColumn = `
             <td class="text-center">
               <button class="btn btn-success btn-sm update-hala-btn"
@@ -578,8 +567,10 @@ function showSuccessNotification(message) {
 let komputerEditMainCat = "";
 
 document.body.addEventListener("click", function (e) {
-  if (e.target.classList.contains("edit-komputer-btn")) {
-    komputerEditMainCat = e.target.dataset.main;
+  if (e.target.classList.contains("edit-komputer-btn") || e.target.closest(".edit-komputer-btn")) {
+    const btn = e.target.classList.contains("edit-komputer-btn") ? e.target : e.target.closest(".edit-komputer-btn");
+    if (!btn) return;
+    komputerEditMainCat = btn.dataset.main;
     document.getElementById("updateKomputerJumlah").value =
       stockData["stok-komputer"][komputerEditMainCat]?.quantity || 0;
     document.getElementById("updateKomputerJenis").value = komputerEditMainCat;
@@ -864,8 +855,8 @@ async function addStockHala(category, mainCat, jewelryType, quantity, adder) {
     if (item.history.length > 10) item.history = item.history.slice(0, 10);
 
     await saveData(category, mainCat);
-  await fetchStockData(true);
-  await populateTables();
+    await fetchStockData(true);
+    await populateTables();
   } catch (error) {
     console.error("Error in addStockHala:", error);
     alert("Terjadi kesalahan saat menambah stok HALA. Silakan coba lagi.");
@@ -906,8 +897,8 @@ async function addStockHalaBulk(category, mainCat, items, adder) {
     });
     if (item.history.length > 10) item.history = item.history.slice(0, 10);
     await saveData(category, mainCat);
-  await fetchStockData(true);
-  await populateTables();
+    await fetchStockData(true);
+    await populateTables();
   } catch (e) {
     console.error("Error bulk add HALA", e);
     throw e;
@@ -968,8 +959,8 @@ async function reduceStockHala(category, mainCat, jewelryType, quantity, pengura
     if (item.history.length > 10) item.history = item.history.slice(0, 10);
 
     await saveData(category, mainCat);
-  await fetchStockData(true);
-  await populateTables();
+    await fetchStockData(true);
+    await populateTables();
     return true;
   } catch (error) {
     console.error("Error in reduceStockHala:", error);
@@ -1279,7 +1270,26 @@ document.body.addEventListener("click", function (e) {
     document.getElementById("updateStokCategory").value = categoryKey;
     document.getElementById("updateStokJenis").value = `${mainCat} - ${subCategory}`;
     document.getElementById("updateStokJumlah").value = stockItem.quantity;
-    document.getElementById("updateStokPetugas").value = "";
+    // Toggle visibility/requirement of Nama Staf based on subCategory
+    const formUpdate = document.getElementById("formUpdateStok");
+    const petugasInput = document.getElementById("updateStokPetugas");
+    if (petugasInput) {
+      // Categories where Nama Staf is NOT used for Update
+      const noStaffSubcats = ["Display", "Rusak", "Batu Lepas", "Manual", "Admin", "DP", "Contoh Custom"];
+      const requirePetugas = !noStaffSubcats.includes(subCategory);
+      if (formUpdate) formUpdate.dataset.requirePetugas = requirePetugas ? "1" : "0";
+      // Find a reasonable wrapper to hide (form-group/mb-3/form-floating) and fallback to parent
+      const wrapper =
+        petugasInput.closest(".mb-3") ||
+        petugasInput.closest(".form-group") ||
+        petugasInput.closest(".form-floating") ||
+        petugasInput.parentElement;
+      if (wrapper) wrapper.classList.toggle("d-none", !requirePetugas);
+      petugasInput.required = requirePetugas;
+      if (!requirePetugas) petugasInput.value = ""; // clear when not needed
+    }
+    // Always reset petugas value when opening
+    if (document.getElementById("updateStokPetugas")) document.getElementById("updateStokPetugas").value = "";
     const ketFieldUpdate = document.querySelector("#modalUpdateStok #keteranganKurangi");
     if (ketFieldUpdate) ketFieldUpdate.value = "";
 
@@ -1340,9 +1350,11 @@ if (formTambahStokHalaBulk) {
         .map((inp) => ({ type: inp.dataset.type, qty: parseInt(inp.value || "0") }))
         .filter((it) => it.qty > 0);
       if (items.length === 0) throw new Error("Isi minimal satu jumlah > 0");
-  $("#modalTambahStokHala").modal("hide");
-  await addStockHalaBulk(currentCategory, currentMainCat, items, adder);
-  showSuccessNotification(`Berhasil menambah ${items.length} jenis (total ${items.reduce((a, b) => a + b.qty, 0)})`);
+      $("#modalTambahStokHala").modal("hide");
+      await addStockHalaBulk(currentCategory, currentMainCat, items, adder);
+      showSuccessNotification(
+        `Berhasil menambah ${items.length} jenis (total ${items.reduce((a, b) => a + b.qty, 0)})`
+      );
     } catch (err) {
       console.error("Bulk HALA error", err);
       showErrorNotification(err.message || "Gagal simpan bulk HALA");
@@ -1381,7 +1393,9 @@ if (formBulkReduce) {
       $("#modalKurangiStokHala").modal("hide");
       const success = await reduceStockHalaBulk(currentCategory, currentMainCat, items, pengurang, keterangan);
       if (success) {
-        showSuccessNotification(`Berhasil mengurangi ${items.length} jenis (total ${items.reduce((a, b) => a + b.qty, 0)})`);
+        showSuccessNotification(
+          `Berhasil mengurangi ${items.length} jenis (total ${items.reduce((a, b) => a + b.qty, 0)})`
+        );
       }
     } catch (err) {
       console.error("Bulk reduce HALA error", err);
@@ -1429,7 +1443,9 @@ document.getElementById("formUpdateStok").onsubmit = async function (e) {
   const petugas = document.getElementById("updateStokPetugas").value;
   const keterangan = this.querySelector("#keteranganKurangi")?.value?.trim() || "";
 
-  if (!mainCat || !category || jumlah === "" || !petugas) {
+  // Determine whether petugas is required for this submission
+  const requirePetugasFlag = this.dataset.requirePetugas === "1";
+  if (!mainCat || !category || jumlah === "" || (requirePetugasFlag && !petugas)) {
     alert("Semua field yang wajib harus diisi.");
     return;
   }
@@ -1575,8 +1591,8 @@ if (formUpdateHala) {
       if (item.history.length > 10) item.history = item.history.slice(0, 10);
 
       await saveData(category, mainCat);
-  await fetchStockData(true);
-  await populateTables();
+      await fetchStockData(true);
+      await populateTables();
       showSuccessNotification("Update HALA berhasil");
       $("#modalUpdateStokHala").modal("hide");
     } catch (err) {
