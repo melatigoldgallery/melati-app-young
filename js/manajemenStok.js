@@ -574,7 +574,9 @@ document.body.addEventListener("click", function (e) {
     document.getElementById("updateKomputerJumlah").value =
       stockData["stok-komputer"][komputerEditMainCat]?.quantity || 0;
     document.getElementById("updateKomputerJenis").value = komputerEditMainCat;
-    $("#modalUpdateKomputer").modal("show");
+    // Show modal using Bootstrap 5 API
+    const modalEl = document.getElementById("modalUpdateKomputer");
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
   }
 });
 
@@ -586,8 +588,10 @@ document.getElementById("formUpdateKomputer").onsubmit = async function (e) {
     alert("Semua field harus diisi.");
     return;
   }
-  // Tutup modal lebih dulu agar UI responsif
-  $("#modalUpdateKomputer").modal("hide");
+  // Tutup modal lebih dulu agar UI responsif (Bootstrap 5 API)
+  const modalEl = document.getElementById("modalUpdateKomputer");
+  const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+  modalInstance.hide();
   try {
     await updateStokKomputer(jenis, jumlah);
   } catch (err) {
@@ -597,11 +601,13 @@ document.getElementById("formUpdateKomputer").onsubmit = async function (e) {
 
 async function updateStokKomputer(jenis, jumlah) {
   await fetchStockData();
-  if (!stockData["stok-komputer"]) return;
+  // Jangan keluar; inisialisasi struktur jika belum ada
+  if (!stockData["stok-komputer"]) stockData["stok-komputer"] = {};
   if (!stockData["stok-komputer"][jenis]) {
     stockData["stok-komputer"][jenis] = { quantity: 0, lastUpdated: null, history: [] };
   }
-  stockData["stok-komputer"][jenis].quantity = parseInt(jumlah);
+  const parsed = parseInt(jumlah, 10);
+  stockData["stok-komputer"][jenis].quantity = isNaN(parsed) ? 0 : parsed;
   stockData["stok-komputer"][jenis].lastUpdated = new Date().toISOString();
   await saveData("stok-komputer", jenis);
   // Refresh from server to ensure latest persisted data reflected immediately
@@ -1293,7 +1299,9 @@ document.body.addEventListener("click", function (e) {
     const ketFieldUpdate = document.querySelector("#modalUpdateStok #keteranganKurangi");
     if (ketFieldUpdate) ketFieldUpdate.value = "";
 
-    $("#modalUpdateStok").modal("show");
+    // Use Bootstrap 5 API to show modal (replaces jQuery .modal('show'))
+    const modalEl = document.getElementById("modalUpdateStok");
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
   }
 });
 
@@ -1450,8 +1458,12 @@ document.getElementById("formUpdateStok").onsubmit = async function (e) {
     return;
   }
 
+  // Close modal first for better UX and to ensure it always closes in BS5
+  const modalEl = document.getElementById("modalUpdateStok");
+  const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+  modalInstance.hide();
+
   await updateStokDisplayManual(category, mainCat, jumlah, petugas, keterangan);
-  $("#modalUpdateStok").modal("hide");
 };
 
 // === Real-time listener (optional) ===
@@ -1522,6 +1534,25 @@ document.body.addEventListener("click", async function (e) {
       document.getElementById("jenisUpdateHalaDisplay").value = jenisDisplay;
       document.getElementById("jenisUpdateHala").value = currentCategory;
       document.getElementById("modalUpdateStokHalaLabel").textContent = `Update Stok ${jenisDisplay}`;
+
+      // Tampilkan/sembunyikan field Nama Staf khusus HALA:
+      // - Wajib & tampil untuk 'brankas' dan 'posting'
+      // - Disembunyikan untuk kategori lain (barang-display, barang-rusak, batu-lepas, manual, admin, DP, contoh-custom)
+      const requirePetugas = currentCategory === "brankas" || currentCategory === "posting";
+      const formEl = document.getElementById("formUpdateStokHalaBulk");
+      if (formEl) formEl.dataset.requirePetugas = requirePetugas ? "1" : "0";
+      const petugasInputHala = document.getElementById("petugasUpdateStokHalaBulk");
+      if (petugasInputHala) {
+        const wrapper =
+          petugasInputHala.closest(".mb-3") ||
+          petugasInputHala.closest(".form-group") ||
+          petugasInputHala.closest(".form-floating") ||
+          petugasInputHala.parentElement;
+        if (wrapper) wrapper.classList.toggle("d-none", !requirePetugas);
+        petugasInputHala.required = requirePetugas;
+        if (!requirePetugas) petugasInputHala.value = ""; // bersihkan saat tidak diperlukan
+      }
+
       $("#modalUpdateStokHala").modal("show");
     } catch (err) {
       console.error("Gagal buka modal update HALA", err);
@@ -1542,8 +1573,9 @@ if (formUpdateHala) {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
       }
+      const requirePetugasFlag = this.dataset.requirePetugas === "1";
       const petugas = document.getElementById("petugasUpdateStokHalaBulk").value.trim();
-      if (!petugas) throw new Error("Nama staf harus diisi");
+      if (requirePetugasFlag && !petugas) throw new Error("Nama staf harus diisi");
       const category = document.getElementById("jenisUpdateHala").value;
       const mainCat = document.getElementById("jenisUpdateHalaDisplay").value.split(" - ")[0] || "HALA";
 
@@ -1577,17 +1609,18 @@ if (formUpdateHala) {
       // Recalculate total & lastUpdated & add history single entry
       item.quantity = calculateHalaTotal(stockData[category], mainCat);
       item.lastUpdated = new Date().toISOString();
-      item.history.unshift({
+      const historyEntry = {
         date: item.lastUpdated,
         action: "Update Bulk",
         quantity: updates.reduce((s, it) => s + it.qty, 0),
-        petugas,
         items: updates.map((it) => ({
           jewelryType: it.type,
           jewelryName: halaJewelryMapping[it.type],
           quantity: it.qty,
         })),
-      });
+      };
+      if (requirePetugasFlag && petugas) historyEntry.petugas = petugas;
+      item.history.unshift(historyEntry);
       if (item.history.length > 10) item.history = item.history.slice(0, 10);
 
       await saveData(category, mainCat);
