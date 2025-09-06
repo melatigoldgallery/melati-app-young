@@ -145,7 +145,8 @@ function isCacheValid(category) {
   return Date.now() - timestamp < CACHE_TTL;
 }
 
-// === Firestore Fetch/Save ===
+// UPDATED: Fetch selektif hanya untuk kategori yang cache-nya invalid.
+// Tetap support forceRefresh, namun default hemat-reads.
 async function fetchStockData(forceRefresh = false) {
   const categories = [
     "brankas",
@@ -159,18 +160,27 @@ async function fetchStockData(forceRefresh = false) {
     "contoh-custom",
     "stok-komputer",
   ];
+
   try {
     if (!forceRefresh && Object.keys(stockData).length > 0 && categories.every(isCacheValid)) {
       return stockData;
     }
-    const fetchPromises = categories.map(async (category) => {
+
+    // Ambil hanya dokumen yang perlu
+    const toFetch = forceRefresh ? categories : categories.filter((c) => !isCacheValid(c));
+    if (toFetch.length === 0) {
+      return stockData;
+    }
+
+    const fetchPromises = toFetch.map(async (category) => {
       const categoryRef = doc(firestore, "stocks", category);
       const categoryDoc = await getDoc(categoryRef);
       let categoryData = {};
+
       if (categoryDoc.exists()) {
         categoryData = categoryDoc.data();
       } else {
-        // Inisialisasi kosong per mainCategories
+        // Inisialisasi kosong per mainCategories (sekali saat pertama)
         mainCategories.forEach((mc) => {
           categoryData[mc] = {
             quantity: 0,
@@ -181,11 +191,9 @@ async function fetchStockData(forceRefresh = false) {
         await setDoc(categoryRef, categoryData);
       }
 
-      // Inisialisasi khusus untuk HALA (kecuali untuk kategori 'stok-komputer')
-      // Agar nilai HALA pada stok-komputer tidak di-reset menjadi 0
+      // Inisialisasi khusus HALA (hindari reset pada 'stok-komputer')
       if (category !== "stok-komputer" && categoryData.HALA) {
         initializeHalaStructure(categoryData, "HALA");
-        // Update quantity total untuk HALA
         categoryData.HALA.quantity = calculateHalaTotal(categoryData, "HALA");
       }
 
@@ -194,14 +202,13 @@ async function fetchStockData(forceRefresh = false) {
       stockCacheMeta.set(category, Date.now());
       return { category, data: categoryData };
     });
+
     await Promise.all(fetchPromises);
     updateCache();
     return stockData;
   } catch (error) {
     console.error("Error fetching stock data:", error);
-    if (Object.keys(stockData).length > 0) {
-      return stockData;
-    }
+    if (Object.keys(stockData).length > 0) return stockData;
     throw error;
   }
 }
@@ -296,9 +303,9 @@ function populateStokKomputerTable() {
     const item = stockData["stok-komputer"][mainCat] || { quantity: 0, lastUpdated: null };
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${idx + 1}</td>
-      <td>${mainCat}</td>
-      <td class="text-center">${item.quantity}</td>
+      <td class="fw-bold" style="font-size:0.91rem;">${idx + 1}</td>
+      <td class="fw-bold" style="font-size:0.91rem;">${mainCat}</td>
+      <td class="text-center fw-bold" style="font-size:0.91rem;">${item.quantity}</td>
       <td class="text-center">
         <button class="btn btn-sm btn-primary edit-komputer-btn" data-main="${mainCat}"><i class="fas fa-edit"></i> Update</button>
       </td>
@@ -308,26 +315,26 @@ function populateStokKomputerTable() {
   });
 }
 
-// === Populate Table (FIXED) ===
-export async function populateTables() {
+// UPDATED: populateTables mendukung opsi { skipFetch } dan hanya tampilkan skeleton pada render pertama.
+export async function populateTables(options = {}) {
+  const { skipFetch = false } = options;
+
   try {
-    // CSS pelindung (disuntik sekali)
     injectDropdownFixCssOnce();
 
-    // Tampilkan skeleton/loading khusus tabel
-    showTableLoading();
+    if (!skipFetch && !populateTables._hasRendered) {
+      showTableLoading();
+    }
 
-    // Ambil data stok (gunakan cache jika valid)
-    await fetchStockData();
+    if (!skipFetch) {
+      await fetchStockData();
+    }
 
-    // Render setiap main category
     mainCategories.forEach((mainCat) => {
       const tbody = document.getElementById(mainCategoryToId[mainCat]);
       if (!tbody) return;
 
-      // pastikan kontainer tabel tidak memotong dropdown
       tbody.style.overflow = "visible";
-
       tbody.innerHTML = "";
 
       subCategories.forEach((subCat, idx) => {
@@ -339,7 +346,6 @@ export async function populateTables() {
 
         const tr = document.createElement("tr");
 
-        // Untuk HALA dan KENDARI: tampilkan tombol Update multi-jenis pada baris tertentu
         const halaUpdateSubcats = ["Display", "Rusak", "Batu Lepas", "Manual", "Admin", "DP", "Contoh Custom"];
         let actionColumn = "";
         if (mainCat === "HALA" && halaUpdateSubcats.includes(subCat)) {
@@ -354,8 +360,6 @@ export async function populateTables() {
             </td>
           `;
         } else {
-          // Kondisi untuk menampilkan tombol Update pada tab lain (sebelumnya)
-          // Tambahkan pengecualian untuk KALUNG agar baris Rusak, Batu Lepas, Contoh Custom juga menjadi Update
           const halaLikeUpdateMains = ["KALUNG", "LIONTIN", "ANTING", "CINCIN", "GELANG", "GIWANG"];
           const showUpdateButton =
             (subCat === "Display" ||
@@ -406,12 +410,17 @@ export async function populateTables() {
 
         tr.innerHTML = `
           <td class="fw-bold">${idx + 1}</td>
-          <td class="fw-medium jenis-column">${subCat} ${
-          mainCat === "HALA"
-            ? `<button class="btn btn-outline-primary btn-sm detail-hala-btn btn-hala" data-main="${mainCat}" data-category="${categoryKey}" title="Detail ${mainCat}"><i class="fas fa-eye"></i></button>
-              `
-            : ""
-        }</td>
+          <td class="fw-bold jenis-column" style="font-size: 0.9rem; color: #35393d;">
+            ${subCat}
+            ${
+              mainCat === "HALA"
+                ? `<button class="btn btn-outline-primary btn-sm detail-hala-btn btn-hala"
+                           data-main="${mainCat}" data-category="${categoryKey}" title="Detail ${mainCat}">
+                     <i class="fas fa-eye"></i>
+                   </button>`
+                : ""
+            }
+          </td>
           <td class="text-center">
             <span class="badge bg-success fs-6 px-2 py-2">${stockItem.quantity}</span>
           </td>
@@ -427,27 +436,22 @@ export async function populateTables() {
           <td class="text-center text-muted small">${formatDate(stockItem.lastUpdated)}</td>
         `;
 
-        // Animasi masuk: opacity saja (tanpa transform → tidak bikin stacking context)
         tr.style.opacity = "0";
         tr.style.transition = "opacity .25s ease";
         tbody.appendChild(tr);
-        requestAnimationFrame(() => {
-          tr.style.opacity = "1";
-        });
+        requestAnimationFrame(() => (tr.style.opacity = "1"));
       });
     });
 
-    // Tabel stok komputer & ringkasan
     populateStokKomputerTable();
     updateSummaryTotals();
 
-    // Listener sekali untuk mengangkat z-index baris yang dropdown-nya dibuka
     if (!populateTables._dropdownRowElevatorBound) {
       document.body.addEventListener("shown.bs.dropdown", (ev) => {
         const row = ev.target.closest("tr");
         if (row) {
           row.style.position = "relative";
-          row.style.zIndex = "3000"; // di atas baris lain & card
+          row.style.zIndex = "3000";
         }
       });
       document.body.addEventListener("hidden.bs.dropdown", (ev) => {
@@ -460,25 +464,20 @@ export async function populateTables() {
       populateTables._dropdownRowElevatorBound = true;
     }
 
-    // Sembunyikan loading + notifikasi
+    populateTables._hasRendered = true;
     hideTableLoading();
-    showSuccessNotification("Data berhasil dimuat");
   } catch (error) {
     console.error("Error populating tables (fixed):", error);
     hideTableLoading();
     showErrorMessage("Gagal memuat data tabel");
   }
 
-  // ---- helper local: inject CSS sekali ---
   function injectDropdownFixCssOnce() {
     if (document.getElementById("dropdown-fix-css")) return;
     const style = document.createElement("style");
     style.id = "dropdown-fix-css";
     style.textContent = `
-      /* cegah menu terpotong / ketiban */
-      .table, .table-container, .tab-pane, .card, .card-body, .content-wrapper {
-        overflow: visible !important;
-      }
+      .table, .table-container, .tab-pane, .card, .card-body, .content-wrapper { overflow: visible !important; }
       .table .dropdown { position: relative; }
       .table .dropdown-menu { z-index: 2000 !important; }
     `;
@@ -599,9 +598,9 @@ document.getElementById("formUpdateKomputer").onsubmit = async function (e) {
   }
 };
 
+// UPDATED: Hilangkan force re-fetch setelah write; render dari in-memory lalu biarkan onSnapshot menyelaraskan.
 async function updateStokKomputer(jenis, jumlah) {
   await fetchStockData();
-  // Jangan keluar; inisialisasi struktur jika belum ada
   if (!stockData["stok-komputer"]) stockData["stok-komputer"] = {};
   if (!stockData["stok-komputer"][jenis]) {
     stockData["stok-komputer"][jenis] = { quantity: 0, lastUpdated: null, history: [] };
@@ -610,17 +609,14 @@ async function updateStokKomputer(jenis, jumlah) {
   stockData["stok-komputer"][jenis].quantity = isNaN(parsed) ? 0 : parsed;
   stockData["stok-komputer"][jenis].lastUpdated = new Date().toISOString();
   await saveData("stok-komputer", jenis);
-  // Refresh from server to ensure latest persisted data reflected immediately
-  await fetchStockData(true);
-  await populateTables();
+  await populateTables({ skipFetch: true });
 }
 
 // === Update Stok Display/Manual ===
 async function updateStokDisplayManual(category, mainCat, newQuantity, petugas, keterangan = "") {
   await fetchStockData();
-  if (!stockData[category] || !stockData[category][mainCat]) {
-    // Inisialisasi jika belum ada
-    if (!stockData[category]) stockData[category] = {};
+  if (!stockData[category]) stockData[category] = {};
+  if (!stockData[category][mainCat]) {
     stockData[category][mainCat] = { quantity: 0, lastUpdated: null, history: [] };
   }
 
@@ -628,11 +624,9 @@ async function updateStokDisplayManual(category, mainCat, newQuantity, petugas, 
   const oldQuantity = item.quantity;
   const newQty = parseInt(newQuantity);
 
-  // Update quantity
   item.quantity = newQty;
   item.lastUpdated = new Date().toISOString();
 
-  // Determine action type
   let actionType, quantityDiff;
   if (newQty > oldQuantity) {
     actionType = "Update (Tambah)";
@@ -645,7 +639,6 @@ async function updateStokDisplayManual(category, mainCat, newQuantity, petugas, 
     quantityDiff = 0;
   }
 
-  // Add to history (hindari undefined untuk Firestore)
   const historyEntry = {
     date: item.lastUpdated,
     action: actionType,
@@ -654,17 +647,13 @@ async function updateStokDisplayManual(category, mainCat, newQuantity, petugas, 
     newQuantity: newQty,
     petugas,
   };
-  if (keterangan && keterangan.trim() !== "") {
-    historyEntry.keterangan = keterangan.trim();
-  }
-  item.history.unshift(historyEntry);
+  if (keterangan && keterangan.trim() !== "") historyEntry.keterangan = keterangan.trim();
 
-  // Keep only last 10 records
+  item.history.unshift(historyEntry);
   if (item.history.length > 10) item.history = item.history.slice(0, 10);
 
   await saveData(category, mainCat);
-  await fetchStockData(true);
-  await populateTables();
+  await populateTables({ skipFetch: true });
 }
 
 // === Update Status Ringkasan ===
@@ -715,10 +704,7 @@ function animateNumberChange(element, newValue) {
 // === Add/Reduce Stock Universal Handler ===
 async function addStock(category, mainCat, quantity, adder) {
   await fetchStockData();
-  // Inisialisasi struktur jika belum ada (memungkinkan kategori baru seperti 'contoh-custom')
-  if (!stockData[category]) {
-    stockData[category] = {};
-  }
+  if (!stockData[category]) stockData[category] = {};
   if (!stockData[category][mainCat]) {
     stockData[category][mainCat] = { quantity: 0, lastUpdated: null, history: [] };
   }
@@ -733,9 +719,9 @@ async function addStock(category, mainCat, quantity, adder) {
   });
   if (item.history.length > 10) item.history = item.history.slice(0, 10);
   await saveData(category, mainCat);
-  await fetchStockData(true);
-  await populateTables();
+  await populateTables({ skipFetch: true });
 }
+
 async function reduceStock(category, mainCat, quantity, pengurang, keterangan) {
   await fetchStockData();
   if (!stockData[category]) {
@@ -811,58 +797,31 @@ function showHalaDetail(category, mainCat) {
 async function addStockHala(category, mainCat, jewelryType, quantity, adder) {
   try {
     await fetchStockData();
-
-    // Pastikan struktur category ada
-    if (!stockData[category]) {
-      stockData[category] = {};
-    }
-
-    // Inisialisasi struktur HALA jika belum ada
+    if (!stockData[category]) stockData[category] = {};
     if (!stockData[category][mainCat]) {
-      stockData[category][mainCat] = {
-        quantity: 0,
-        lastUpdated: null,
-        history: [],
-        details: {},
-      };
+      stockData[category][mainCat] = { quantity: 0, lastUpdated: null, history: [], details: {} };
     }
-
     const item = stockData[category][mainCat];
-
-    // Pastikan details ada dan semua jenis perhiasan diinisialisasi
-    if (!item.details) {
-      item.details = {};
-    }
-
-    // Inisialisasi semua jenis perhiasan jika belum ada
-    halaJewelryTypes.forEach((type) => {
-      if (!item.details[type]) {
-        item.details[type] = 0;
-      }
+    if (!item.details) item.details = {};
+    halaJewelryTypes.forEach((t) => {
+      if (!item.details[t]) item.details[t] = 0;
     });
 
-    // Tambah stok untuk jenis perhiasan spesifik
     item.details[jewelryType] += parseInt(quantity);
-
-    // Update total quantity
     item.quantity = calculateHalaTotal(stockData[category], mainCat);
     item.lastUpdated = new Date().toISOString();
-
-    // Tambah history
     item.history.unshift({
       date: item.lastUpdated,
       action: "Tambah",
       quantity: parseInt(quantity),
-      jewelryType: jewelryType,
+      jewelryType,
       jewelryName: halaJewelryMapping[jewelryType],
       adder,
     });
-
     if (item.history.length > 10) item.history = item.history.slice(0, 10);
 
     await saveData(category, mainCat);
-    await fetchStockData(true);
-    await populateTables();
+    await populateTables({ skipFetch: true });
   } catch (error) {
     console.error("Error in addStockHala:", error);
     alert("Terjadi kesalahan saat menambah stok HALA. Silakan coba lagi.");
@@ -883,6 +842,7 @@ async function addStockHalaBulk(category, mainCat, items, adder) {
     halaJewelryTypes.forEach((t) => {
       if (item.details[t] === undefined) item.details[t] = 0;
     });
+
     let totalAdded = 0;
     items.forEach(({ type, qty }) => {
       item.details[type] += qty;
@@ -902,9 +862,9 @@ async function addStockHalaBulk(category, mainCat, items, adder) {
       })),
     });
     if (item.history.length > 10) item.history = item.history.slice(0, 10);
+
     await saveData(category, mainCat);
-    await fetchStockData(true);
-    await populateTables();
+    await populateTables({ skipFetch: true });
   } catch (e) {
     console.error("Error bulk add HALA", e);
     throw e;
@@ -914,59 +874,38 @@ async function addStockHalaBulk(category, mainCat, items, adder) {
 async function reduceStockHala(category, mainCat, jewelryType, quantity, pengurang, keterangan) {
   try {
     await fetchStockData();
-
-    // Pastikan struktur category ada
-    if (!stockData[category]) {
-      stockData[category] = {};
-    }
-
-    // Inisialisasi struktur HALA jika belum ada
+    if (!stockData[category]) stockData[category] = {};
     if (!stockData[category][mainCat]) {
       initializeHalaStructure(stockData[category], mainCat);
     }
-
     const item = stockData[category][mainCat];
-
-    // Pastikan details ada
     if (!item.details) {
       item.details = {};
-      halaJewelryTypes.forEach((type) => {
-        item.details[type] = 0;
-      });
+      halaJewelryTypes.forEach((t) => (item.details[t] = 0));
     }
 
     const currentJewelryStock = parseInt(item.details[jewelryType] || 0);
-
     if (currentJewelryStock < quantity) {
-      alert(
-        `Stok ${halaJewelryMapping[jewelryType]} (${jewelryType}) tidak cukup. Stok saat ini: ${currentJewelryStock}`
-      );
+      alert(`${halaJewelryMapping[jewelryType]} (${jewelryType}) tidak cukup. Stok: ${currentJewelryStock}`);
       return false;
     }
 
-    // Kurangi stok untuk jenis perhiasan spesifik
     item.details[jewelryType] -= parseInt(quantity);
-
-    // Update total quantity
     item.quantity = calculateHalaTotal(stockData[category], mainCat);
     item.lastUpdated = new Date().toISOString();
-
-    // Tambah history
     item.history.unshift({
       date: item.lastUpdated,
       action: "Kurangi",
       quantity: parseInt(quantity),
-      jewelryType: jewelryType,
+      jewelryType,
       jewelryName: halaJewelryMapping[jewelryType],
       pengurang,
       keterangan,
     });
-
     if (item.history.length > 10) item.history = item.history.slice(0, 10);
 
     await saveData(category, mainCat);
-    await fetchStockData(true);
-    await populateTables();
+    await populateTables({ skipFetch: true });
     return true;
   } catch (error) {
     console.error("Error in reduceStockHala:", error);
@@ -976,31 +915,27 @@ async function reduceStockHala(category, mainCat, jewelryType, quantity, pengura
 }
 
 // Bulk reduce HALA (mirroring bulk add style: one history entry with items array)
+// UPDATED: Handler reduce bulk HALA render tanpa fetch ulang
 async function reduceStockHalaBulk(category, mainCat, items, pengurang, keterangan) {
   try {
     await fetchStockData();
     if (!stockData[category]) stockData[category] = {};
-    if (!stockData[category][mainCat]) {
-      // initialize structure if missing
-      initializeHalaStructure(stockData[category], mainCat);
-    }
+    if (!stockData[category][mainCat]) initializeHalaStructure(stockData[category], mainCat);
     const item = stockData[category][mainCat];
     if (!item.details) {
       item.details = {};
       halaJewelryTypes.forEach((t) => (item.details[t] = 0));
     }
-    // Validate all first (no partial updates)
+
     const insufficient = [];
     items.forEach(({ type, qty }) => {
       const cur = parseInt(item.details[type] || 0);
-      if (qty > cur) insufficient.push({ type, name: halaJewelryMapping[type], requested: qty, current: cur });
+      if (qty > cur) insufficient.push({ type, cur });
     });
     if (insufficient.length) {
-      const msg = insufficient
-        .map((it) => `${it.name} (${it.type}) diminta ${it.requested}, stok ${it.current}`)
-        .join("; ");
-      throw new Error("Stok tidak cukup: " + msg);
+      throw new Error("Stok tidak cukup untuk sebagian item.");
     }
+
     let totalReduced = 0;
     items.forEach(({ type, qty }) => {
       item.details[type] -= qty;
@@ -1021,8 +956,9 @@ async function reduceStockHalaBulk(category, mainCat, items, pengurang, keterang
       })),
     });
     if (item.history.length > 10) item.history = item.history.slice(0, 10);
+
     await saveData(category, mainCat);
-    await populateTables();
+    await populateTables({ skipFetch: true });
     return true;
   } catch (e) {
     console.error("Error bulk reduce HALA", e);
@@ -1466,22 +1402,50 @@ document.getElementById("formUpdateStok").onsubmit = async function (e) {
   await updateStokDisplayManual(category, mainCat, jumlah, petugas, keterangan);
 };
 
-// === Real-time listener (optional) ===
+// UPDATED: Listener realtime gunakan data snapshot langsung (tanpa re-fetch),
+// merge per mainCat berdasarkan lastUpdated, tandai cache valid, dan render tanpa fetch.
 function setupRealtimeListener() {
   const stocksRef = collection(firestore, "stocks");
   return onSnapshot(stocksRef, (snapshot) => {
     let updated = false;
+
     snapshot.docChanges().forEach((change) => {
       const cat = change.doc.id;
-      if (stockData[cat]) {
-        stockData[cat] = change.doc.data();
-        stockCache.set(cat, stockData[cat]);
-        stockCacheMeta.set(cat, Date.now());
+      const incoming = change.doc.data();
+      if (!incoming) return;
+
+      if (!stockData[cat]) {
+        stockData[cat] = incoming;
         updated = true;
+      } else {
+        const merged = { ...stockData[cat] };
+        Object.keys(incoming).forEach((mainCat) => {
+          const localNode = stockData[cat][mainCat];
+          const remoteNode = incoming[mainCat];
+          if (!localNode) {
+            merged[mainCat] = remoteNode;
+            updated = true;
+          } else if (!remoteNode) {
+            // keep local
+          } else {
+            const lt = localNode.lastUpdated ? Date.parse(localNode.lastUpdated) : 0;
+            const rt = remoteNode.lastUpdated ? Date.parse(remoteNode.lastUpdated) : 0;
+            if (rt >= lt) {
+              merged[mainCat] = remoteNode;
+              updated = true;
+            }
+          }
+        });
+        stockData[cat] = merged;
       }
+
+      stockCache.set(cat, stockData[cat]);
+      stockCacheMeta.set(cat, Date.now());
     });
+
     if (updated) {
-      populateTables();
+      updateCache();
+      populateTables({ skipFetch: true });
     }
   });
 }
@@ -1581,32 +1545,24 @@ if (formUpdateHala) {
 
       await fetchStockData();
       if (!stockData[category]) stockData[category] = {};
-      // Ensure the HALA structure exists and has .details initialized
       if (!stockData[category][mainCat] || !stockData[category][mainCat].details) {
         initializeHalaStructure(stockData[category], mainCat);
       }
 
-      const item = stockData[category][mainCat] || { details: {} };
-      // Ambil nilai input (jika kosong, biarkan tidak diubah)
+      const item = stockData[category][mainCat];
       const updates = [];
       halaJewelryTypes.forEach((t) => {
         const input = document.querySelector(`.hala-update-qty-input[data-type="${t}"]`);
         if (!input) return;
         const val = input.value;
-        if (val === "") return; // kosong -> skip (tidak diubah)
+        if (val === "") return;
         const newVal = parseInt(val || "0");
         if (isNaN(newVal) || newVal < 0) throw new Error("Nilai tidak valid");
         updates.push({ type: t, qty: newVal });
       });
+      if (!updates.length) throw new Error("Kosongkan kolom jika tidak ingin mengubah, atau isi minimal satu jenis.");
 
-      if (updates.length === 0)
-        throw new Error("Kosongkan kolom jika tidak ingin mengubah, atau isi minimal satu jenis.");
-
-      // Terapkan update: set setiap details[type] = newVal
-      updates.forEach((u) => {
-        item.details[u.type] = u.qty;
-      });
-      // Recalculate total & lastUpdated & add history single entry
+      updates.forEach((u) => (item.details[u.type] = u.qty));
       item.quantity = calculateHalaTotal(stockData[category], mainCat);
       item.lastUpdated = new Date().toISOString();
       const historyEntry = {
@@ -1624,8 +1580,7 @@ if (formUpdateHala) {
       if (item.history.length > 10) item.history = item.history.slice(0, 10);
 
       await saveData(category, mainCat);
-      await fetchStockData(true);
-      await populateTables();
+      await populateTables({ skipFetch: true });
       showSuccessNotification("Update HALA berhasil");
       $("#modalUpdateStokHala").modal("hide");
     } catch (err) {
@@ -1777,14 +1732,33 @@ async function loadDailySnapshotDoc(dateObj) {
 async function saveDailySnapshotDoc(dateObj, { backfilled = false } = {}) {
   const dateKey = formatDateKeySnapshot(dateObj);
   if (!dateKey) return;
-  // Pastikan data stok mutakhir
-  await fetchStockData(true);
+
+  const needed = [
+    "brankas",
+    "posting",
+    "barang-display",
+    "barang-rusak",
+    "batu-lepas",
+    "manual",
+    "admin",
+    "DP",
+    "contoh-custom",
+    "stok-komputer",
+  ];
+  const allValid = needed.every(isCacheValid);
+
+  if (!allValid || Object.keys(stockData).length === 0) {
+    // fetchStockData akan membaca hanya kategori invalid (hemat reads)
+    await fetchStockData(false);
+  }
+
   const payload = {
     date: dateKey,
     createdAt: new Date().toISOString(),
     items: computeCurrentSummarySnapshotForDaily(),
   };
   if (backfilled) payload.backfilled = true;
+
   const ref = doc(firestore, "daily_stock_reports", dateKey);
   await setDoc(ref, payload, { merge: true });
   return payload;
