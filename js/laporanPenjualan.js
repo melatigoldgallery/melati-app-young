@@ -35,27 +35,27 @@ const tableConfigs = {
 // Smart cache management adapted from laporanStok.js
 const cacheManager = {
   // Cache TTL constants
-  CACHE_TTL_TODAY: 30 * 60 * 1000,     // 30 menit untuk data hari ini
-  CACHE_TTL_STANDARD: 60 * 60 * 1000,  // 1 jam untuk data historis
+  CACHE_TTL_TODAY: 30 * 60 * 1000, // 30 menit untuk data hari ini
+  CACHE_TTL_STANDARD: 60 * 60 * 1000, // 1 jam untuk data historis
 
   // Check if cache is valid
   isValid(cacheKey) {
     const metaKey = `${cacheKey}_timestamp`;
     const timestamp = localStorage.getItem(metaKey);
-    
+
     if (!timestamp) return false;
-    
+
     const now = Date.now();
     const lastUpdate = parseInt(timestamp);
-    
+
     // Jika cache key mencakup hari ini, gunakan TTL yang lebih pendek
     const today = this.getLocalDateString();
     if (cacheKey.includes(today)) {
-      return (now - lastUpdate) < this.CACHE_TTL_TODAY;
+      return now - lastUpdate < this.CACHE_TTL_TODAY;
     }
-    
+
     // Untuk data historis, gunakan TTL standar
-    return (now - lastUpdate) < this.CACHE_TTL_STANDARD;
+    return now - lastUpdate < this.CACHE_TTL_STANDARD;
   },
 
   // Set cache data with localStorage persistence
@@ -63,10 +63,10 @@ const cacheManager = {
     try {
       const compressedData = this.compressData(data);
       localStorage.setItem(cacheKey, compressedData);
-      
+
       const metaKey = `${cacheKey}_timestamp`;
       localStorage.setItem(metaKey, Date.now().toString());
-      
+
       console.log(`Cache saved for key: ${cacheKey}`);
     } catch (error) {
       console.error("Error saving cache:", error);
@@ -87,11 +87,11 @@ const cacheManager = {
       this.clear(cacheKey);
       return null;
     }
-    
+
     try {
       const compressedData = localStorage.getItem(cacheKey);
       if (!compressedData) return null;
-      
+
       return this.decompressData(compressedData);
     } catch (error) {
       console.error("Error retrieving cache:", error);
@@ -107,8 +107,8 @@ const cacheManager = {
       localStorage.removeItem(`${cacheKey}_timestamp`);
     } else {
       const keys = Object.keys(localStorage);
-      keys.forEach(key => {
-        if (key.startsWith('salesData_') || key.includes('_timestamp')) {
+      keys.forEach((key) => {
+        if (key.startsWith("salesData_") || key.includes("_timestamp")) {
           localStorage.removeItem(key);
         }
       });
@@ -119,13 +119,13 @@ const cacheManager = {
   clearOldCache() {
     const now = Date.now();
     const maxAge = 24 * 60 * 60 * 1000; // 24 hours
-    
+
     const keys = Object.keys(localStorage);
-    keys.forEach(key => {
-      if (key.endsWith('_timestamp')) {
+    keys.forEach((key) => {
+      if (key.endsWith("_timestamp")) {
         const timestamp = parseInt(localStorage.getItem(key));
         if (now - timestamp > maxAge) {
-          const dataKey = key.replace('_timestamp', '');
+          const dataKey = key.replace("_timestamp", "");
           localStorage.removeItem(key);
           localStorage.removeItem(dataKey);
         }
@@ -137,8 +137,8 @@ const cacheManager = {
   clearCacheForDate(date) {
     const dateStr = formatDate(date).replace(/\//g, "-");
     const keys = Object.keys(localStorage);
-    keys.forEach(key => {
-      if (key.includes(dateStr) && key.startsWith('salesData_')) {
+    keys.forEach((key) => {
+      if (key.includes(dateStr) && key.startsWith("salesData_")) {
         localStorage.removeItem(key);
         localStorage.removeItem(`${key}_timestamp`);
       }
@@ -149,13 +149,15 @@ const cacheManager = {
   // Compress data before storing
   compressData(data) {
     try {
-      const processedData = JSON.parse(JSON.stringify(data, (key, value) => {
-        if (value && typeof value === 'object' && value.seconds && value.nanoseconds) {
-          return new Date(value.seconds * 1000 + value.nanoseconds / 1000000).toISOString();
-        }
-        return value;
-      }));
-      
+      const processedData = JSON.parse(
+        JSON.stringify(data, (key, value) => {
+          if (value && typeof value === "object" && value.seconds && value.nanoseconds) {
+            return new Date(value.seconds * 1000 + value.nanoseconds / 1000000).toISOString();
+          }
+          return value;
+        })
+      );
+
       const jsonString = JSON.stringify(processedData);
       return jsonString.replace(/\s+/g, "");
     } catch (error) {
@@ -168,16 +170,16 @@ const cacheManager = {
   decompressData(compressedData) {
     try {
       const parsed = JSON.parse(compressedData);
-      
+
       if (Array.isArray(parsed)) {
-        return parsed.map(item => {
-          if (item.timestamp && typeof item.timestamp === 'string') {
+        return parsed.map((item) => {
+          if (item.timestamp && typeof item.timestamp === "string") {
             item.timestamp = new Date(item.timestamp);
           }
           return item;
         });
       }
-      
+
       return parsed;
     } catch (error) {
       console.error("Error decompressing data:", error);
@@ -189,10 +191,10 @@ const cacheManager = {
   getLocalDateString() {
     const now = new Date();
     const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
-  }
+  },
 };
 
 // Main handler object with smart real-time updates
@@ -200,7 +202,7 @@ const laporanPenjualanHandler = {
   salesData: [],
   filteredSalesData: [],
   dataTable: null,
-  
+
   // Real-time listener management (adapted from laporanStok.js)
   currentListener: null,
   currentSelectedDate: null,
@@ -229,7 +231,7 @@ const laporanPenjualanHandler = {
   setupRealtimeListener(selectedDate) {
     const today = new Date();
     const isToday = this.isSameDate(selectedDate, today);
-    
+
     // Only setup listener for today's data
     if (isToday && !this.isListeningToday) {
       this.setupTodayListener();
@@ -279,20 +281,19 @@ const laporanPenjualanHandler = {
   // Handle real-time updates
   async handleRealtimeUpdate() {
     if (!this.currentSelectedDate) return;
-    
+
     try {
       // Clear cache for current date
       cacheManager.clearCacheForDate(this.currentSelectedDate);
-      
+
       // Reload data for current date
       await this.loadSalesDataByDate(this.currentSelectedDate, true);
-      
+
       // Filter and render
       this.filterSalesData();
-      
+
       // Show update indicator
       this.showUpdateIndicator();
-      
     } catch (error) {
       console.error("Error handling real-time update:", error);
     }
@@ -303,12 +304,12 @@ const laporanPenjualanHandler = {
     try {
       const dateStr = formatDate(selectedDate).replace(/\//g, "-");
       const cacheKey = `salesData_${dateStr}`;
-      
+
       this.currentSelectedDate = selectedDate;
-      
+
       // Setup real-time listener
       this.setupRealtimeListener(selectedDate);
-      
+
       // Check cache first (except for forced refresh)
       if (!forceRefresh) {
         const cachedData = cacheManager.get(cacheKey);
@@ -323,20 +324,20 @@ const laporanPenjualanHandler = {
 
       console.log(`🔄 Loading fresh data for ${dateStr}`);
       this.hideCacheIndicator();
-      
+
       // Query for specific date
       const startOfDay = new Date(selectedDate);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(selectedDate);
       endOfDay.setHours(23, 59, 59, 999);
-      
+
       const salesQuery = query(
         collection(firestore, "penjualanAksesoris"),
         where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
         where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
         orderBy("timestamp", "desc")
       );
-      
+
       const salesSnapshot = await getDocs(salesQuery);
       const salesData = [];
 
@@ -351,23 +352,26 @@ const laporanPenjualanHandler = {
 
       // Save to cache
       cacheManager.set(cacheKey, salesData);
-      
+
       this.salesData = salesData;
       this.populateSalesPersonFilter();
       console.log(`✅ Loaded ${salesData.length} sales records for ${dateStr}`);
-      
     } catch (error) {
       console.error("Error loading sales data by date:", error);
-      
+
       // Try fallback to cache
       const dateStr = formatDate(selectedDate).replace(/\//g, "-");
       const cacheKey = `salesData_${dateStr}`;
       const cachedData = cacheManager.get(cacheKey);
-      
+
       if (cachedData) {
         console.log("📦 Using cached data as fallback");
-        this.showAlert("Terjadi kesalahan saat mengambil data terbaru. Menggunakan data cache.", "Peringatan", "warning");
-        this.showCacheIndicator('Menggunakan data cache (fallback)');
+        this.showAlert(
+          "Terjadi kesalahan saat mengambil data terbaru. Menggunakan data cache.",
+          "Peringatan",
+          "warning"
+        );
+        this.showCacheIndicator("Menggunakan data cache (fallback)");
         this.salesData = cachedData;
         this.populateSalesPersonFilter();
       } else {
@@ -378,27 +382,27 @@ const laporanPenjualanHandler = {
 
   // Show cache indicator
   showCacheIndicator(message) {
-    let cacheIndicator = document.getElementById('cacheIndicator');
+    let cacheIndicator = document.getElementById("cacheIndicator");
     if (!cacheIndicator) {
-      cacheIndicator = document.createElement('small');
-      cacheIndicator.id = 'cacheIndicator';
-      cacheIndicator.className = 'text-muted ms-2';
-      
-      const filterBtn = document.getElementById('filterSalesBtn');
+      cacheIndicator = document.createElement("small");
+      cacheIndicator.id = "cacheIndicator";
+      cacheIndicator.className = "text-muted ms-2";
+
+      const filterBtn = document.getElementById("filterSalesBtn");
       if (filterBtn && filterBtn.parentNode) {
         filterBtn.parentNode.appendChild(cacheIndicator);
       }
     }
-    
+
     cacheIndicator.textContent = message;
-    cacheIndicator.style.display = 'inline-block';
+    cacheIndicator.style.display = "inline-block";
   },
 
   // Hide cache indicator
   hideCacheIndicator() {
-    const cacheIndicator = document.getElementById('cacheIndicator');
+    const cacheIndicator = document.getElementById("cacheIndicator");
     if (cacheIndicator) {
-      cacheIndicator.style.display = 'none';
+      cacheIndicator.style.display = "none";
     }
   },
 
@@ -460,9 +464,10 @@ const laporanPenjualanHandler = {
           let totalHarga = 0;
           let hasValidBerat = false;
 
+          // Sum totals from visible table rows (these reflect aggregated item prices)
           data.forEach((row) => {
             const jumlah = parseInt(row[4]) || 0;
-            const hargaStr = row[7].replace(/[^\d]/g, "") || "0";
+            const hargaStr = (row[7] || "").toString().replace(/[^\d]/g, "") || "0";
             const harga = parseInt(hargaStr) || 0;
 
             totalPcs += jumlah;
@@ -478,10 +483,35 @@ const laporanPenjualanHandler = {
             }
           });
 
+          // Compute total DP applied across the currently filtered transactions.
+          // We subtract DP once per transaction to get the net collected amount.
+          let dpTotal = 0;
+          try {
+            const seenTx = new Set();
+            if (Array.isArray(laporanPenjualanHandler.filteredSalesData)) {
+              laporanPenjualanHandler.filteredSalesData.forEach((tx) => {
+                if (!tx || !tx.id) return;
+                if (seenTx.has(tx.id)) return;
+                seenTx.add(tx.id);
+
+                // nominalDP may be string or number; fallback 0
+                const dp = parseInt(tx.nominalDP) || 0;
+                dpTotal += dp;
+              });
+            }
+          } catch (e) {
+            console.warn("Could not compute DP total:", e);
+            dpTotal = 0;
+          }
+
+          // Final collected amount = totalHarga (sum of item totals shown) - dpTotal
+          let finalHarga = totalHarga - dpTotal;
+          if (finalHarga < 0) finalHarga = 0;
+
           const api = this.api();
           $(api.column(4).footer()).html(totalPcs);
           $(api.column(5).footer()).html(hasValidBerat ? `${totalBerat.toFixed(2)} gr` : "-");
-          $(api.column(7).footer()).html(`Rp ${totalHarga.toLocaleString("id-ID")}`);
+          $(api.column(7).footer()).html(`Rp ${finalHarga.toLocaleString("id-ID")}`);
         },
         dom: "Bfrtip",
         buttons: [
@@ -533,7 +563,7 @@ const laporanPenjualanHandler = {
             title: "Laporan Penjualan Manual / Aksesoris / Kotak \n Melati Atas",
             filename: function () {
               const selectedDate = document.getElementById("startDate").value || "semua";
-              return `Laporan_Penjualan_Bawah_${selectedDate.replace(/\//g, "-")}`;
+              return `Laporan_Penjualan_Atas_${selectedDate.replace(/\//g, "-")}`;
             },
             orientation: "landscape",
             pageSize: "A4",
@@ -667,8 +697,16 @@ const laporanPenjualanHandler = {
     const configKey = "manual";
     const config = tableConfigs[configKey];
     if (!config) return [];
-
+    const tableRows = [];
     const summaryMap = new Map();
+
+    const toNumber = (v) => {
+      if (v === null || v === undefined) return 0;
+      if (typeof v === "number") return v;
+      const s = String(v).replace(/[^0-9-]/g, "");
+      const n = parseInt(s, 10);
+      return isNaN(n) ? 0 : n;
+    };
 
     this.filteredSalesData.forEach((transaction) => {
       // Enhanced date formatting with better timestamp handling
@@ -693,6 +731,11 @@ const laporanPenjualanHandler = {
 
       if (!transaction.items) return;
 
+      const isManualSale =
+        transaction.jenisPenjualan === "manual" ||
+        transaction.isGantiLock ||
+        transaction.jenisPenjualan === "gantiLock";
+
       transaction.items.forEach((item) => {
         const key = item.kodeText || item.barcode || "-";
         const name = item.nama || "-";
@@ -700,39 +743,52 @@ const laporanPenjualanHandler = {
         const berat = parseFloat(item.berat) || 0;
         const jumlah = parseInt(item.jumlah) || 1;
 
-        // PERBAIKAN: Selalu gunakan harga asli, bukan harga setelah dipotong DP
-        let harga = parseInt(item.totalHarga) || 0;
+        let harga = toNumber(item.totalHarga || item.harga || 0);
+        if (transaction.metodeBayar === "free") harga = 0;
 
-        // Hapus logika pemotongan DP - selalu tampilkan harga asli
-        if (transaction.metodeBayar === "free") {
-          harga = 0;
-        }
-        // Tidak ada lagi pemotongan untuk DP - harga tetap asli
-
-        if (summaryMap.has(key)) {
-          const existing = summaryMap.get(key);
-          existing.jumlah += jumlah;
-          existing.berat += berat;
-          existing.harga += harga;
-        } else {
-          summaryMap.set(key, {
-            tanggal: date,
-            jenis: jenisPenjualan,
-            kode: key,
-            nama: name,
+        if (isManualSale) {
+          // For manual sales, push each transaction-item as its own row (no aggregation)
+          const beratDisplay = transaction.jenisPenjualan === "kotak" ? "-" : `${berat.toFixed(2)} gr`;
+          tableRows.push([
+            date,
+            jenisPenjualan,
+            key,
+            name,
             jumlah,
-            berat,
+            beratDisplay,
             kadar,
-            harga,
+            `Rp ${harga.toLocaleString("id-ID")}`,
             status,
-            keterangan: item.keterangan || keterangan,
-            jenisPenjualan: transaction.jenisPenjualan,
-          });
+            item.keterangan || keterangan,
+          ]);
+        } else {
+          // Non-manual: aggregate by item key
+          if (summaryMap.has(key)) {
+            const existing = summaryMap.get(key);
+            existing.jumlah += jumlah;
+            existing.berat += berat;
+            existing.harga += harga;
+          } else {
+            summaryMap.set(key, {
+              tanggal: date,
+              jenis: jenisPenjualan,
+              kode: key,
+              nama: name,
+              jumlah,
+              berat,
+              kadar,
+              harga,
+              status,
+              keterangan: item.keterangan || keterangan,
+              jenisPenjualan: transaction.jenisPenjualan,
+            });
+          }
         }
       });
     });
 
-    return Array.from(summaryMap.values()).map((item) => {
+    // Append aggregated non-manual items after manual rows
+    const aggregatedRows = Array.from(summaryMap.values()).map((item) => {
       const beratDisplay = item.jenisPenjualan === "kotak" ? "-" : `${item.berat.toFixed(2)} gr`;
       return [
         item.tanggal,
@@ -747,14 +803,31 @@ const laporanPenjualanHandler = {
         item.keterangan,
       ];
     });
+
+    return tableRows.concat(aggregatedRows);
   },
 
   getStatusBadge(transaction) {
     const status = transaction.statusPembayaran || "Lunas";
 
     if (status === "DP") {
-      return `<span class="badge bg-warning">DP: Rp ${formatRupiah(transaction.nominalDP)}</span>
-              <br><small>Sisa: Rp ${formatRupiah(transaction.sisaPembayaran)}</small>`;
+      // Helper to parse numbers robustly (handles strings with separators)
+      const toNumber = (v) => {
+        if (v === null || v === undefined) return 0;
+        if (typeof v === "number") return v;
+        const s = String(v).replace(/[^0-9-]/g, "");
+        const n = parseInt(s, 10);
+        return isNaN(n) ? 0 : n;
+      };
+
+      // Compute DP paid: prefer nominalDP, but also sum any payment entries if present
+      let dpPaid = toNumber(transaction.nominalDP);
+      if (Array.isArray(transaction.pembayaran)) {
+        dpPaid = transaction.pembayaran.reduce((sum, p) => sum + toNumber(p.nominal || p.amount || 0), dpPaid);
+      }
+
+      // Only show DP amount in status as requested
+      return `<span class="badge bg-warning">DP: Rp ${formatRupiah(dpPaid)}</span>`;
     } else if (status === "Lunas") {
       return `<span class="badge bg-success">Lunas</span>`;
     } else if (transaction.metodeBayar === "free") {
@@ -812,13 +885,13 @@ const laporanPenjualanHandler = {
       this.filteredSalesData.sort((a, b) => {
         const getDate = (item) => {
           if (item.timestamp) {
-            if (typeof item.timestamp.toDate === 'function') {
+            if (typeof item.timestamp.toDate === "function") {
               return item.timestamp.toDate();
             } else if (item.timestamp instanceof Date) {
               return item.timestamp;
-            } else if (typeof item.timestamp === 'string') {
+            } else if (typeof item.timestamp === "string") {
               return new Date(item.timestamp);
-            } else if (typeof item.timestamp === 'object' && item.timestamp.seconds) {
+            } else if (typeof item.timestamp === "object" && item.timestamp.seconds) {
               return new Date(item.timestamp.seconds * 1000);
             }
           }
@@ -892,12 +965,14 @@ const laporanPenjualanHandler = {
       }
 
       this.showLoading(true);
-      this.loadSalesDataByDate(selectedDate).then(() => {
-        this.filterSalesData();
-        this.isDataLoaded = true;
-      }).finally(() => {
-        this.showLoading(false);
-      });
+      this.loadSalesDataByDate(selectedDate)
+        .then(() => {
+          this.filterSalesData();
+          this.isDataLoaded = true;
+        })
+        .finally(() => {
+          this.showLoading(false);
+        });
     });
 
     // Sales type filter change
@@ -920,7 +995,7 @@ const laporanPenjualanHandler = {
       this.isDataLoaded = false;
       this.salesData = [];
       this.filteredSalesData = [];
-      
+
       // Clear table
       const tableBody = document.querySelector("#penjualanTable tbody");
       if (tableBody) {
@@ -946,20 +1021,20 @@ const laporanPenjualanHandler = {
   // Cleanup method
   destroy() {
     console.log("🧹 Destroying Sales Report Handler");
-    
+
     // Remove real-time listener
     this.removeTodayListener();
-    
+
     // Destroy DataTable
     this.destroyDataTable();
-    
+
     // Clear data
     this.salesData = [];
     this.filteredSalesData = [];
     this.isDataLoaded = false;
     this.currentSelectedDate = null;
     this.isListeningToday = false;
-    
+
     console.log("✅ Sales Report Handler destroyed");
   },
 
@@ -986,7 +1061,7 @@ const laporanPenjualanHandler = {
     }, 30 * 60 * 1000);
 
     // Clear today's cache when page is about to unload (to ensure fresh data on next visit)
-    window.addEventListener('beforeunload', () => {
+    window.addEventListener("beforeunload", () => {
       const today = new Date();
       cacheManager.clearCacheForDate(today);
       this.destroy();
@@ -1025,19 +1100,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
   try {
     // Check dependencies
-    if (typeof firestore === 'undefined') {
+    if (typeof firestore === "undefined") {
       throw new Error("Firebase Firestore not initialized");
     }
-    
-    if (typeof $ === 'undefined') {
+
+    if (typeof $ === "undefined") {
       throw new Error("jQuery not loaded");
     }
-    
+
     // Initialize the handler
     laporanPenjualanHandler.init();
-    
+
     console.log("✅ Sales Report System initialized successfully");
-    
   } catch (error) {
     console.error("❌ Failed to initialize Sales Report System:", error);
     alert("Gagal menginisialisasi sistem laporan penjualan: " + error.message);
@@ -1045,12 +1119,10 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 // Cleanup on page unload
-window.addEventListener('beforeunload', () => {
-  if (typeof laporanPenjualanHandler !== 'undefined') {
+window.addEventListener("beforeunload", () => {
+  if (typeof laporanPenjualanHandler !== "undefined") {
     laporanPenjualanHandler.destroy();
   }
 });
 
 export default laporanPenjualanHandler;
-
-
