@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!data) return;
 
         // Update current queue number
-        const currentQueueNumber = `${["A", "B", "C", "D"][data.currentLetter]}${String(data.currentNumber).padStart(2, '0')}`;
+        const currentQueueNumber = `${["A", "B", "C", "D"][data.currentLetter]}${String(data.currentNumber -1).padStart(2, '0')}`;
         const queueNumberElement = document.getElementById("queueNumber");
         if (queueNumberElement) {
             const oldNumber = queueNumberElement.textContent;
@@ -25,8 +25,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         
         // Calculate and update next queue number
-        const nextNumber = data.currentNumber + 1;
-        const nextLetter = nextNumber > 50 ? (data.currentLetter + 1) % 4 : data.currentLetter;
+        const nextNumber = data.currentNumber;
+        const nextLetter = nextNumber > 50 ? (data.currentLetter) % 4 : data.currentLetter;
         const nextQueueNumber = `${["A", "B", "C", "D"][nextLetter]}${String(nextNumber > 50 ? 1 : nextNumber).padStart(2, '0')}`;
         
         const nextQueueElement = document.getElementById("nextQueueNumber");
