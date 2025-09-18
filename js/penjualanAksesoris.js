@@ -381,7 +381,59 @@ const penjualanHandler = {
       }
     );
 
+    // Sales listener - perubahan penjualan hari ini
+    const todayStr = utils.formatDate(new Date());
+    const salesQuery = query(
+      collection(firestore, "penjualanAksesoris"),
+      where("tanggal", "==", todayStr)
+    );
+
+    this.salesListener = onSnapshot(
+      salesQuery,
+      (snapshot) => {
+        if (!snapshot.metadata.hasPendingWrites) {
+          this.handleSalesUpdates(snapshot.docChanges());
+        }
+      },
+      (error) => {
+        console.error("Sales listener error:", error);
+        this.salesListener = null;
+      }
+    );
+
     console.log("🔊 Real-time listeners activated (changes only)");
+  },
+
+  // Load today's sales data (cache-first)
+  async loadTodaySales() {
+    try {
+      const dateKey = new Date().toISOString().split("T")[0];
+      const cached = simpleCache.get(`salesData_${dateKey}`);
+      if (cached && Array.isArray(cached)) {
+        this.salesData = cached;
+        return;
+      }
+
+      const todayStr = utils.formatDate(new Date());
+      const qSales = query(
+        collection(firestore, "penjualanAksesoris"),
+        where("tanggal", "==", todayStr)
+      );
+      const snap = await getDocs(qSales);
+      readsMonitor.increment("Load Today Sales", snap.size || 1);
+
+      const list = [];
+      snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
+      list.sort((a, b) => {
+        const ta = a.timestamp?.toMillis ? a.timestamp.toMillis() : 0;
+        const tb = b.timestamp?.toMillis ? b.timestamp.toMillis() : 0;
+        return tb - ta;
+      });
+      this.salesData = list;
+      simpleCache.set(`salesData_${dateKey}`, list);
+    } catch (err) {
+      console.error("Error loading today sales:", err);
+    }
   },
 
   // TAMBAH: Method baru untuk handle stock changes
@@ -2213,7 +2265,7 @@ setInterval(() => {
   const readsStats = readsMonitor.getStats();
 
   console.log("📊 System Health Check:", {
-    stockItems: this.stockData?.length || 0,
+    stockItems: penjualanHandler.stockData?.length || 0,
     reads: `${readsStats.total}/${readsMonitor.dailyLimit} (${readsStats.percentage.toFixed(1)}%)`,
   });
 }, 10 * 60 * 1000); // Every 10 minutes
@@ -2227,18 +2279,28 @@ window.addEventListener("unhandledrejection", (event) => {
   }
 });
 
-// Add remove listeners method to penjualanHandler
-penjualanHandler.removeListeners = function () {
-  // Remove all event listeners to prevent memory leaks
-  $(document).off(".penjualan");
-  $(window).off(".penjualan");
+// Add remove listeners method to penjualanHandler (extend original to also clear DOM listeners)
+(function enhanceRemoveListeners() {
+  const original = penjualanHandler.removeListeners.bind(penjualanHandler);
+  penjualanHandler.removeListeners = function () {
+    // Ensure Firestore listeners are unsubscribed
+    try {
+      original();
+    } catch (e) {
+      console.warn("Error during Firestore listener cleanup:", e);
+    }
 
-  // Clear intervals
-  if (this.refreshInterval) {
-    clearInterval(this.refreshInterval);
-    this.refreshInterval = null;
-  }
-};
+    // Remove DOM-scoped listeners to prevent memory leaks
+    $(document).off(".penjualan");
+    $(window).off(".penjualan");
+
+    // Clear any intervals
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+      this.refreshInterval = null;
+    }
+  };
+})();
 
 // Export for potential use in other modules
 window.penjualanHandler = penjualanHandler;
