@@ -1046,13 +1046,20 @@ const penjualanHandler = {
       $("#totalOngkos").val("0");
     } else if (method === "dp") {
       if (salesType === "manual") {
-        $(".payment-field, .dp-field").show();
+        // For DP on manual sales: only show DP fields; hide cash payment fields
+        $(".dp-field").show();
+        $(".payment-field").hide();
+        // Clear cash-related inputs
+        $("#jumlahBayar, #kembalian").val("");
       } else {
+        // DP only allowed on manual; fallback to cash
         $("#metodeBayar").val("tunai");
         $(".payment-field").show();
         $(".dp-field").hide();
       }
       this.updateTotal();
+      // Recalculate remaining immediately
+      this.calculateSisaPembayaran();
     } else {
       $(".payment-field").show();
       $(".dp-field").hide();
@@ -1369,12 +1376,8 @@ const penjualanHandler = {
       const paymentMethod = $("#metodeBayar").val();
       if (paymentMethod === "dp") {
         const nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "")) || 0;
-        const total = parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0;
-
-        if (nominalDP <= 0 || nominalDP >= total) {
-          utils.showAlert(
-            nominalDP <= 0 ? "Nominal DP harus diisi!" : "Nominal DP tidak boleh sama dengan atau melebihi total harga!"
-          );
+        if (nominalDP <= 0) {
+          utils.showAlert("Nominal DP harus diisi!");
           $("#nominalDP").focus();
           return;
         }
@@ -1412,9 +1415,33 @@ const penjualanHandler = {
 
       // Add payment details
       if (paymentMethod === "dp") {
-        transactionData.nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "")) || 0;
-        transactionData.sisaPembayaran = parseFloat($("#sisaPembayaran").val().replace(/\./g, "")) || 0;
-        transactionData.statusPembayaran = "DP";
+        const dpNominal = parseFloat($("#nominalDP").val().replace(/\./g, "")) || 0;
+        const totalHarga = parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0;
+        const sisa = Math.max(totalHarga - dpNominal, 0);
+        const kembalianDP = Math.max(dpNominal - totalHarga, 0);
+
+        transactionData.nominalDP = dpNominal;
+        transactionData.sisaPembayaran = sisa;
+        if (kembalianDP > 0 || sisa === 0) {
+          // DP menutupi total (atau lebih) -> anggap lunas di sisi status
+          transactionData.statusPembayaran = "Lunas";
+          transactionData.kembalian = kembalianDP;
+          transactionData.jumlahBayar = dpNominal; // catat untuk konsistensi struk
+        } else {
+          transactionData.statusPembayaran = "DP";
+        }
+        // Align with aksesoris-app: store pembayaran breakdown entry for DP
+        transactionData.pembayaran = [
+          {
+            jenis: "DP",
+            method: "dp",
+            nominal: dpNominal,
+            tanggal: transactionData.tanggal,
+            sales: salesName,
+            // Firestore does not allow serverTimestamp() inside arrays
+            timestamp: Timestamp.now(),
+          },
+        ];
       } else if (paymentMethod === "free") {
         transactionData.statusPembayaran = "Free";
       } else {
@@ -1460,6 +1487,12 @@ const penjualanHandler = {
       if (paymentMethod === "dp") {
         currentTransactionData.nominalDP = $("#nominalDP").val();
         currentTransactionData.sisaPembayaran = $("#sisaPembayaran").val();
+        // Simpan kembalian jika DP >= total
+        const dpNominalStr = $("#nominalDP").val();
+        const dpNominal = parseFloat((dpNominalStr || "0").replace(/\./g, "")) || 0;
+        const totalHarga = parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0;
+        const kembalianDP = Math.max(dpNominal - totalHarga, 0);
+        currentTransactionData.kembalian = utils.formatRupiah(kembalianDP);
       }
 
       // Show print modal
@@ -1889,9 +1922,11 @@ const penjualanHandler = {
 
     // Add DP information if applicable
     if (transaction.metodeBayar === "dp") {
-      const dpAmount = parseInt(transaction.nominalDP.replace(/\./g, "")) || 0;
-      const remainingAmount = parseInt(transaction.sisaPembayaran.replace(/\./g, "")) || 0;
+      const dpAmount = parseInt((transaction.nominalDP || "0").toString().replace(/\./g, "")) || 0;
+      const remainingAmount = parseInt((transaction.sisaPembayaran || "0").toString().replace(/\./g, "")) || 0;
+      const changeAmount = parseInt((transaction.kembalian || "0").toString().replace(/\./g, "")) || 0;
 
+      const showChange = dpAmount >= totalHarga;
       receiptHTML += `
               <div class="payment-info">
                 <table>
@@ -1904,8 +1939,8 @@ const penjualanHandler = {
                     <td class="text-right">${utils.formatRupiah(dpAmount)}</td>
                   </tr>
                   <tr>
-                    <td><strong>SISA:</strong></td>
-                    <td class="text-right"><strong>${utils.formatRupiah(remainingAmount)}</strong></td>
+                    <td><strong>${showChange ? "KEMBALIAN" : "SISA"}:</strong></td>
+                    <td class="text-right"><strong>${utils.formatRupiah(showChange ? changeAmount : remainingAmount)}</strong></td>
                   </tr>
                 </table>
               </div>
@@ -2099,6 +2134,120 @@ const penjualanHandler = {
     printWindow.document.close();
   },
 
+  // Print separate invoices per item for manual sales
+  printInvoicePerItem() {
+    if (!currentTransactionData) {
+      utils.showAlert("Tidak ada data transaksi untuk dicetak!");
+      return;
+    }
+
+    const tx = currentTransactionData;
+    if (tx.salesType !== "manual" || !Array.isArray(tx.items) || tx.items.length === 0) {
+      // Fallback to normal invoice
+      this.printInvoice();
+      return;
+    }
+    // Helpers to build HTML and print via hidden iframe (avoids popup blockers)
+    const buildItemHTML = (item) => {
+      const itemHarga = parseInt(item.totalHarga) || 0;
+      const tanggal = tx.tanggal || "";
+      const sales = tx.sales || "-";
+      const keterangan = item.keterangan ? String(item.keterangan).trim() : "";
+
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Invoice Customer</title>
+          <style>
+            @page { size: 10cm 20cm; margin: 0; }
+            body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; box-sizing: border-box; }
+            .invoice { width: 100%; }
+            .header-info { text-align: right; margin-bottom: 2cm; margin-right: 3cm; margin-top: 0.8cm; }
+            .total-row { margin-top: 0.7cm; text-align: right; font-weight: bold; margin-right: 3cm; }
+            .sales { text-align: right; margin-top: 0.6cm; margin-right: 2cm; }
+            .item-details { display: flex; flex-wrap: wrap; }
+            .item-data { display: grid; grid-template-columns: 2cm 1.8cm 5cm 2cm 2cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 0.5cm; margin-top: 1cm; margin-right: 3cm; }
+            .item-data span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .keterangan { font-style: italic; font-size: 10px; margin-top: 1cm; margin-bottom: 0.5cm; padding-top: 2mm; text-align: left; margin-left: 0.5cm; margin-right: 3cm; }
+          </style>
+        </head>
+        <body>
+          <div class="invoice">
+            <div class="header-info"><p>${tanggal}</p></div>
+            <hr>
+            <div class="item-details">
+              <div class="item-data">
+                <span>${item.kodeText || "-"}</span>
+                <span>${item.jumlah || "1"}pcs</span>
+                <span>${item.nama || "-"}</span>
+                <span>${item.kadar || "-"}</span>
+                <span>${item.berat || "-"}gr</span>
+                <span>${utils.formatRupiah(itemHarga)}</span>
+              </div>
+            </div>
+            ${keterangan ? `<div class="keterangan"><strong>Keterangan:</strong><br>${keterangan}</div>` : ""}
+            <div class="total-row">Rp ${utils.formatRupiah(itemHarga)}</div>
+            <div class="sales">${sales}</div>
+          </div>
+        </body>
+        </html>
+      `;
+    };
+
+    const printViaIframe = (html) => new Promise((resolve) => {
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow || iframe.contentDocument;
+      const w = iframe.contentWindow;
+      const d = doc.document || doc;
+      d.open();
+      d.write(html);
+      d.close();
+
+      const cleanup = () => {
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+          resolve();
+        }, 150);
+      };
+
+      // Try afterprint; fallback to timeout if not supported
+      const onAfterPrint = () => {
+        w.removeEventListener && w.removeEventListener('afterprint', onAfterPrint);
+        cleanup();
+      };
+
+      try {
+        if (w.addEventListener) {
+          w.addEventListener('afterprint', onAfterPrint);
+        }
+      } catch (e) { /* ignore */ }
+
+      w.focus();
+      setTimeout(() => {
+        w.print();
+        // Fallback cleanup in case afterprint doesn't fire
+        setTimeout(cleanup, 1000);
+      }, 50);
+    });
+
+    // Print each item sequentially
+    (async () => {
+      for (const item of tx.items) {
+        const html = buildItemHTML(item);
+        await printViaIframe(html);
+      }
+    })();
+  },
+
   // Reset form
   resetForm() {
     try {
@@ -2138,7 +2287,17 @@ const penjualanHandler = {
     if (type === "receipt") {
       this.printReceipt();
     } else if (type === "invoice") {
-      this.printInvoice();
+      // If manual sale with more than one item, print per item
+      if (
+        currentTransactionData &&
+        currentTransactionData.salesType === "manual" &&
+        Array.isArray(currentTransactionData.items) &&
+        currentTransactionData.items.length > 1
+      ) {
+        this.printInvoicePerItem();
+      } else {
+        this.printInvoice();
+      }
     }
   },
 
