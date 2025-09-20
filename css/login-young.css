@@ -1,0 +1,116 @@
+/* Distinctive overrides for Melati Gold Young login */
+:root {
+  /* Gold / White / Black palette */
+  --young-primary: #ffd700; /* Gold */
+  --young-secondary: #b8860b; /* Dark goldenrod */
+  --young-black: #0a0a0a;
+  --young-white: #ffffff;
+  --young-bg: radial-gradient(1000px 600px at 80% -100px, rgba(255, 215, 0, 0.25), transparent 70%),
+               radial-gradient(800px 500px at -10% 120%, rgba(255, 193, 7, 0.18), transparent 70%),
+               linear-gradient(135deg, #000000 0%, #0d0d0d 60%, #111111 100%);
+}
+
+/* Body theme hook so we don't affect other pages */
+.theme-young .login-background .animated-bg {
+  background: var(--young-bg) !important;
+  filter: none !important;
+}
+
+/* Add a subtle grid/watermark to differentiate visually */
+.theme-young .login-background .overlay {
+  background: linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.6)),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 215, 0, 0.05) 0px,
+      rgba(255, 215, 0, 0.05) 1px,
+      transparent 1px,
+      transparent 16px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 215, 0, 0.05) 0px,
+      rgba(255, 215, 0, 0.05) 1px,
+      transparent 1px,
+      transparent 16px
+    );
+}
+
+/* Young corner ribbon */
+.theme-young .young-ribbon {
+  position: absolute;
+  top: 12px;
+  right: -40px;
+  transform: rotate(45deg);
+  background: linear-gradient(135deg, var(--young-primary), var(--young-secondary));
+  color: #111;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 6px 50px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+  text-transform: uppercase;
+  font-size: 11px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Header tweaks */
+.theme-young .login-card .login-header h1 {
+  color: var(--young-black);
+  text-shadow: 0 1px 0 rgba(255, 215, 0, 0.25);
+}
+.theme-young .login-card .login-header p {
+  color: #444;
+}
+.theme-young .login-card .branch-badge {
+  background: rgba(255, 215, 0, 0.15);
+  color: #8a6d00;
+  border: 1px solid rgba(255, 215, 0, 0.6);
+  padding: 2px 8px;
+  margin-left: 6px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  vertical-align: middle;
+}
+
+/* Button styling distinct from the other repo */
+.theme-young .login-button {
+  background: linear-gradient(135deg, var(--young-primary) 0%, var(--young-secondary) 100%) !important;
+  color: #111 !important; /* black text on gold */
+  border: 1px solid var(--young-secondary);
+  box-shadow: 0 10px 30px rgba(255, 215, 0, 0.35);
+
+}
+.theme-young .login-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 34px rgba(255, 215, 0, 0.5);
+}
+
+/* Input focus color distinctive */
+.theme-young .form-control {
+  background: var(--young-white);
+  color: var(--young-black);
+  border: 1px solid #333;
+}
+.theme-young .form-control:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.25);
+  border-color: #e6b800;
+}
+
+/* Toggle password icon tint */
+.theme-young .toggle-password i {
+  color: var(--young-secondary);
+}
+
+/* Card slight glass effect to differ */
+.theme-young .login-card {
+  background: var(--young-white) !important;
+  backdrop-filter: none;
+  border: 1px solid #111;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2), 0 0 0 3px rgba(255, 215, 0, 0.08);
+}
+
+/* Logo halo to make it pop differently */
+.theme-young .logo-container .logo {
+  filter: drop-shadow(0 6px 16px rgba(255, 215, 0, 0.25)) saturate(1.05);
+}

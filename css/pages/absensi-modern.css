@@ -5,7 +5,7 @@
   --primary-dark: #3f37c9;
   --secondary-color: #f72585;
   --success-color: #05d828;
-  --warning-color: #f8961e;
+  --warning-color: #f0c949;
   --danger-color: #f94144;
   --light-color: #f8f9fa;
   --dark-color: #212529;
@@ -962,7 +962,7 @@ tr:has(.badge.bg-info) {
 /* Sidebar styles */
 .sidebar {
   width: var(--sidebar-width);
-  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
+  background: linear-gradient(320deg, var(--warning-color) 0%, var(--dark-color) 100%);
   color: white;
   height: 100vh;
   position: fixed;
@@ -989,6 +989,7 @@ tr:has(.badge.bg-info) {
   object-fit: cover;
   margin-right: 10px;
   transition: all var(--transition-speed) ease;
+  background-color: white;
 }
 
 .brand-name {
@@ -1229,13 +1230,14 @@ tr:has(.badge.bg-info) {
 .user-profile {
   display: flex;
   align-items: center;
+  
 }
 
 .user-avatar {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: var(--primary-color);
+  background: linear-gradient(320deg, var(--warning-color) 0%, var(--dark-color) 100%);
   color: white;
   display: flex;
   align-items: center;

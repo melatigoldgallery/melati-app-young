@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Login - Melati Gold Shop</title>
+  <title>Login - Melati Gold Young</title>
     <!-- Favicon sederhana -->
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -14,8 +14,10 @@
     />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <link rel="stylesheet" href="css/login.css" />
+    <!-- Young theme overrides to distinguish from main app -->
+    <link rel="stylesheet" href="css/login-young.css" />
   </head>
-  <body>
+  <body class="theme-young">
     <div class="login-container">
       <div class="login-background">
         <div class="animated-bg"></div>
@@ -23,9 +25,11 @@
       </div>
 
       <div class="login-card">
+        <!-- Corner ribbon to clearly mark this variant -->
+        <div class="young-ribbon" aria-hidden="true">YOUNG</div>
         <div class="login-header">
           <div class="logo-container">
-            <img src="img/Melati.jfif" alt="Melati Gold Shop Logo" class="logo" />
+            <img src="img/logo.png" alt="Melati Gold Shop Logo" class="logo" />
           </div>
           <h1>Melati Gold Young</h1>
           <p>Sistem Manajemen Toko</p>
@@ -61,7 +65,7 @@
             </div>
 
             <button type="submit" class="login-button">
-              <span>Login</span>
+              Login
               <i class="fas fa-arrow-right"></i>
             </button>
           </form>
