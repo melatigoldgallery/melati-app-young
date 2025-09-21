@@ -1033,19 +1033,16 @@ const penjualanHandler = {
       $("#totalOngkos").val("0");
     } else if (method === "dp") {
       if (salesType === "manual") {
-        // For DP on manual sales: only show DP fields; hide cash payment fields
-        $(".dp-field").show();
-        $(".payment-field").hide();
-        // Clear cash-related inputs
-        $("#jumlahBayar, #kembalian").val("");
+        // Sesuai aksesoris-app: pada manual + DP tampilkan keduanya (DP dan pembayaran)
+        $(".payment-field, .dp-field").show();
       } else {
-        // DP only allowed on manual; fallback to cash
+        // DP hanya untuk manual; fallback ke tunai
         $("#metodeBayar").val("tunai");
         $(".payment-field").show();
         $(".dp-field").hide();
       }
       this.updateTotal();
-      // Recalculate remaining immediately
+      // Hitung ulang sisa dan kembalian (jika ada)
       this.calculateSisaPembayaran();
     } else {
       $(".payment-field").show();
@@ -1282,6 +1279,16 @@ const penjualanHandler = {
     const sisa = total - nominalDP;
     $("#sisaPembayaran").val(utils.formatRupiah(sisa > 0 ? sisa : 0));
 
+    // Jika DP melebihi total, tampilkan kembalian secara langsung (untuk UX yang jelas)
+    const method = $("#metodeBayar").val();
+    if (method === "dp" && nominalDP > total) {
+      const kembalianDP = nominalDP - total;
+      $("#kembalian").val(utils.formatRupiah(kembalianDP));
+    } else if (!$("#jumlahBayar").val()) {
+      // Kosongkan jika tidak ada input jumlah bayar dan tidak ada kelebihan DP
+      $("#kembalian").val("");
+    }
+
     if ($("#jumlahBayar").val()) {
       this.calculateKembalian();
     }
@@ -1332,6 +1339,19 @@ const penjualanHandler = {
       $("#sales").removeClass("is-invalid").addClass("is-valid");
       $("#sales").next(".invalid-feedback").remove();
     }
+    // Optional: simple phone format hint (digits only)
+    const tel = $("#noTelp").val().trim();
+    if (tel && !/^\d{8,15}$/.test(tel)) {
+      if (!$("#noTelp").next(".invalid-feedback").length) {
+        $("#noTelp").after('<div class="invalid-feedback">No. Tlp 8-15 digit angka</div>');
+      }
+      $("#noTelp").addClass("is-invalid");
+    } else {
+      $("#noTelp")
+        .removeClass("is-invalid")
+        .addClass(tel ? "is-valid" : "");
+      $("#noTelp").next(".invalid-feedback").remove();
+    }
   },
 
   // Save transaction
@@ -1343,6 +1363,25 @@ const penjualanHandler = {
         utils.showAlert("Nama sales harus diisi!");
         $("#sales").focus();
         return;
+      }
+
+      // Ambil customer info
+      const customerName = $("#namaCustomer").val().trim();
+      const customerPhone = $("#noTelp").val().trim();
+
+      // Jika DP dipilih, wajib ada nama dan no telp (untuk follow up)
+      const selectedMethod = $("#metodeBayar").val();
+      if (selectedMethod === "dp") {
+        if (!customerName) {
+          utils.showAlert("Nama customer wajib diisi untuk transaksi DP!");
+          $("#namaCustomer").focus();
+          return;
+        }
+        if (!/^\d{8,15}$/.test(customerPhone)) {
+          utils.showAlert("No. Tlp harus 8-15 digit angka untuk transaksi DP!");
+          $("#noTelp").focus();
+          return;
+        }
       }
 
       const salesType = $("#jenisPenjualan").val();
@@ -1389,6 +1428,8 @@ const penjualanHandler = {
         jenisPenjualan: salesType,
         tanggal: $("#tanggal").val(),
         sales: salesName,
+        customerName: customerName || null,
+        customerPhone: customerPhone || null,
         metodeBayar: paymentMethod,
         totalHarga: parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0,
         timestamp: serverTimestamp(),
@@ -1464,6 +1505,8 @@ const penjualanHandler = {
         salesType: salesType,
         tanggal: $("#tanggal").val(),
         sales: salesName,
+        customerName,
+        customerPhone,
         totalHarga: $("#totalOngkos").val(),
         items: items,
         metodeBayar: paymentMethod,
@@ -1865,6 +1908,13 @@ const penjualanHandler = {
               <h4>NOTA PENJUALAN ${transaction.salesType.toUpperCase()}</h4>
               <hr>
               <p class="tanggal">Tanggal: ${transaction.tanggal}<br>Sales: ${transaction.sales}</p>
+              ${
+                transaction.customerName || transaction.customerPhone
+                  ? `<p class="tanggal">Customer: ${transaction.customerName || "-"}${
+                      transaction.customerPhone ? ` | Tlp: ${transaction.customerPhone}` : ""
+                    }</p>`
+                  : ""
+              }
               <hr>
               <table>
                 <tr>
@@ -1962,6 +2012,22 @@ const penjualanHandler = {
     printWindow.document.close();
   },
 
+  // Shared CSS for invoice printing (aligned with aksesoris-app)
+  INVOICE_CSS: `
+    @page { size: 10cm 20cm; margin: 0; }
+    body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; box-sizing: border-box; }
+    .invoice { width: 100%; }
+    .header-info { text-align: right; margin-bottom: 0.5cm; margin-right: 3cm; margin-top: 0.8cm; }
+    .customer-info { text-align: right; margin-bottom: 0.9cm; margin-right: 3cm; font-size: 11px; line-height: 1.2; }
+    .total-row { margin-top: 0.7cm; text-align: right; font-weight: bold; margin-right: 3cm; }
+    .sales { text-align: right; margin-top: 0.6cm; margin-right: 2cm; }
+    .keterangan { font-style: italic; font-size: 10px; margin-top: 1.2cm; margin-bottom: 0.4cm; padding-top: 2mm; text-align: left; margin-left: 0.5cm; margin-right: 3cm; }
+    .keterangan-spacer { height: 1.6cm; }
+    .item-details { display: flex; flex-wrap: wrap; }
+    .item-data { display: grid; grid-template-columns: 2cm 2.7cm 4.6cm 1.8cm 1.8cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 0.5cm; margin-top: 1cm; margin-right: 3cm; }
+    .item-data span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  `,
+
   // Print invoice
   printInvoice() {
     if (!currentTransactionData) {
@@ -1983,75 +2049,16 @@ const penjualanHandler = {
         <head>
           <title>Invoice Customer</title>
           <style>
-            @page {
-              size: 10cm 20cm;
-              margin: 0;
-            }
-            body {
-              font-family: Arial, sans-serif;
-              font-size: 12px;
-              margin: 0;
-              padding: 5mm;
-              width: 20cm;
-              box-sizing: border-box;
-            }
-            .invoice {
-              width: 100%;
-            }
-            .header-info {
-              text-align: right;
-              margin-bottom: 2cm;
-              margin-right: 3cm;
-              margin-top: 0.8cm;
-            }         
-            .total-row {
-              margin-top: 0.7cm;
-              text-align: right;
-              font-weight: bold;
-              margin-right: 3cm;
-            }
-            .sales {
-              text-align: right;
-              margin-top: 0.6cm;
-              margin-right: 2cm;
-            }
-            .keterangan {
-              font-style: italic;
-              font-size: 10px;
-              margin-top: 1cm;
-              margin-bottom: 0.5cm;
-              padding-top: 2mm;
-              text-align: left;
-              margin-left: 0.5cm;
-              margin-right: 3cm;
-            }
-            .keterangan-spacer { height: 1.6cm; }
-            .item-details {
-              display: flex;
-              flex-wrap: wrap;
-            }
-            .item-data {
-              display: grid;
-              grid-template-columns: 2cm 1.8cm 5cm 2cm 2cm 2cm;
-              width: 100%;
-              column-gap: 0.2cm;
-              margin-left: 0.5cm;
-              margin-top: 1cm;
-              margin-right: 3cm;
-            }
-            .item-data span {
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            }
+            ${this.INVOICE_CSS}
           </style>
         </head>
         <body>
           <div class="invoice">
-            <div class="header-info">
-              <p>${transaction.tanggal}</p>
+            <div class="header-info"><p>${transaction.tanggal}</p></div>
+            <div class="customer-info">
+              <div>${transaction.customerName || "-"}</div>
+              <div>${transaction.customerPhone || ""}</div>
             </div>
-            <hr>
       `;
 
     let hasKeterangan = false;
@@ -2147,23 +2154,15 @@ const penjualanHandler = {
         <html>
         <head>
           <title>Invoice Customer</title>
-          <style>
-            @page { size: 10cm 20cm; margin: 0; }
-            body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; box-sizing: border-box; }
-            .invoice { width: 100%; }
-            .header-info { text-align: right; margin-bottom: 2cm; margin-right: 3cm; margin-top: 0.8cm; }
-            .total-row { margin-top: 0.7cm; text-align: right; font-weight: bold; margin-right: 3cm; }
-            .sales { text-align: right; margin-top: 0.6cm; margin-right: 2cm; }
-            .item-details { display: flex; flex-wrap: wrap; }
-            .item-data { display: grid; grid-template-columns: 2cm 1.8cm 5cm 2cm 2cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 0.5cm; margin-top: 1cm; margin-right: 3cm; }
-            .item-data span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            .keterangan { font-style: italic; font-size: 10px; margin-top: 1cm; margin-bottom: 0.5cm; padding-top: 2mm; text-align: left; margin-left: 0.5cm; margin-right: 3cm; }
-          </style>
+          <style>${this.INVOICE_CSS}</style>
         </head>
         <body>
           <div class="invoice">
             <div class="header-info"><p>${tanggal}</p></div>
-            <hr>
+            <div class="customer-info">
+              <div>${tx.customerName || "-"}</div>
+              <div>${tx.customerPhone || ""}</div>
+            </div>
             <div class="item-details">
               <div class="item-data">
                 <span>${item.kodeText || "-"}</span>
@@ -2250,6 +2249,10 @@ const penjualanHandler = {
 
       // Reset sales name field
       $("#sales").val("").removeClass("is-valid is-invalid");
+
+      // Reset customer fields
+      $("#namaCustomer, #noTelp").val("").removeClass("is-valid is-invalid");
+      $("#namaCustomer, #noTelp").next(".invalid-feedback").remove();
 
       // Clear all tables
       $("#tableAksesorisDetail tbody, #tableKotakDetail tbody, #tableManualDetail tbody").empty();

@@ -739,8 +739,8 @@ body {
 }
 
 .queue-card .card-header {
-  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
-  color: white;
+  background: #f0d16e;
+  color: black;
   font-weight: 600;
   border-top-left-radius: var(--border-radius);
   border-top-right-radius: var(--border-radius);
@@ -1342,7 +1342,7 @@ tr:has(.badge.bg-info) {
 .queue-display {
   font-size: 3.5rem;
   font-weight: 700;
-  color: var(--primary-color);
+  color: #caa21d;
   text-align: center;
   padding: 1.5rem 0;
   background-color: rgba(67, 97, 238, 0.05);

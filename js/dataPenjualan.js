@@ -276,6 +276,22 @@ class OptimizedDataPenjualanApp {
     // ✅ PERBAIKAN: Bind inactivity methods
     this.resetInactivityTimer = this.resetInactivityTimer.bind(this);
     this.handleUserInactivity = this.handleUserInactivity.bind(this);
+
+    // Shared CSS for printing invoice (aligned with aksesoris-app)
+    this.INVOICE_CSS = `
+      @page { size: 10cm 20cm; margin: 0; }
+      body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; box-sizing: border-box; }
+      .invoice { width: 100%; }
+      .header-info { text-align: right; margin-bottom: 0.5cm; margin-right: 3cm; margin-top: 0.8cm; }
+      .customer-info { text-align: right; margin-bottom: 0.9cm; margin-right: 3cm; font-size: 11px; line-height: 1.2; }
+      .total-row { margin-top: 0.7cm; text-align: right; font-weight: bold; margin-right: 3cm; }
+      .sales { text-align: right; margin-top: 0.6cm; margin-right: 2cm; }
+      .keterangan { font-style: italic; font-size: 10px; margin-top: 1.2cm; margin-bottom: 0.4cm; padding-top: 2mm; text-align: left; margin-left: 0.5cm; margin-right: 3cm; }
+      .keterangan-spacer { height: 1.6cm; }
+      .item-details { display: flex; flex-wrap: wrap; }
+      .item-data { display: grid; grid-template-columns: 2cm 2.7cm 4.6cm 1.8cm 1.8cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 0.5cm; margin-top: 1cm; margin-right: 3cm; }
+      .item-data span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    `;
   }
 
   // ✅ PERBAIKAN: Tambahkan method untuk handle inactivity
@@ -1592,17 +1608,117 @@ class OptimizedDataPenjualanApp {
       return utils.showAlert("Tidak ada data transaksi untuk dicetak!");
     }
 
-    const transaction = this.currentTransaction;
-    const printWindow = window.open("", "_blank");
+    const tx = this.currentTransaction;
 
+    if (
+      type === "invoice" &&
+      (tx.jenisPenjualan === "manual" || tx.isGantiLock) &&
+      Array.isArray(tx.items) &&
+      tx.items.length > 1
+    ) {
+      // Cetak invoice per item untuk penjualan manual dengan banyak item
+      this.printInvoicePerItem(tx);
+      return;
+    }
+
+    const printWindow = window.open("", "_blank");
     if (!printWindow) {
       return utils.showAlert("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak.", "Error", "error");
     }
 
-    const html = type === "receipt" ? this.generateReceiptHTML(transaction) : this.generateInvoiceHTML(transaction);
-
+    const html = type === "receipt" ? this.generateReceiptHTML(tx) : this.generateInvoiceHTML(tx);
     printWindow.document.write(html);
     printWindow.document.close();
+  }
+
+  // Print separate invoices per item for manual sales
+  printInvoicePerItem(tx) {
+    const buildItemHTML = (item) => {
+      const tanggal = utils.formatDate(tx.timestamp || tx.tanggal) || "";
+      const itemHarga = parseInt(item.totalHarga || 0) || 0;
+      const keterangan = item.keterangan ? String(item.keterangan).trim() : "";
+
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Invoice Customer</title>
+          <style>${this.INVOICE_CSS}</style>
+        </head>
+        <body>
+          <div class="invoice">
+            <div class="header-info"><p>${tanggal}</p></div>
+            <div class="customer-info">
+              <div>${tx.customerName || "-"}</div>
+              <div>${tx.customerPhone || ""}</div>
+            </div>
+            <div class="item-details">
+              <div class="item-data">
+                <span>${item.kodeText || item.kode || "-"}</span>
+                <span>${item.jumlah || "1"}pcs</span>
+                <span>${item.nama || item.namaBarang || "-"}</span>
+                <span>${item.kadar || "-"}</span>
+                <span>${item.berat || item.gr || "-"}gr</span>
+                <span>${utils.formatRupiah(itemHarga)}</span>
+              </div>
+            </div>
+            ${keterangan ? `<div class="keterangan"><strong>Keterangan:</strong><br>${keterangan}</div>` : ""}
+            <div class="total-row">Rp ${utils.formatRupiah(itemHarga)}</div>
+            <div class="sales">${tx.sales || "-"}</div>
+          </div>
+        </body>
+        </html>
+      `;
+    };
+
+    const printViaIframe = (html) =>
+      new Promise((resolve) => {
+        const iframe = document.createElement("iframe");
+        iframe.style.position = "fixed";
+        iframe.style.right = "0";
+        iframe.style.bottom = "0";
+        iframe.style.width = "0";
+        iframe.style.height = "0";
+        iframe.style.border = "0";
+        document.body.appendChild(iframe);
+
+        const w = iframe.contentWindow;
+        const d = w.document;
+        d.open();
+        d.write(html);
+        d.close();
+
+        const cleanup = () => {
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+            resolve();
+          }, 150);
+        };
+
+        const onAfterPrint = () => {
+          try {
+            w.removeEventListener("afterprint", onAfterPrint);
+          } catch (e) {}
+          cleanup();
+        };
+
+        try {
+          w.addEventListener("afterprint", onAfterPrint);
+        } catch (e) {}
+
+        w.focus();
+        setTimeout(() => {
+          w.print();
+          setTimeout(cleanup, 1000);
+        }, 50);
+      });
+
+    (async () => {
+      for (const item of tx.items || []) {
+        const html = buildItemHTML(item);
+        await printViaIframe(html);
+      }
+    })();
   }
 
   // Generate receipt HTML
@@ -1637,6 +1753,13 @@ class OptimizedDataPenjualanApp {
           <h4>NOTA PENJUALAN ${salesType.toUpperCase()}</h4>
           <hr>
           <p class="tanggal">Tanggal: ${tanggal}<br>Sales: ${transaction.sales || "-"}</p>
+          ${
+            transaction.customerName || transaction.customerPhone
+              ? `<p class="tanggal">Customer: ${transaction.customerName || "-"}${
+                  transaction.customerPhone ? ` | Tlp: ${transaction.customerPhone}` : ""
+                }</p>`
+              : ""
+          }
           <hr>
           <table>
             <tr>
@@ -1737,26 +1860,15 @@ class OptimizedDataPenjualanApp {
     <html>
     <head>
       <title>Invoice Customer</title>
-      <style>
-        @page { size: 10cm 20cm; margin: 0; }
-        body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; box-sizing: border-box; }
-        .invoice { width: 100%; }
-        .header-info { text-align: right; margin-bottom: 2cm; margin-right: 3cm; margin-top: 0.8cm; }
-        .total-row { margin-top: 0.7cm; text-align: right; font-weight: bold; margin-right: 3cm; }
-        .sales { text-align: right; margin-top: 0.6cm; margin-right: 2cm; }
-        .keterangan { font-style: italic; font-size: 10px; margin-top: 1cm; margin-bottom: 0.5cm; padding-top: 2mm; text-align: left; margin-left: 0.5cm; margin-right: 3cm; }
-        .keterangan-spacer { height: 1.6cm; }
-        .item-details { display: flex; flex-wrap: wrap; }
-        .item-data { display: grid; grid-template-columns: 2cm 1.8cm 5cm 2cm 2cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 0.5cm; margin-top: 1cm; margin-right: 3cm; }
-        .item-data span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      </style>
+      <style>${this.INVOICE_CSS}</style>
     </head>
     <body>
       <div class="invoice">
-        <div class="header-info">
-          <p>${tanggal}</p>
+        <div class="header-info"><p>${tanggal}</p></div>
+        <div class="customer-info">
+          <div>${transaction.customerName || "-"}</div>
+          <div>${transaction.customerPhone || ""}</div>
         </div>
-        <hr>
   `;
 
     let hasKeterangan = false;
