@@ -9,23 +9,17 @@
       href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <!-- jQuery first -->
     <script src="js/jquery-3.6.3.min.js"></script>
-    <!-- Bootstrap CSS and JS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.min.js"></script>
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-    <!-- Custom CSS -->
     <link rel="stylesheet" href="css/pages/absensi-modern.css" />
-    <!-- Favicon sederhana -->
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
-    <title>Sistem Antrian - Melati Gold Shop</title>
+    <title>Sistem Antrian - Melati Gold Young</title>
   </head>
   <body>
     <div class="app-container">
-      <!-- Sidebar -->
       <aside class="sidebar">
         <div class="sidebar-header">
           <img src="img/Melati.jfif" alt="Logo" class="logo" />
@@ -204,9 +198,7 @@
         </div>
       </aside>
 
-      <!-- Main Content -->
       <main class="main-content">
-        <!-- Top Navigation -->
         <header class="top-nav">
           <div class="menu-toggle d-md-flex d-none">
             <i class="fa-solid fa-minimize"></i>
@@ -235,7 +227,6 @@
           </div>
         </header>
 
-        <!-- Page Content -->
         <div class="page-content">
           <div class="page-header">
             <h1>Sistem Antrian</h1>
@@ -247,83 +238,97 @@
             </nav>
           </div>
 
-          <!-- Announcement Section -->
           <div class="row mb-2">
             <div class="col-md-6">
-              <button class="btn btn-outline-danger announcement-btn text-dark" id="waitMessage">
-                <i class="fas fa-info-circle"></i> Informasi Tunggu
+              <button class="btn btn-danger announcement-btn" id="waitMessage">
+                <i class="fas fa-info-circle"></i>
+                Informasi Tunggu
               </button>
             </div>
             <div class="col-md-6">
-              <button class="btn btn-outline-warning announcement-btn text-dark" id="takeMessage">
-                <i class="fas fa-bell"></i> Pengingat Antrian
+              <button class="btn btn-warning announcement-btn" id="takeMessage">
+                <i class="fas fa-bell"></i>
+                Pengingat Antrian
+              </button>
+            </div>
+            <div class="col-md-12">
+              <button class="btn btn-success announcement-btn d-none" id="announceClosingNow">
+                <i class="fas fa-bullhorn me-2"></i>
+                Info Penutupan
               </button>
             </div>
           </div>
 
-          <!-- Queue Management Section -->
-          <div class="row d-flex  justify-content-evenly">
-            <!-- Delayed Queue Card -->
+          <div class="row d-flex justify-content-evenly">
             <div class="col-md-4 mb-4">
               <div class="card queue-card">
                 <div class="card-header d-flex justify-content-center p-2">
                   <h6 class="card-title mb-0">
-                    <i class="fas fa-pause-circle me-2"></i>Nomor Antrian Tertunda
+                    <i class="fas fa-pause-circle me-2"></i>
+                    Nomor Antrian Tertunda
                   </h6>
                 </div>
                 <div class="card-body">
                   <div class="queue-display" id="delayQueueNumber">-</div>
                   <div class="action-buttons">
                     <button class="btn btn-outline-primary d-none" id="sequentialCallButton">
-                      <i class="fas fa-bullhorn"></i>Panggil Nomor Antrian
+                      <i class="fas fa-bullhorn"></i>
+                      Panggil Nomor Antrian
                     </button>
                     <button class="btn btn-outline-success text-dark" id="delayHandleButton">
-                      <i class="fas fa-check-circle"></i>Sudah Dilayani
+                      <i class="fas fa-check-circle"></i>
+                      Sudah Dilayani
                     </button>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Current Queue Card -->
             <div class="col-md-4 mb-4">
               <div class="card queue-card">
                 <div class="card-header d-flex justify-content-center p-2">
-                  <h6 class="card-title mb-0 ">
-                    <i class="fas fa-user-clock me-2"></i>Nomor Antrian Saat Ini
+                  <h6 class="card-title mb-0">
+                    <i class="fas fa-user-clock me-2"></i>
+                    Nomor Antrian Saat Ini
                   </h6>
                 </div>
                 <div class="card-body">
                   <div class="queue-display" id="queueNumber">-</div>
                   <div class="action-buttons">
                     <button class="btn btn-outline-primary text-dark" id="callButton">
-                      <i class="fas fa-bullhorn"></i>Panggil Nomor Antrian
+                      <i class="fas fa-bullhorn"></i>
+                      Panggil Nomor Antrian
                     </button>
                     <button class="btn btn-outline-success text-dark" id="handleButton">
-                      <i class="fas fa-check-circle"></i>Sudah Dilayani
+                      <i class="fas fa-check-circle"></i>
+                      Sudah Dilayani
                     </button>
                     <button class="btn btn-outline-warning text-dark" id="skipQueueButton">
-                      <i class="fas fa-forward"></i>Skip Nomor Antrian
+                      <i class="fas fa-forward"></i>
+                      Skip Nomor Antrian
                     </button>
                     <button class="btn btn-outline-secondary text-dark" id="delayQueueButton">
-                      <i class="fas fa-pause-circle"></i>Nomor Antrian Tertunda
+                      <i class="fas fa-pause-circle"></i>
+                      Nomor Antrian Tertunda
                     </button>
                     <button class="btn btn-outline-primary text-dark" id="customQueueButton">
-                      <i class="fas fa-step-forward"></i>Custom Nomor Antrian
+                      <i class="fas fa-step-forward"></i>
+                      Custom Nomor Antrian
                     </button>
                     <button class="btn btn-outline-danger text-dark" id="resetButton">
-                      <i class="fas fa-redo-alt"></i>Reset Nomor Antrian
+                      <i class="fas fa-redo-alt"></i>
+                      Reset Nomor Antrian
                     </button>
                   </div>
                 </div>
               </div>
             </div>
-            <!-- Tambahkan di bawah card Delayed Queue atau di tempat yang sesuai -->
             <div class="col-md-4 mb-4">
               <div class="card queue-card">
                 <div class="card-header d-flex justify-content-center p-2">
                   <h6 class="card-title mb-0">
-                    <i class="fas fa-forward me-2"></i>Skip Nomor Antrian
+                    <i class="fas fa-forward me-2"></i>
+                    Skip Nomor Antrian
                   </h6>
                 </div>
                 <div class="card-body">
@@ -332,22 +337,24 @@
               </div>
             </div>
 
-            <!-- Customer Count Card -->
             <div class="col-md-4 mb-4 d-none">
               <div class="card queue-card">
                 <div class="card-header d-flex justify-content-center p-2">
                   <h6 class="card-title mb-0">
-                    <i class="fas fa-users me-2"></i>Jumlah Pelanggan
+                    <i class="fas fa-users me-2"></i>
+                    Jumlah Pelanggan
                   </h6>
                 </div>
                 <div class="card-body">
                   <div class="customer-count" id="customerCount">0</div>
                   <div class="action-buttons">
                     <button class="btn btn-outline-info text-dark" id="tambahCustomerBtn">
-                      <i class="fas fa-user-plus me-2"></i>Tambah Pelanggan
+                      <i class="fas fa-user-plus me-2"></i>
+                      Tambah Pelanggan
                     </button>
                     <button class="btn btn-outline-danger" id="kurangiCustomerBtn">
-                      <i class="fas fa-user-slash me-2"></i>Kurangi Pelanggan
+                      <i class="fas fa-user-slash me-2"></i>
+                      Kurangi Pelanggan
                     </button>
                   </div>
                 </div>
@@ -355,11 +362,11 @@
             </div>
           </div>
 
-          <!-- Vehicle Information Section -->
           <div class="card mb-4">
             <div class="card-header">
               <h5 class="card-title mb-0">
-                <i class="fas fa-car me-2"></i>Informasi Kendaraan
+                <i class="fas fa-car me-2"></i>
+                Informasi Kendaraan
               </h5>
             </div>
             <div class="card-body">
@@ -367,259 +374,456 @@
                 <div class="col-md-4 mb-3">
                   <label for="vehicleType" class="form-label">Jenis Kendaraan</label>
                   <input type="text" class="form-control" id="carType" placeholder="Contoh: Mobil Alphard" />
-                  </div>          
+                </div>
                 <div class="col-md-4 mb-3">
                   <label for="vehicleColor" class="form-label">Warna Kendaraan</label>
-                  <input type="text" class="form-control" id="vehicleColor" placeholder="Contoh: Hitam">
+                  <input type="text" class="form-control" id="vehicleColor" placeholder="Contoh: Hitam" />
                 </div>
-                  <div class="col-md-4 mb-3">
-                    <label for="vehiclePlate" class="form-label">Nomor Plat</label>
-                    <input type="text" class="form-control" id="plateNumber" placeholder="Contoh: B 1234 ABC">
-                  </div>
+                <div class="col-md-4 mb-3">
+                  <label for="vehiclePlate" class="form-label">Nomor Plat</label>
+                  <input type="text" class="form-control" id="plateNumber" placeholder="Contoh: B 1234 ABC" />
+                </div>
               </div>
               <div class="d-flex justify-content-end">
                 <button class="btn btn-primary" id="panggilInformasi">
-                  <i class="fas fa-bullhorn me-2"></i>Umumkan Kendaraan
+                  <i class="fas fa-bullhorn me-2"></i>
+                  Umumkan Kendaraan
                 </button>
               </div>
             </div>
           </div>
-   
-    <!-- Modern Modal for "Sudah Dilayani" button -->
-<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-success text-white">
-        <h5 class="modal-title" id="confirmModalLabel">
-          <i class="fas fa-check-circle me-2"></i>Konfirmasi Pelayanan
-        </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="alert alert-info">
-          <i class="fas fa-info-circle me-2"></i>
-          <span>Anda akan menandai nomor antrian ini sebagai sudah dilayani.</span>
-        </div>
-        <p class="mb-0">Apakah Anda yakin nomor antrian ini sudah dilayani?</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-          <i class="fas fa-times me-2"></i>Tidak
-        </button>
-        <button type="button" class="btn btn-success" id="confirmYes">
-          <i class="fas fa-check me-2"></i>Ya, Sudah Dilayani
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
 
-<!-- Modern Modal for "Sudah Dilayani" button (Delayed Queue) -->
-<div class="modal fade" id="confirmDelayedModal" tabindex="-1" aria-labelledby="confirmDelayedModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-success text-white">
-        <h5 class="modal-title" id="confirmDelayedModalLabel">
-          <i class="fas fa-check-circle me-2"></i>Konfirmasi Pelayanan Tertunda
-        </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="alert alert-info">
-          <i class="fas fa-info-circle me-2"></i>
-          <span>Anda akan menandai nomor antrian tertunda ini sebagai sudah dilayani.</span>
-        </div>
-        <div class="form-group mb-3">
-          <label for="delayedQueueSelect" class="form-label">Pilih nomor antrian yang sudah dilayani:</label>
-          <select class="form-select" id="delayedQueueSelect" aria-label="Pilih nomor antrian"></select>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-          <i class="fas fa-times me-2"></i>Batal
-        </button>
-        <button type="button" class="btn btn-success" id="confirmDelayedYes">
-          <i class="fas fa-check me-2"></i>Selesai
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Modal untuk Skip Nomor Antrian -->
-<div class="modal fade" id="skipQueueModal" tabindex="-1" aria-labelledby="skipQueueModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-warning text-white">
-        <h5 class="modal-title" id="skipQueueModalLabel">
-          <i class="fas fa-forward me-2"></i>Skip Nomor Antrian
-        </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="alert alert-warning">
-          <i class="fas fa-exclamation-triangle me-2"></i>
-          <span>Anda akan melewati nomor antrian tertentu.</span>
-        </div>
-        <p>Nomor antrian saat ini: <strong id="currentQueueText">-</strong></p>
-        
-        <div class="mb-3">
-          <label for="skipQueueLetter" class="form-label">Huruf Antrian (A-D)</label>
-          <select class="form-select" id="skipQueueLetter">
-            <option value="A">A</option>
-            <option value="B">B</option>
-            <option value="C">C</option>
-            <option value="D">D</option>
-          </select>
-        </div>
-        <div class="mb-3">
-          <label for="skipQueueNumberInput" class="form-label">Nomor Antrian yang Akan Dilewati (1-50)</label>
-          <input type="number" class="form-control" id="skipQueueNumberInput" min="1" max="50" placeholder="Masukkan nomor antrian">
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-          <i class="fas fa-times me-2"></i>Batal
-        </button>
-        <button type="button" class="btn btn-warning" id="confirmSkipQueue">
-          <i class="fas fa-check me-2"></i>Tambahkan ke Skip List
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-
-<!-- Modern Modal for "Nomor Antrian Sebelumnya" button -->
-<div class="modal fade" id="previousNumberModal" tabindex="-1" aria-labelledby="previousNumberModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-warning text-white">
-        <h5 class="modal-title  text-dark" id="previousNumberModalLabel">
-          <i class="fas fa-step-backward me-2"></i>Kembali ke Nomor Sebelumnya
-        </h5>
-        <button type="button" class="btn-close btn-close-dark" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="alert alert-warning">
-          <i class="fas fa-exclamation-triangle me-2"></i>
-          <span>Anda akan kembali ke nomor antrian sebelumnya.</span>
-        </div>
-        <p>Apakah Anda yakin ingin kembali ke nomor antrian sebelumnya?</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-          <i class="fas fa-times me-2"></i>Batal
-        </button>
-        <button type="button" class="btn btn-warning" id="confirmPreviousNumber">
-          <i class="fas fa-check me-2"></i>Ya, Kembali
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Modern Modal for "Nomor Antrian Tertunda" button -->
-<div class="modal fade" id="confirmDelayModal" tabindex="-1" aria-labelledby="confirmDelayModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-secondary">
-        <h5 class="modal-title" id="confirmDelayModalLabel">
-          <i class="fas fa-pause-circle me-2"></i>Konfirmasi Antrian Tertunda
-        </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="alert alert-secondary">
-          <i class="fas fa-exclamation-triangle me-2"></i>
-          <span>Anda akan memindahkan nomor antrian ini ke daftar antrian tertunda.</span>
-        </div>
-        <p>Apakah Anda yakin ingin memindahkan nomor antrian ini ke antrian tertunda?</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-          <i class="fas fa-times me-2"></i>Tidak
-        </button>
-        <button type="button" class="btn btn-secondary" id="confirmDelayYes">
-          <i class="fas fa-check me-2"></i>Ya, Pindahkan
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Modern Modal for "Custom Nomor Antrian" button -->
-<div class="modal fade" id="customQueueModal" tabindex="-1" aria-labelledby="customQueueModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-primary text-white">
-        <h5 class="modal-title" id="customQueueModalLabel">
-          <i class="fas fa-edit me-2"></i>Set Custom Nomor Antrian
-        </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="alert alert-info">
-          <i class="fas fa-info-circle me-2"></i>
-          <span>Anda akan mengatur nomor antrian secara manual.</span>
-        </div>
-        <div class="mb-3">
-          <label for="queueLetter" class="form-label">Huruf Antrian (A-D)</label>
-          <select class="form-select" id="queueLetter">
-            <option value="A">A</option>
-            <option value="B">B</option>
-            <option value="C">C</option>
-            <option value="D">D</option>
-          </select>
-        </div>
-        <div class="mb-3">
-          <label for="queueNumberInput" class="form-label">Nomor Antrian (1-50)</label>
-          <input type="number" class="form-control" id="queueNumberInput" min="1" max="50" placeholder="Masukkan nomor antrian">
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-          <i class="fas fa-times me-2"></i>Batal
-        </button>
-        <button type="button" class="btn btn-primary" id="setCustomQueue">
-          <i class="fas fa-check me-2"></i>Terapkan
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-    <!-- Reset Confirmation Modal -->
-    <div class="modal fade" id="resetConfirmModal" tabindex="-1" aria-labelledby="resetConfirmModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header bg-danger text-white">
-            <h5 class="modal-title" id="resetConfirmModalLabel">Konfirmasi Reset</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <div class="alert alert-warning">
-              <i class="fas fa-exclamation-triangle me-2"></i>
-              <strong>Perhatian!</strong> Tindakan ini akan mereset nomor antrian.
+          <div
+            class="modal fade"
+            id="confirmModal"
+            tabindex="-1"
+            aria-labelledby="confirmModalLabel"
+            aria-hidden="true"
+          >
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                  <h5 class="modal-title" id="confirmModalLabel">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Konfirmasi Pelayanan
+                  </h5>
+                  <button
+                    type="button"
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"
+                  ></button>
+                </div>
+                <div class="modal-body">
+                  <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span>Anda akan menandai nomor antrian ini sebagai sudah dilayani.</span>
+                  </div>
+                  <p class="mb-0">Apakah Anda yakin nomor antrian ini sudah dilayani?</p>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>
+                    Tidak
+                  </button>
+                  <button type="button" class="btn btn-success" id="confirmYes">
+                    <i class="fas fa-check me-2"></i>
+                    Ya, Sudah Dilayani
+                  </button>
+                </div>
+              </div>
             </div>
-            <p>Apakah Anda yakin ingin mereset nomor antrian? Tindakan ini tidak dapat dibatalkan.</p>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-            <button type="button" class="btn btn-danger" id="confirmResetBtn">
-              <i class="fas fa-redo-alt me-2"></i>Ya, Reset Antrian
-            </button>
+
+          <div
+            class="modal fade"
+            id="confirmDelayedModal"
+            tabindex="-1"
+            aria-labelledby="confirmDelayedModalLabel"
+            aria-hidden="true"
+          >
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                  <h5 class="modal-title" id="confirmDelayedModalLabel">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Konfirmasi Pelayanan Tertunda
+                  </h5>
+                  <button
+                    type="button"
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"
+                  ></button>
+                </div>
+                <div class="modal-body">
+                  <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span>Anda akan menandai nomor antrian tertunda ini sebagai sudah dilayani.</span>
+                  </div>
+                  <div class="form-group mb-3">
+                    <label for="delayedQueueSelect" class="form-label">Pilih nomor antrian yang sudah dilayani:</label>
+                    <select class="form-select" id="delayedQueueSelect" aria-label="Pilih nomor antrian"></select>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>
+                    Batal
+                  </button>
+                  <button type="button" class="btn btn-success" id="confirmDelayedYes">
+                    <i class="fas fa-check me-2"></i>
+                    Selesai
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
+
+          <div
+            class="modal fade"
+            id="skipQueueModal"
+            tabindex="-1"
+            aria-labelledby="skipQueueModalLabel"
+            aria-hidden="true"
+          >
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header bg-warning text-white">
+                  <h5 class="modal-title" id="skipQueueModalLabel">
+                    <i class="fas fa-forward me-2"></i>
+                    Skip Nomor Antrian
+                  </h5>
+                  <button
+                    type="button"
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"
+                  ></button>
+                </div>
+                <div class="modal-body">
+                  <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span>Anda akan melewati nomor antrian tertentu.</span>
+                  </div>
+                  <p>
+                    Nomor antrian saat ini:
+                    <strong id="currentQueueText">-</strong>
+                  </p>
+
+                  <div class="mb-3">
+                    <label for="skipQueueLetter" class="form-label">Huruf Antrian (A-D)</label>
+                    <select class="form-select" id="skipQueueLetter">
+                      <option value="A">A</option>
+                      <option value="B">B</option>
+                      <option value="C">C</option>
+                      <option value="D">D</option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label for="skipQueueNumberInput" class="form-label">Nomor Antrian yang Akan Dilewati (1-50)</label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="skipQueueNumberInput"
+                      min="1"
+                      max="50"
+                      placeholder="Masukkan nomor antrian"
+                    />
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>
+                    Batal
+                  </button>
+                  <button type="button" class="btn btn-warning" id="confirmSkipQueue">
+                    <i class="fas fa-check me-2"></i>
+                    Tambahkan ke Skip List
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="modal fade"
+            id="previousNumberModal"
+            tabindex="-1"
+            aria-labelledby="previousNumberModalLabel"
+            aria-hidden="true"
+          >
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header bg-warning text-white">
+                  <h5 class="modal-title text-dark" id="previousNumberModalLabel">
+                    <i class="fas fa-step-backward me-2"></i>
+                    Kembali ke Nomor Sebelumnya
+                  </h5>
+                  <button
+                    type="button"
+                    class="btn-close btn-close-dark"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"
+                  ></button>
+                </div>
+                <div class="modal-body">
+                  <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span>Anda akan kembali ke nomor antrian sebelumnya.</span>
+                  </div>
+                  <p>Apakah Anda yakin ingin kembali ke nomor antrian sebelumnya?</p>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>
+                    Batal
+                  </button>
+                  <button type="button" class="btn btn-warning" id="confirmPreviousNumber">
+                    <i class="fas fa-check me-2"></i>
+                    Ya, Kembali
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="modal fade"
+            id="confirmDelayModal"
+            tabindex="-1"
+            aria-labelledby="confirmDelayModalLabel"
+            aria-hidden="true"
+          >
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header bg-secondary">
+                  <h5 class="modal-title" id="confirmDelayModalLabel">
+                    <i class="fas fa-pause-circle me-2"></i>
+                    Konfirmasi Antrian Tertunda
+                  </h5>
+                  <button
+                    type="button"
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"
+                  ></button>
+                </div>
+                <div class="modal-body">
+                  <div class="alert alert-secondary">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span>Anda akan memindahkan nomor antrian ini ke daftar antrian tertunda.</span>
+                  </div>
+                  <p>Apakah Anda yakin ingin memindahkan nomor antrian ini ke antrian tertunda?</p>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>
+                    Tidak
+                  </button>
+                  <button type="button" class="btn btn-secondary" id="confirmDelayYes">
+                    <i class="fas fa-check me-2"></i>
+                    Ya, Pindahkan
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="modal fade"
+            id="customQueueModal"
+            tabindex="-1"
+            aria-labelledby="customQueueModalLabel"
+            aria-hidden="true"
+          >
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                  <h5 class="modal-title" id="customQueueModalLabel">
+                    <i class="fas fa-edit me-2"></i>
+                    Set Custom Nomor Antrian
+                  </h5>
+                  <button
+                    type="button"
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"
+                  ></button>
+                </div>
+                <div class="modal-body">
+                  <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span>Anda akan mengatur nomor antrian secara manual.</span>
+                  </div>
+                  <div class="mb-3">
+                    <label for="queueLetter" class="form-label">Huruf Antrian (A-D)</label>
+                    <select class="form-select" id="queueLetter">
+                      <option value="A">A</option>
+                      <option value="B">B</option>
+                      <option value="C">C</option>
+                      <option value="D">D</option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label for="queueNumberInput" class="form-label">Nomor Antrian (1-50)</label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="queueNumberInput"
+                      min="1"
+                      max="50"
+                      placeholder="Masukkan nomor antrian"
+                    />
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>
+                    Batal
+                  </button>
+                  <button type="button" class="btn btn-primary" id="setCustomQueue">
+                    <i class="fas fa-check me-2"></i>
+                    Terapkan
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="modal fade"
+            id="resetConfirmModal"
+            tabindex="-1"
+            aria-labelledby="resetConfirmModalLabel"
+            aria-hidden="true"
+          >
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                  <h5 class="modal-title" id="resetConfirmModalLabel">Konfirmasi Reset</h5>
+                  <button
+                    type="button"
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"
+                  ></button>
+                </div>
+                <div class="modal-body">
+                  <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Perhatian!</strong>
+                    Tindakan ini akan mereset nomor antrian.
+                  </div>
+                  <p>Apakah Anda yakin ingin mereset nomor antrian? Tindakan ini tidak dapat dibatalkan.</p>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                  <button type="button" class="btn btn-danger" id="confirmResetBtn">
+                    <i class="fas fa-redo-alt me-2"></i>
+                    Ya, Reset Antrian
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <script type="module" src="js/melati.js"></script>
+          <script type="module" src="js/main.js"></script>
+          <script type="module">
+            import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
+            import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+          </script>
+          <script type="module">
+            import { playClosingAnnouncement, primeAudioPlayback } from "./js/audioHandlers.js";
+
+            const MESSAGE =
+              "Kepada pelanggan Melati, kami informasikan toko akan tutup pada jam 9 malam. Silakan melanjutkan berbelanja dan kami akan membantu hingga selesai. Terima kasih atas perhatiannya";
+
+            const SLOTS = [
+              { h: 12, m: 22 },
+            ];
+
+            let lastAutoRunSlot = null;
+            const AUTO_RUN_STORAGE_KEY = "closing_auto_run_slot";
+            const makeSlotKey = (dateObj, hour, minute) => {
+              const d = dateObj || new Date();
+              const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+                d.getDate()
+              ).padStart(2, "0")}`;
+              const hm = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+              return `${day}|${hm}`;
+            };
+
+            async function triggerAutoForSlot(targetHour, targetMinute) {
+              const slotKey = makeSlotKey(new Date(), targetHour, targetMinute);
+              if (lastAutoRunSlot === slotKey) return;
+              if (localStorage.getItem(AUTO_RUN_STORAGE_KEY) === slotKey) {
+                lastAutoRunSlot = slotKey;
+                return;
+              }
+              try {
+                localStorage.setItem(AUTO_RUN_STORAGE_KEY, slotKey);
+              } catch (e) {}
+              lastAutoRunSlot = slotKey;
+              await playClosingAnnouncement(MESSAGE);
+            }
+
+            function scheduleDailyCheck() {
+              const ONE_DAY = 24 * 60 * 60 * 1000;
+
+              const computeNextDelayFor = (hour, minute) => {
+                const now = new Date();
+                const target = new Date();
+                target.setHours(hour, minute, 0, 0);
+                let delay = target.getTime() - now.getTime();
+                if (delay < 0) delay += ONE_DAY;
+                return delay;
+              };
+
+              const scheduleSlot = (hour, minute) => {
+                const delay = computeNextDelayFor(hour, minute);
+                setTimeout(async () => {
+                  await triggerAutoForSlot(hour, minute);
+                  scheduleSlot(hour, minute);
+                }, delay);
+              };
+
+              SLOTS.forEach(({ h, m }) => scheduleSlot(h, m));
+              const POLL_MS = 60 * 1000;
+              const WINDOW_MS = 5 * 60 * 1000;
+              setInterval(async () => {
+                const now = new Date();
+                for (const { h, m } of SLOTS) {
+                  const target = new Date();
+                  target.setHours(h, m, 0, 0);
+                  const diff = now.getTime() - target.getTime();
+                  if (diff >= 0 && diff < WINDOW_MS) {
+                    await triggerAutoForSlot(h, m);
+                  }
+                }
+              }, POLL_MS);
+            }
+
+            document.addEventListener("DOMContentLoaded", () => {
+              scheduleDailyCheck();
+              const btn = document.getElementById("announceClosingNow");
+              if (btn) btn.addEventListener("click", () => playClosingAnnouncement(MESSAGE));
+
+              const unlock = () => {
+                try {
+                  primeAudioPlayback();
+                } catch (e) {}
+                window.removeEventListener("click", unlock);
+                window.removeEventListener("keydown", unlock);
+                window.removeEventListener("touchstart", unlock);
+              };
+              window.addEventListener("click", unlock);
+              window.addEventListener("keydown", unlock);
+              window.addEventListener("touchstart", unlock);
+            });
+          </script>
         </div>
-      </div>
+      </main>
     </div>
-    <script type="module" src="js/melati.js"></script>
-    <script type="module" src="js/main.js"></script>
-    <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
-      import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
-    </script>
   </body>
 </html>
-
-

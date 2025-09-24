@@ -8,8 +8,7 @@ export class QueueManager {
         this.customerRef = ref(database, 'customerCount');
         this.initializeCustomerCount();
         this.skipList = [];
-        // Tambahkan baris ini untuk memastikan tampilan diperbarui saat inisialisasi
-        setTimeout(() => this.updateSkipListDisplay(), 1000); // Delay sedikit untuk memastikan DOM sudah siap
+        setTimeout(() => this.updateSkipListDisplay(), 1000);
     }
 
     async initializeFromFirebase() {
@@ -22,14 +21,14 @@ export class QueueManager {
                 this.currentNumber = data.currentNumber;
                 this.delayedQueue = data.delayedQueue || [];
                 this.skipList = data.skipList || [];
-                this.updateSkipListDisplay(); // Tambahkan baris ini
+                this.updateSkipListDisplay(); 
             } else {
                 this.currentLetter = 0;
                 this.currentNumber = 1;
                 this.delayedQueue = [];
                 this.skipList = [];
                 await this.saveState();
-                this.updateSkipListDisplay(); // Tambahkan baris ini
+                this.updateSkipListDisplay();
             }
         } catch (error) {
             console.log('Initializing default values due to:', error.message);
@@ -38,7 +37,7 @@ export class QueueManager {
             this.delayedQueue = [];
             this.skipList = [];
             await this.saveState();
-            this.updateSkipListDisplay(); // Tambahkan baris ini
+            this.updateSkipListDisplay();
         }
     }
     
@@ -91,30 +90,19 @@ export class QueueManager {
     }
     
     skipQueue() {
-        // Simpan nomor antrian saat ini
         const currentQueue = this.getCurrentQueue();
-        
-        // Tambahkan 1 ke nomor antrian (untuk mendapatkan nomor berikutnya)
         this.currentNumber++;
-        
-        // Jika nomor antrian melebihi batas, atur ke nomor awal dan tambah huruf
         if (this.currentNumber > 50) {
             this.currentNumber = 1;
             this.currentLetter++;
-            
-            // Jika huruf melebihi batas, kembali ke huruf pertama
             if (this.currentLetter >= this.letters.length) {
                 this.currentLetter = 0;
             }
         }
         
-        // Simpan perubahan ke Firebase
         this.saveState();
-        
-        // Kembalikan nomor antrian yang baru
         return this.getCurrentQueue();
     }
-    // Tambahkan method baru untuk memperbarui tampilan skip list
 updateSkipListDisplay() {
     const skipListDisplay = document.getElementById("skipListDisplay");
     if (skipListDisplay) {
@@ -126,29 +114,18 @@ updateSkipListDisplay() {
     }
 }
 
-    // Tambahkan fungsi ini ke class QueueManager
 previousQueue() {
-    // Simpan nomor antrian saat ini
     const currentQueue = this.getCurrentQueue();
-    
-    // Kurangi nomor antrian
     this.currentNumber--;
-    
-    // Jika nomor antrian menjadi kurang dari 1, kembali ke nomor maksimum dan kurangi huruf
     if (this.currentNumber < 1) {
         this.currentNumber = 50;
         this.currentLetter--;
-        
-        // Jika huruf menjadi kurang dari 0, kembali ke huruf terakhir
         if (this.currentLetter < 0) {
             this.currentLetter = this.letters.length - 1;
         }
     }
     
-    // Simpan perubahan ke Firebase
     this.saveState();
-    
-    // Kembalikan nomor antrian yang baru
     return this.getCurrentQueue();
 }
 
@@ -161,23 +138,19 @@ previousQueue() {
             skipList: this.skipList
         });
     }
-// Modifikasi method addToSkipList
 addToSkipList(letter, number) {
-    // Format nomor dengan leading zero
     const formattedNumber = this.formatNumber(number);
     const skipItem = `${letter}${formattedNumber}`;
     
     if (!this.skipList.includes(skipItem)) {
         this.skipList.push(skipItem);
         this.saveState();
-        this.updateSkipListDisplay(); // Tambahkan baris ini untuk memperbarui tampilan
+        this.updateSkipListDisplay(); 
         return true;
     }
     return false;
 }
 
-
-// Tambahkan method untuk mendapatkan skipList
 getSkipList() {
     return this.skipList;
 }
@@ -210,14 +183,12 @@ getSkipList() {
                 this.currentLetter = 0;
             }
         }
-         // Periksa apakah nomor berikutnya ada di skipList
     const nextQueue = this.getCurrentQueue();
     if (this.skipList.includes(nextQueue)) {
-        // Jika ada di skipList, hapus dari skipList dan panggil next lagi
         const index = this.skipList.indexOf(nextQueue);
         this.skipList.splice(index, 1);
         this.saveState();
-        return this.next(); // Rekursif untuk mendapatkan nomor berikutnya yang tidak di-skip
+        return this.next();
     }
         this.saveState();
         return this.getCurrentQueue();
@@ -252,7 +223,7 @@ getSkipList() {
         this.currentLetter = 0;
         this.currentNumber = 1;
         this.delayedQueue = [];
-        this.skipList = []; // Tambahkan baris ini untuk mereset skipList
+        this.skipList = [];
         this.saveState();
         return this.getCurrentQueue();
     }

@@ -6,7 +6,6 @@ let dailyChart = null;
 let currentHourlyPeriod = 'today';
 let currentDailyPeriod = 'week';
 
-// Initialize the dashboard
 document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     loadAnalytics();
@@ -15,17 +14,15 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(updateDateTime, 1000);
 });
 
-// Set up all event listeners
+
 function setupEventListeners() {
-    // Period selectors for hourly chart
     const hourlyPeriodLinks = document.querySelectorAll('[data-period]');
     hourlyPeriodLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             const period = e.target.getAttribute('data-period');
             currentHourlyPeriod = period;
-            
-            // Update dropdown button text
+
             const dropdownButton = e.target.closest('.dropdown').querySelector('.dropdown-toggle');
             dropdownButton.innerHTML = `<i class="fas fa-calendar"></i> ${e.target.textContent}`;
             
@@ -34,9 +31,6 @@ function setupEventListeners() {
     });
 }
 
-
-
-// Load analytics data and update UI
 async function loadAnalytics() {
     if (hourlyChart) {
         hourlyChart.destroy();
@@ -47,8 +41,7 @@ async function loadAnalytics() {
 
     const today = new Date();
     const analyticsRef = ref(database, `analytics/${today.getFullYear()}/${today.getMonth() + 1}`);
-    
-    // Initialize data arrays
+
     const hourlyData = new Array(24).fill(0);
     const dailyData = new Array(7).fill(0);
     let todayCount = 0;
@@ -63,7 +56,6 @@ async function loadAnalytics() {
         if (snapshot.exists()) {
             const data = snapshot.val();
             
-            // Calculate period start dates
             const periodStartHourly = new Date();
             if (currentHourlyPeriod === 'week') {
                 periodStartHourly.setDate(today.getDate() - 7);
@@ -80,23 +72,17 @@ async function loadAnalytics() {
                 periodStartDaily.setMonth(today.getMonth() - 3);
             }
             
-            // Process data
             Object.values(data).forEach(day => {
                 Object.values(day).forEach(entry => {
                     const entryDate = new Date(entry.timestamp);
-                    
-                    // Calculate wait time if available
+
                     if (entry.waitTime) {
                         totalWaitTime += entry.waitTime;
                         totalCustomers++;
                     }
-                    
-                    // Today's data
                     if (entry.date === today.getDate() && entry.month === (today.getMonth() + 1)) {
                         todayCount++;
                     }
-                    
-                    // Hourly data based on selected period
                     if (currentHourlyPeriod === 'today') {
                         if (entry.date === today.getDate() && entry.month === (today.getMonth() + 1)) {
                             hourlyData[entry.hour]++;
@@ -104,21 +90,16 @@ async function loadAnalytics() {
                     } else if (entryDate >= periodStartHourly) {
                         hourlyData[entry.hour]++;
                     }
-                    
-                    // Weekly data
                     const dayDiff = Math.floor((today - entryDate) / (1000 * 60 * 60 * 24));
                     if (dayDiff < 7) {
                         weekCount++;
                     }
-                    
-                    // Daily data based on selected period
                     if (entryDate >= periodStartDaily) {
                         dailyData[entry.day]++;
                     }
                 });
             });
             
-            // Find peak hour
             hourlyData.forEach((count, index) => {
                 if (count > peakHourCount) {
                     peakHourCount = count;
@@ -127,25 +108,19 @@ async function loadAnalytics() {
             });
         }
         
-        // Calculate average wait time
         const avgWaitTime = totalCustomers > 0 ? Math.round(totalWaitTime / totalCustomers) : 0;
         
-        // Format peak hour
         const peakHour = peakHourIndex < 10 ? `0${peakHourIndex}:00` : `${peakHourIndex}:00`;
         
-        // Update UI elements
         document.getElementById('todayTotal').textContent = todayCount;
         document.getElementById('weekTotal').textContent = weekCount;
         document.getElementById('avgWaitTime').textContent = `${avgWaitTime} min`;
         document.getElementById('peakHour').textContent = peakHour;
         
-        // Update detailed metrics if they exist
         const avgWaitTimeDetailed = document.getElementById('avgWaitTimeDetailed');
         if (avgWaitTimeDetailed) {
             avgWaitTimeDetailed.textContent = `${avgWaitTime} menit`;
         }
-        
-        // Create hourly chart
         const hourlyChartCanvas = document.getElementById('hourlyChart');
         if (hourlyChartCanvas) {
             hourlyChart = new Chart(hourlyChartCanvas, {
@@ -196,7 +171,6 @@ async function loadAnalytics() {
             });
         }
         
-        // Create daily chart
         const dailyChartCanvas = document.getElementById('dailyChart');
         if (dailyChartCanvas) {
             dailyChart = new Chart(dailyChartCanvas, {
@@ -260,33 +234,26 @@ async function loadAnalytics() {
     }
 }
 
-// Handle reset analytics button
 function resetAnalyticsHandler() {
     const resetButton = document.getElementById('resetAnalytics');
     if (resetButton) {
         resetButton.addEventListener('click', async () => {
             if (confirm('Apakah Anda yakin ingin menghapus semua data analisis? Tindakan ini tidak dapat dibatalkan.')) {
                 try {
-                    // Show loading state on button
                     resetButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mereset...';
                     resetButton.disabled = true;
                     
                     const analyticsRef = ref(database, 'analytics');
                     await remove(analyticsRef);
-                    
-                    // Reset counters
                     document.getElementById('todayTotal').textContent = '0';
                     document.getElementById('weekTotal').textContent = '0';
                     document.getElementById('avgWaitTime').textContent = '0 min';
                     document.getElementById('peakHour').textContent = '--:--';
-                    
-                    // Reset detailed metrics if they exist
                     const avgWaitTimeDetailed = document.getElementById('avgWaitTimeDetailed');
                     if (avgWaitTimeDetailed) {
                         avgWaitTimeDetailed.textContent = '0 menit';
                     }
                     
-                    // Reload charts
                     await loadAnalytics();
                     
                     alert('Data analisis berhasil direset');
@@ -294,7 +261,6 @@ function resetAnalyticsHandler() {
                     console.error("Error resetting analytics:", error);
                     alert('Gagal mereset data analisis');
                 } finally {
-                    // Reset button state
                     resetButton.innerHTML = '<i class="fas fa-trash-alt"></i> Reset Data';
                     resetButton.disabled = false;
                 }

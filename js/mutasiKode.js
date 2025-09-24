@@ -20,7 +20,7 @@ console.log("mutasiKode.js loaded");
 // ===== IMPROVED CACHE MANAGEMENT =====
 const CACHE_KEY = "kodeDataCache";
 const CACHE_TTL_STANDARD = 60 * 60 * 1000; // 1 jam untuk data historis
-const CACHE_TTL_TODAY = 5 * 60 * 1000;     // 5 menit untuk data yang mungkin berubah
+const CACHE_TTL_TODAY = 5 * 60 * 1000; // 5 menit untuk data yang mungkin berubah
 const CACHE_VERSION = "v4.0"; // Update versi untuk sistem cache baru
 
 // Cache storage dengan Map untuk performa lebih baik
@@ -35,8 +35,8 @@ let currentDataSource = null;
 function getLocalDateString() {
   const now = new Date();
   const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
@@ -44,18 +44,18 @@ function getLocalDateString() {
 function isCacheValid(cacheKey) {
   const timestamp = kodeDataCacheMeta.get(cacheKey);
   if (!timestamp) return false;
-  
+
   const now = Date.now();
   const lastUpdate = timestamp;
-  
+
   // Jika cache key mencakup hari ini, gunakan TTL yang lebih pendek
   const today = getLocalDateString();
   if (cacheKey.includes(today)) {
-    return (now - lastUpdate) < CACHE_TTL_TODAY;
+    return now - lastUpdate < CACHE_TTL_TODAY;
   }
-  
+
   // Untuk data historis, gunakan TTL standar
-  return (now - lastUpdate) < CACHE_TTL_STANDARD;
+  return now - lastUpdate < CACHE_TTL_STANDARD;
 }
 
 // Fungsi untuk menyimpan data ke cache
@@ -65,15 +65,15 @@ function saveToCache(data, source, cacheKey = CACHE_KEY) {
     kodeDataCache.set(cacheKey, {
       data: data,
       source: source,
-      version: CACHE_VERSION
+      version: CACHE_VERSION,
     });
-    
+
     // Update timestamp
     kodeDataCacheMeta.set(cacheKey, Date.now());
-    
+
     // Simpan ke localStorage sebagai backup
     saveCacheToStorage();
-    
+
     console.log(`Data saved to cache with key: ${cacheKey}, source: ${source}`);
   } catch (error) {
     console.error("Error saving to cache:", error);
@@ -92,31 +92,31 @@ function getFromCache(cacheKey = CACHE_KEY) {
         return cached.data;
       }
     }
-    
+
     // Fallback ke localStorage
     const cachedData = localStorage.getItem(cacheKey);
     if (cachedData) {
       const { data, version, source, timestamp } = JSON.parse(cachedData);
       if (version === CACHE_VERSION) {
         const now = Date.now();
-        const isValid = (now - timestamp) < CACHE_TTL_STANDARD;
-        
+        const isValid = now - timestamp < CACHE_TTL_STANDARD;
+
         if (isValid) {
           console.log(`Using localStorage cached data with key: ${cacheKey}, source: ${source}`);
           currentDataSource = source;
-          
+
           // Restore ke Map cache
           kodeDataCache.set(cacheKey, { data, source, version });
           kodeDataCacheMeta.set(cacheKey, timestamp);
-          
+
           return data;
         }
       }
-      
+
       // Hapus cache yang tidak valid
       localStorage.removeItem(cacheKey);
     }
-    
+
     return null;
   } catch (error) {
     console.error("Error getting from cache:", error);
@@ -133,7 +133,7 @@ function saveCacheToStorage() {
         timestamp: timestamp,
         version: CACHE_VERSION,
         data: value.data,
-        source: value.source
+        source: value.source,
       };
       localStorage.setItem(key, JSON.stringify(cacheData));
     });
@@ -153,19 +153,19 @@ function saveCacheToStorage() {
 function clearOldCache() {
   const now = Date.now();
   const keysToDelete = [];
-  
+
   kodeDataCacheMeta.forEach((timestamp, key) => {
-    if ((now - timestamp) > CACHE_TTL_STANDARD) {
+    if (now - timestamp > CACHE_TTL_STANDARD) {
       keysToDelete.push(key);
     }
   });
-  
-  keysToDelete.forEach(key => {
+
+  keysToDelete.forEach((key) => {
     kodeDataCache.delete(key);
     kodeDataCacheMeta.delete(key);
     localStorage.removeItem(key);
   });
-  
+
   console.log(`Cleared ${keysToDelete.length} old cache entries`);
 }
 
@@ -175,15 +175,15 @@ function loadCacheFromStorage() {
     // Scan localStorage untuk cache yang valid
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.includes('kode')) {
+      if (key && key.includes("kode")) {
         try {
           const cachedData = localStorage.getItem(key);
           if (cachedData) {
             const { data, version, source, timestamp } = JSON.parse(cachedData);
             if (version === CACHE_VERSION) {
               const now = Date.now();
-              const isValid = (now - timestamp) < CACHE_TTL_STANDARD;
-              
+              const isValid = now - timestamp < CACHE_TTL_STANDARD;
+
               if (isValid) {
                 kodeDataCache.set(key, { data, source, version });
                 kodeDataCacheMeta.set(key, timestamp);
@@ -414,7 +414,7 @@ async function loadFromPenjualanAksesoris() {
     currentDataSource = "penjualanAksesoris";
 
     return processedData;
-  }   catch (error) {
+  } catch (error) {
     console.error("Error loading from penjualanAksesoris:", error);
     return null;
   }
@@ -460,7 +460,7 @@ async function loadKodeData(forceRefresh = false) {
     // Buat cache key berdasarkan tanggal dan sumber data
     const today = getLocalDateString();
     const cacheKey = `${CACHE_KEY}_${today}`;
-    
+
     // Cek cache jika tidak force refresh
     if (!forceRefresh && isCacheValid(cacheKey)) {
       const cachedData = getFromCache(cacheKey);
@@ -497,10 +497,10 @@ async function loadKodeData(forceRefresh = false) {
 
     kodeData = loadedData || { active: [], mutated: [] };
     sortKodeData();
-    
+
     // Simpan ke cache dengan key yang sesuai
     saveToCache(kodeData, currentDataSource, cacheKey);
-    
+
     updateKodeDisplay();
     updateCounters();
     updateDataSourceIndicator();
@@ -508,12 +508,12 @@ async function loadKodeData(forceRefresh = false) {
   } catch (error) {
     console.error("Error loading kode data:", error);
     Swal.close();
-    
+
     // Coba gunakan cache sebagai fallback jika terjadi error
     const today = getLocalDateString();
     const cacheKey = `${CACHE_KEY}_${today}`;
     const cachedData = getFromCache(cacheKey);
-    
+
     if (cachedData) {
       console.log("Using cached data as fallback due to error");
       kodeData = cachedData;
@@ -564,15 +564,15 @@ function updateDataSourceIndicator() {
   const sourceColor = currentDataSource === "penjualanAksesoris" ? "text-success" : "text-info";
 
   $("#dataSourceText").text(sourceText).removeClass("text-success text-info").addClass(sourceColor);
-  
+
   // Tampilkan indikator cache jika menggunakan data cache
   const today = getLocalDateString();
   const cacheKey = `${CACHE_KEY}_${today}`;
   if (kodeDataCache.has(cacheKey)) {
     const cacheTime = new Date(kodeDataCacheMeta.get(cacheKey));
-    const formattedTime = cacheTime.toLocaleTimeString('id-ID', {
-      hour: '2-digit',
-      minute: '2-digit'
+    const formattedTime = cacheTime.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
     });
     $("#cacheIndicator").text(`Cache (${formattedTime})`).show();
   } else {
@@ -611,12 +611,12 @@ function setupRealtimeListener() {
 
           kodeData = processedData;
           sortKodeData();
-          
+
           // Update cache dengan real-time data
           const today = getLocalDateString();
           const cacheKey = `${CACHE_KEY}_${today}`;
           saveToCache(kodeData, currentDataSource, cacheKey);
-          
+
           updateKodeDisplay();
           updateCounters();
           resetSelections();
@@ -636,12 +636,12 @@ function setupRealtimeListener() {
           console.log("Real-time update from mutasiKode");
           kodeData = processMutasiKodeData(snapshot.docs);
           sortKodeData();
-          
+
           // Update cache dengan real-time data
           const today = getLocalDateString();
           const cacheKey = `${CACHE_KEY}_${today}`;
           saveToCache(kodeData, currentDataSource, cacheKey);
-          
+
           updateKodeDisplay();
           updateCounters();
           resetSelections();
@@ -760,7 +760,6 @@ async function mutateSelectedKodes() {
       // Refresh data
       loadKodeData(true);
     });
-
   } catch (error) {
     console.error("Error mutating kodes:", error);
     Swal.fire({
@@ -860,7 +859,6 @@ async function deleteSelectedKodes() {
 
     // Tampilkan modal validasi
     showValidasiHapusModal(selectedItems);
-
   } catch (error) {
     console.error("Error in deleteSelectedKodes:", error);
     showAlert("Terjadi kesalahan: " + error.message, "Error", "error");
@@ -872,13 +870,13 @@ function showValidasiHapusModal(selectedItems) {
   // Reset form
   $("#validasiHapusForm")[0].reset();
   $("#validasiError").addClass("d-none");
-  
+
   // Update jumlah kode yang akan dihapus
   $("#jumlahKodeHapus").text(selectedItems.length);
-  
+
   // Simpan data yang akan dihapus untuk digunakan nanti
   window.pendingDeleteItems = selectedItems;
-  
+
   // Tampilkan modal
   $("#modalValidasiHapus").modal("show");
 }
@@ -887,32 +885,31 @@ function showValidasiHapusModal(selectedItems) {
 async function validateCredentials(userId, password) {
   try {
     const validCredentials = {
-      "input": "input116",
-      "manager": "manager123",
-      "supervisor": "super123"
+      input: "input116",
+      manager: "manager123",
+      supervisor: "super123",
     };
-    
+
     // Cek apakah user ID dan password valid
     if (validCredentials[userId] && validCredentials[userId] === password) {
       return { success: true };
     }
-    
+
     // Atau bisa juga validasi dengan current user session
     const currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
     if (currentUser.username === userId && currentUser.password === password) {
       return { success: true };
     }
-    
-    return { 
-      success: false, 
-      message: "User ID atau Password tidak valid" 
+
+    return {
+      success: false,
+      message: "User ID atau Password tidak valid",
     };
-    
   } catch (error) {
     console.error("Error validating credentials:", error);
-    return { 
-      success: false, 
-      message: "Terjadi kesalahan saat validasi" 
+    return {
+      success: false,
+      message: "Terjadi kesalahan saat validasi",
     };
   }
 }
@@ -948,7 +945,7 @@ async function executeDelete(selectedItems) {
 
     // Tutup modal dan tampilkan success
     $("#modalValidasiHapus").modal("hide");
-    
+
     Swal.fire({
       title: "Berhasil!",
       text: `${selectedItems.length} kode berhasil dihapus`,
@@ -958,7 +955,6 @@ async function executeDelete(selectedItems) {
       // Refresh data
       loadKodeData(true);
     });
-
   } catch (error) {
     console.error("Error executing delete:", error);
     Swal.fire({
@@ -986,17 +982,17 @@ async function refreshData() {
 function clearAllCache() {
   kodeDataCache.clear();
   kodeDataCacheMeta.clear();
-  
+
   // Hapus dari localStorage
   const keysToRemove = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.includes('kode')) {
+    if (key && key.includes("kode")) {
       keysToRemove.push(key);
     }
   }
-  
-  keysToRemove.forEach(key => localStorage.removeItem(key));
+
+  keysToRemove.forEach((key) => localStorage.removeItem(key));
   console.log("All cache cleared");
 }
 
@@ -1044,11 +1040,12 @@ function renderKodeTable(data, type) {
   tableBody.empty();
 
   if (data.length === 0) {
-    tableBody.html(`<tr><td colspan="7" class="text-center">Tidak ada data kode</td></tr>`);
+    tableBody.html(`<tr><td colspan="8" class="text-center">Tidak ada data kode</td></tr>`);
     return;
   }
 
   data.forEach((item) => {
+    const keteranganText = item.keterangan || "";
     const row = `
       <tr data-id="${item.id}">
         <td>
@@ -1058,21 +1055,22 @@ function renderKodeTable(data, type) {
         <td>${item.nama}</td>
         <td>${item.kadar}</td>
         <td>${item.berat}</td>
+        <td class="keterangan-cell" title="${keteranganText.replace(/"/g, "&quot;")}">${keteranganText}</td>
         <td>${type === "active" ? item.tanggalInput : item.tanggalMutasi || "-"}</td>
-        <td>
-          <button class="btn btn-sm btn-info btn-detail" data-id="${item.id}" data-type="${type}">
+        <td class="actions-cell">
+          <button class="btn btn-sm px-1 btn-info btn-detail" data-id="${item.id}" data-type="${type}">
             <i class="fas fa-info-circle"></i>
           </button>
           ${
             type === "active" && currentDataSource === "mutasiKode"
-              ? `<button class="btn btn-sm btn-warning btn-mutasi" data-id="${item.id}">
+              ? `<button class="btn btn-sm px-1 btn-warning btn-mutasi" data-id="${item.id}">
                   <i class="fas fa-exchange-alt"></i>
                 </button>`
               : ""
           }
           ${
             type === "mutated" && currentDataSource === "mutasiKode"
-              ? `<button class="btn btn-sm btn-secondary btn-restore" data-id="${item.id}">
+              ? `<button class="btn btn-sm px-1 btn-secondary btn-restore" data-id="${item.id}">
                   <i class="fas fa-undo"></i>
                 </button>`
               : ""
@@ -1137,10 +1135,12 @@ function updateButtonStatus(type) {
     const hasSelected = selectedKodes.active.size > 0;
     console.log(`Active selected count: ${selectedKodes.active.size}`);
     $("#btnMutasiSelected").prop("disabled", !hasSelected);
-    
+
     // Update text button untuk debugging
     if (hasSelected) {
-      $("#btnMutasiSelected").html(`<i class="fas fa-exchange-alt me-2"></i>Mutasi Terpilih (${selectedKodes.active.size})`);
+      $("#btnMutasiSelected").html(
+        `<i class="fas fa-exchange-alt me-2"></i>Mutasi Terpilih (${selectedKodes.active.size})`
+      );
     } else {
       $("#btnMutasiSelected").html(`<i class="fas fa-exchange-alt me-2"></i>Mutasi Terpilih`);
     }
@@ -1336,14 +1336,16 @@ function initializeEventHandlers() {
     updateKodeDisplay();
   });
 
-  $("#btnMutasiSelected").off('click').on("click", function() {
-    console.log(`Mutasi button clicked, selected: ${selectedKodes.active.size}`);
-    if (selectedKodes.active.size > 0) {
-      showMutasiModal();
-    } else {
-      showAlert("Pilih kode yang akan dimutasi terlebih dahulu", "Informasi", "info");
-    }
-  });
+  $("#btnMutasiSelected")
+    .off("click")
+    .on("click", function () {
+      console.log(`Mutasi button clicked, selected: ${selectedKodes.active.size}`);
+      if (selectedKodes.active.size > 0) {
+        showMutasiModal();
+      } else {
+        showAlert("Pilih kode yang akan dimutasi terlebih dahulu", "Informasi", "info");
+      }
+    });
 
   $("#btnRestoreSelected").on("click", function () {
     if (selectedKodes.mutated.size > 0) {
@@ -1362,10 +1364,10 @@ function initializeEventHandlers() {
   });
 
   // Event handler untuk toggle password visibility
-  $("#togglePasswordValidasi").on("click", function() {
+  $("#togglePasswordValidasi").on("click", function () {
     const passwordInput = $("#validasiPassword");
     const eyeIcon = $("#eyeIconValidasi");
-    
+
     if (passwordInput.attr("type") === "password") {
       passwordInput.attr("type", "text");
       eyeIcon.removeClass("fa-eye").addClass("fa-eye-slash");
@@ -1376,23 +1378,23 @@ function initializeEventHandlers() {
   });
 
   // Event handler untuk form validasi hapus
-  $("#validasiHapusForm").on("submit", async function(e) {
+  $("#validasiHapusForm").on("submit", async function (e) {
     e.preventDefault();
-    
+
     const userId = $("#validasiUserId").val().trim();
     const password = $("#validasiPassword").val();
-    
+
     if (!userId || !password) {
       showValidasiError("User ID dan Password harus diisi");
       return;
     }
-    
+
     // Disable tombol sementara
     $("#btnKonfirmasiHapus").prop("disabled", true).html('<i class="fas fa-spinner fa-spin me-2"></i>Memvalidasi...');
-    
+
     try {
       const validation = await validateCredentials(userId, password);
-      
+
       if (validation.success) {
         // Validasi berhasil, lakukan penghapusan
         const selectedItems = window.pendingDeleteItems || [];
@@ -1412,27 +1414,29 @@ function initializeEventHandlers() {
   });
 
   // Reset error saat modal ditutup
-  $("#modalValidasiHapus").on("hidden.bs.modal", function() {
+  $("#modalValidasiHapus").on("hidden.bs.modal", function () {
     $("#validasiError").addClass("d-none");
     $("#validasiHapusForm")[0].reset();
     window.pendingDeleteItems = null;
   });
 
-  $("#selectAllActive").off('change').on("change", function() {
-    const isChecked = $(this).is(":checked");
-    console.log(`Select all active: ${isChecked}`);
-    
-    $("#tableActiveKode .kode-checkbox").prop("checked", isChecked);
-    
-    if (isChecked) {
-      const filteredActive = filterKodeData(kodeData.active);
-      selectedKodes.active.clear();
-      filteredActive.forEach(item => selectedKodes.active.add(item.id));
-    } else {
-      selectedKodes.active.clear();
-    }
-    updateButtonStatus("active");
-  });
+  $("#selectAllActive")
+    .off("change")
+    .on("change", function () {
+      const isChecked = $(this).is(":checked");
+      console.log(`Select all active: ${isChecked}`);
+
+      $("#tableActiveKode .kode-checkbox").prop("checked", isChecked);
+
+      if (isChecked) {
+        const filteredActive = filterKodeData(kodeData.active);
+        selectedKodes.active.clear();
+        filteredActive.forEach((item) => selectedKodes.active.add(item.id));
+      } else {
+        selectedKodes.active.clear();
+      }
+      updateButtonStatus("active");
+    });
 
   $("#btnSaveMutasi").on("click", mutateSelectedKodes);
 
@@ -1464,7 +1468,7 @@ function initializeEventHandlers() {
 function showValidasiError(message) {
   $("#validasiErrorText").text(message);
   $("#validasiError").removeClass("d-none");
-  
+
   // Auto hide error setelah 5 detik
   setTimeout(() => {
     $("#validasiError").addClass("d-none");
@@ -1476,7 +1480,7 @@ async function initializePage() {
   try {
     // Load cache dari storage terlebih dahulu
     loadCacheFromStorage();
-    
+
     Swal.fire({
       title: "Memuat Data",
       text: "Mohon tunggu...",
@@ -1492,10 +1496,9 @@ async function initializePage() {
     initializeEventHandlers();
 
     console.log("Page initialized successfully");
-    
+
     // Setup periodic cache cleanup
     setInterval(clearOldCache, 30 * 60 * 1000); // Cleanup setiap 30 menit
-    
   } catch (error) {
     console.error("Error initializing page:", error);
     Swal.fire({
@@ -1513,7 +1516,7 @@ function cleanup() {
     unsubscribeListener();
     console.log("Real-time listener unsubscribed");
   }
-  
+
   // Simpan cache sebelum cleanup
   saveCacheToStorage();
 }
