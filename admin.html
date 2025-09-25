@@ -66,8 +66,14 @@
                     </a>
                   </li>
                   <li class="nav-item">
+                    <a class="nav-link active" href="restokBarang.html">
+                      <i class="fa-solid fa-box-open"></i>
+                      <span class="menu-text">Restok Barang</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
                     <a class="nav-link" href="mutasiKode.html">
-                      <i class="fa-solid fa-calendar-xmark"></i>
+                      <i class="fa-solid fa-undo-alt"></i>
                       <span class="menu-text">Mutasi Kode</span>
                     </a>
                   </li>
@@ -240,13 +246,13 @@
 
           <div class="row mb-2">
             <div class="col-md-6">
-              <button class="btn btn-danger announcement-btn" id="waitMessage">
+              <button class="btn btn-outline-danger announcement-btn text-dark" id="waitMessage">
                 <i class="fas fa-info-circle"></i>
                 Informasi Tunggu
               </button>
             </div>
             <div class="col-md-6">
-              <button class="btn btn-warning announcement-btn" id="takeMessage">
+              <button class="btn btn-outline-warning announcement-btn text-dark" id="takeMessage">
                 <i class="fas fa-bell"></i>
                 Pengingat Antrian
               </button>
@@ -740,7 +746,7 @@
               "Kepada pelanggan Melati, kami informasikan toko akan tutup pada jam 9 malam. Silakan melanjutkan berbelanja dan kami akan membantu hingga selesai. Terima kasih atas perhatiannya";
 
             const SLOTS = [
-              { h: 12, m: 22 },
+              { h: 20, m: 55 },
             ];
 
             let lastAutoRunSlot = null;

@@ -287,7 +287,6 @@
 
 .table tbody tr:hover {
   background: linear-gradient(135deg, rgba(89, 102, 224, 0.05) 0%, rgba(89, 102, 224, 0.02) 100%);
-  transform: scale(1.01);
   box-shadow: 0 4px 12px rgba(89, 102, 224, 0.1);
 }
 
@@ -628,8 +627,6 @@
   font-size: 1.9rem;
 }
 
-/* ===== Compact Modal Styling (simpler, smaller, scoped) ===== */
-/* Target only the add/update/reduce modals to keep global modal styles intact */
 #modalTambahStok .modal-dialog,
 #modalKurangiStok .modal-dialog,
 #modalUpdateStok .modal-dialog,
@@ -637,7 +634,8 @@
 #modalKurangiStokHala .modal-dialog,
 #modalUpdateStokHala .modal-dialog,
 #modalUpdateKomputer .modal-dialog,
-#modalDetailHala .modal-dialog {
+#modalDetailHala .modal-dialog,
+#categoryBreakdownModal .modal-dialog {
   max-width: 400px;
 }
 

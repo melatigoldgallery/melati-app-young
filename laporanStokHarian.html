@@ -251,8 +251,14 @@
                     </a>
                   </li>
                   <li class="nav-item">
+                    <a class="nav-link active" href="restokBarang.html">
+                      <i class="fa-solid fa-box-open"></i>
+                      <span class="menu-text">Restok Barang</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
                     <a class="nav-link" href="mutasiKode.html">
-                      <i class="fa-solid fa-calendar-xmark"></i>
+                      <i class="fa-solid fa-undo-alt"></i>
                       <span class="menu-text">Mutasi Kode</span>
                     </a>
                   </li>
@@ -443,7 +449,7 @@
                       <input type="date" id="dailyReportDate" class="form-control" />
                     </div>
                     <div class="col-md-5 col-sm-6 d-flex gap-2 mt-3 flex-wrap">
-                      <button class="btn btn-primary" id="dailyReportShowBtn">
+                      <button class="btn btn-outline-primary" id="dailyReportShowBtn">
                         <i class="fas fa-eye"></i>
                         Tampilkan
                       </button>
@@ -462,11 +468,12 @@
                           <th class="text-center" style="width: 140px">Jumlah Barang</th>
                           <th class="text-center" style="width: 140px">Data Komputer</th>
                           <th class="text-center" style="width: 200px">Status Akhir</th>
+                          <th class="text-center" style="width: 80px">Lihat Detail</th>
                         </tr>
                       </thead>
                       <tbody id="daily-report-table-body">
                         <tr>
-                          <td colspan="5" class="text-center text-muted py-3">Pilih tanggal lalu klik Tampilkan</td>
+                          <td colspan="6" class="text-center text-muted py-3">Pilih tanggal lalu klik Tampilkan</td>
                         </tr>
                       </tbody>
                     </table>
@@ -477,6 +484,36 @@
           </div>
         </div>
       </main>
+    </div>
+
+    <!-- Modal Breakdown Kategori -->
+    <div class="modal fade" id="categoryBreakdownModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h5 class="modal-title" id="categoryBreakdownTitle">Rincian</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" id="categoryBreakdownBody">
+            <div class="text-center text-muted py-3">
+              <i class="fas fa-circle-info fa-2x mb-2 d-block"></i>
+              <div>Tidak ada data</div>
+            </div>
+          </div>
+          <div class="modal-footer gap-2">
+            <button type="button" class="btn btn-outline-primary d-none" id="btnEditBreakdown">
+              <i class="fas fa-pen-to-square me-1"></i>
+              Edit Breakdown
+            </button>
+            <button type="button" class="btn btn-success d-none" id="btnSaveBreakdown">
+              <i class="fas fa-save me-1"></i>
+              Simpan
+            </button>
+            <button type="button" class="btn btn-secondary d-none" id="btnCancelBreakdown">Batal</button>
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Scripts -->

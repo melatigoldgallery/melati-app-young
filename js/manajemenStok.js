@@ -1699,10 +1699,11 @@ function computeCurrentSummarySnapshotForDaily() {
   const result = {};
   mainCategories.forEach((mainCat) => {
     let total = 0;
+    const breakdown = {};
     summaryCategories.forEach((cat) => {
-      if (stockData[cat] && stockData[cat][mainCat]) {
-        total += parseInt(stockData[cat][mainCat].quantity) || 0;
-      }
+      const qty = stockData[cat] && stockData[cat][mainCat] ? parseInt(stockData[cat][mainCat].quantity) || 0 : 0;
+      breakdown[cat] = qty;
+      total += qty;
     });
     let komputer = 0;
     if (stockData["stok-komputer"] && stockData["stok-komputer"][mainCat]) {
@@ -1712,7 +1713,7 @@ function computeCurrentSummarySnapshotForDaily() {
     if (total === komputer) status = "Sesuai / Klop";
     else if (total < komputer) status = `Kurang ${komputer - total}`;
     else status = `Lebih ${total - komputer}`;
-    result[mainCat] = { total, komputer, status };
+    result[mainCat] = { total, komputer, status, breakdown };
   });
   return result;
 }

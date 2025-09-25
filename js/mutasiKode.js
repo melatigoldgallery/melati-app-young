@@ -30,6 +30,8 @@ const kodeDataCacheMeta = new Map();
 // Variabel untuk real-time listener dan tracking sumber data
 let unsubscribeListener = null;
 let currentDataSource = null;
+// Track last bound source to avoid stale realtime listeners overriding UI state
+let lastBoundDataSource = null;
 
 // Fungsi untuk mendapatkan tanggal hari ini dalam format string
 function getLocalDateString() {
@@ -343,6 +345,12 @@ function processMutasiKodeData(docs) {
       return;
     }
 
+    // Normalisasi flag isMutated agar aman untuk berbagai tipe (boolean/string/number)
+    const normalizedIsMutated = (val) => {
+      if (typeof val === "string") return val.toLowerCase() === "true" || val === "1";
+      return !!val;
+    };
+
     // Buat objek kode dengan struktur yang konsisten
     const kodeItem = {
       id: data.id,
@@ -355,7 +363,7 @@ function processMutasiKodeData(docs) {
       jenisPrefix: prefix,
       jenisNama: jenisBarang[prefix],
       penjualanId: data.penjualanId || data.id,
-      isMutated: data.isMutated || false,
+      isMutated: normalizedIsMutated(data.isMutated),
       tanggalMutasi: data.tanggalMutasi || null,
       mutasiKeterangan: data.mutasiKeterangan || "",
       mutasiHistory: data.mutasiHistory || [],
@@ -367,8 +375,8 @@ function processMutasiKodeData(docs) {
       totalHarga: data.totalHarga || 0,
     };
 
-    // Tambahkan ke array yang sesuai berdasarkan status mutasi
-    if (kodeItem.isMutated) {
+    // Tambahkan ke array yang sesuai berdasarkan status mutasi (strict true)
+    if (kodeItem.isMutated === true) {
       processedData.mutated.push(kodeItem);
     } else {
       processedData.active.push(kodeItem);
@@ -457,6 +465,7 @@ async function loadFromMutasiKode() {
 // Fungsi utama untuk memuat data dengan sistem cache yang diperbaiki
 async function loadKodeData(forceRefresh = false) {
   try {
+    const prevSource = currentDataSource;
     // Buat cache key berdasarkan tanggal dan sumber data
     const today = getLocalDateString();
     const cacheKey = `${CACHE_KEY}_${today}`;
@@ -504,6 +513,12 @@ async function loadKodeData(forceRefresh = false) {
     updateKodeDisplay();
     updateCounters();
     updateDataSourceIndicator();
+    // Jika sumber data berubah (misalnya dari penjualanAksesoris -> mutasiKode),
+    // pastikan realtime listener ikut berpindah agar tidak menimpa state dengan snapshot lama
+    if (prevSource !== currentDataSource || lastBoundDataSource !== currentDataSource) {
+      setupRealtimeListener();
+      lastBoundDataSource = currentDataSource;
+    }
     loadingToast.close();
   } catch (error) {
     console.error("Error loading kode data:", error);
@@ -596,10 +611,16 @@ function setupRealtimeListener() {
         orderBy("timestamp", "desc")
       );
 
+      const boundSource = "penjualanAksesoris";
       unsubscribeListener = onSnapshot(
         penjualanQuery,
         (snapshot) => {
           console.log("Real-time update from penjualanAksesoris");
+          // Abaikan update jika source sudah berganti (race protection)
+          if (currentDataSource !== boundSource) {
+            console.log("Ignoring outdated realtime update (penjualanAksesoris)");
+            return;
+          }
           const processedData = processPenjualanData(snapshot.docs);
 
           if (processedData.active.length === 0 && processedData.mutated.length === 0) {
@@ -630,10 +651,15 @@ function setupRealtimeListener() {
     } else {
       const mutasiKodeQuery = query(collection(firestore, "mutasiKode"), orderBy("timestamp", "desc"));
 
+      const boundSource = "mutasiKode";
       unsubscribeListener = onSnapshot(
         mutasiKodeQuery,
         (snapshot) => {
           console.log("Real-time update from mutasiKode");
+          if (currentDataSource !== boundSource) {
+            console.log("Ignoring outdated realtime update (mutasiKode)");
+            return;
+          }
           kodeData = processMutasiKodeData(snapshot.docs);
           sortKodeData();
 
@@ -653,6 +679,7 @@ function setupRealtimeListener() {
       );
     }
 
+    lastBoundDataSource = currentDataSource;
     console.log(`Real-time listener setup for ${currentDataSource}`);
   } catch (error) {
     console.error("Error setting up real-time listener:", error);
@@ -726,6 +753,10 @@ async function mutateSelectedKodes() {
         // Update existing document
         const mutasiKodeRef = doc(firestore, "mutasiKode", item.id);
         await updateDoc(mutasiKodeRef, updateData);
+        // Update state lokal agar langsung hilang dari daftar aktif
+        item.isMutated = true;
+        item.tanggalMutasi = tanggalMutasi;
+        item.mutasiKeterangan = keteranganMutasi;
       } else {
         // Create new document in mutasiKode collection
         const newMutasiData = {
@@ -736,6 +767,8 @@ async function mutateSelectedKodes() {
         };
         delete newMutasiData.id; // Remove old id
         await addDoc(collection(firestore, "mutasiKode"), newMutasiData);
+        // Tandai item sumber sebagai telah dimutasi agar tidak muncul lagi di tab aktif sementara
+        item.isMutated = true;
       }
 
       return item.kode;
@@ -748,6 +781,9 @@ async function mutateSelectedKodes() {
     $("#mutasiModal").modal("hide");
     $("#btnMutasiSelected").prop("disabled", true).html(`<i class="fas fa-exchange-alt me-2"></i>Mutasi Terpilih`);
 
+    // Hapus item yang sudah dimutasi dari daftar aktif di state lokal untuk mencegah reappear hingga refresh
+    const mutatedIds = new Set(selectedItems.map((x) => x.id));
+    kodeData.active = kodeData.active.filter((x) => !mutatedIds.has(x.id));
     // Clear cache untuk refresh data
     clearAllCache();
 
@@ -1040,7 +1076,9 @@ function renderKodeTable(data, type) {
   tableBody.empty();
 
   if (data.length === 0) {
-    tableBody.html(`<tr><td colspan="8" class="text-center">Tidak ada data kode</td></tr>`);
+    // Active has 8 columns, Mutated now has 9 columns
+    const colspan = type === "active" ? 8 : 9;
+    tableBody.html(`<tr><td colspan="${colspan}" class="text-center">Tidak ada data kode</td></tr>`);
     return;
   }
 
@@ -1056,7 +1094,11 @@ function renderKodeTable(data, type) {
         <td>${item.kadar}</td>
         <td>${item.berat}</td>
         <td class="keterangan-cell" title="${keteranganText.replace(/"/g, "&quot;")}">${keteranganText}</td>
-        <td>${type === "active" ? item.tanggalInput : item.tanggalMutasi || "-"}</td>
+        ${
+          type === "active"
+            ? `<td>${item.tanggalInput}</td>`
+            : `<td>${item.tanggalInput}</td><td>${item.tanggalMutasi || "-"}</td>`
+        }
         <td class="actions-cell">
           <button class="btn btn-sm px-1 btn-info btn-detail" data-id="${item.id}" data-type="${type}">
             <i class="fas fa-info-circle"></i>

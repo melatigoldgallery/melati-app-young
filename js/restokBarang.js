@@ -8,6 +8,7 @@ import {
   doc,
   updateDoc,
   deleteDoc,
+  getDoc,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
 // DOM refs
@@ -22,8 +23,75 @@ const btnTampilkan = document.getElementById("btnTampilkan");
 const dataTbody = document.querySelector("#dataTable tbody");
 const btnSendWA = document.getElementById("btnSendWA");
 
-const SUPPLIER_PHONE = "+6287853715623"; // TODO: set real number
 const collRef = collection(firestore, "restokBarang");
+let SUPPLIER_PHONE = null;
+
+async function loadSupplierPhone() {
+  try {
+    const candidates = [
+      { col: "settings", docId: "whatsapp", fields: ["supplierPhone", "phone", "suplierphone"] },
+      { col: "setting", docId: "whatsapp", fields: ["suplierphone", "supplierPhone", "phone"] },
+    ];
+
+    for (const c of candidates) {
+      try {
+        const ref = doc(firestore, c.col, c.docId);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) continue;
+        const data = snap.data() || {};
+        let raw = "";
+        for (const f of c.fields) {
+          if (data[f]) {
+            raw = data[f];
+            break;
+          }
+        }
+        if (raw) {
+          const cleaned = String(raw).replace(/[^+\d]/g, "");
+          SUPPLIER_PHONE = cleaned.startsWith("+") ? cleaned.slice(1) : cleaned;
+          return true;
+        }
+      } catch (_) {
+        /* continue to next candidate */
+      }
+    }
+    console.warn("Supplier phone settings not found. Checked: settings/whatsapp and setting/whatsapp");
+    return false;
+  } catch (err) {
+    console.error("Failed to load supplier phone:", err);
+    return false;
+  }
+}
+
+function toastSuccess(title = "Berhasil") {
+  if (window.Swal) {
+    const Toast = Swal.mixin({
+      toast: true,
+      position: "top-end",
+      showConfirmButton: false,
+      timer: 1500,
+      timerProgressBar: true,
+    });
+    Toast.fire({ icon: "success", title });
+  } else {
+    alert(title);
+  }
+}
+
+async function confirmDelete(text = "Hapus data ini?") {
+  if (window.Swal) {
+    const res = await Swal.fire({
+      icon: "warning",
+      title: "Yakin?",
+      text,
+      showCancelButton: true,
+      confirmButtonText: "Ya, hapus",
+      cancelButtonText: "Batal",
+    });
+    return res.isConfirmed;
+  }
+  return confirm(text);
+}
 
 // Helpers
 function pad(n) {
@@ -46,8 +114,8 @@ function makeRow() {
   tr.innerHTML = `
     <td><input type="text" class="form-control" placeholder="Nama barang" required></td>
     <td><input type="text" class="form-control" placeholder="Kadar" required></td>
-    <td><input type="number" step="0.01" class="form-control" placeholder="Berat (gr)" required min="0"></td>
-    <td><input type="number" step="0.1" class="form-control" placeholder="Panjang (cm)" required min="0"></td>
+    <td><input type="text" class="form-control" placeholder="Berat (gr)"></td>
+    <td><input type="text" class="form-control" placeholder="Panjang (cm)"></td>
     <td class="actions-cell"><button type="button" class="btn btn-outline-danger btn-sm btn-remove">Hapus</button></td>
   `;
   tr.querySelector(".btn-remove").addEventListener("click", () => {
@@ -62,7 +130,8 @@ function getInputRowsData() {
   const rows = Array.from(inputTbody.querySelectorAll("tr"));
   return rows.map((tr) => {
     const [nama, kadar, berat, panjang] = Array.from(tr.querySelectorAll("input")).map((i) => i.value.trim());
-    return { nama, kadar, berat: parseFloat(berat || "0"), panjang: parseFloat(panjang || "0") };
+    // berat dan panjang disimpan sebagai string (opsional, bisa range "2 - 3", dlsb)
+    return { nama, kadar, berat, panjang };
   });
 }
 
@@ -80,10 +149,8 @@ function validateInputForm() {
     const inputs = tr.querySelectorAll("input");
     inputs.forEach((inp, idx) => {
       const val = inp.value.trim();
-      let valid = val !== "";
-      if (idx >= 2) {
-        valid = valid && !isNaN(val) && parseFloat(val) >= 0;
-      }
+      // Hanya wajib untuk kolom 0: nama, 1: kadar
+      let valid = idx < 2 ? val !== "" : true;
       inp.classList.toggle("is-invalid", !valid);
       if (!valid) ok = false;
     });
@@ -109,6 +176,7 @@ if (form) {
           tanggal,
           nama: item.nama,
           kadar: item.kadar,
+          // berat & panjang disimpan apa adanya (string), bisa kosong atau range
           berat: item.berat,
           panjang: item.panjang,
           createdAt: Date.now(),
@@ -118,6 +186,7 @@ if (form) {
       // reset
       inputTbody.innerHTML = "";
       makeRow();
+      toastSuccess("Data berhasil disimpan");
       // refresh listing for selected filter date if equals tanggal
       if (filterTanggal && filterTanggal.value === tanggal) {
         await fetchAndRender();
@@ -203,8 +272,8 @@ function enterEditMode(tr) {
     <td>${tanggal}</td>
     <td><input type="text" class="form-control form-control-sm" value="${nama}"></td>
     <td><input type="text" class="form-control form-control-sm" value="${kadar}"></td>
-    <td><input type="number" step="0.01" min="0" class="form-control form-control-sm" value="${berat}"></td>
-    <td><input type="number" step="0.1" min="0" class="form-control form-control-sm" value="${panjang}"></td>
+    <td><input type="text" class="form-control form-control-sm" value="${berat}"></td>
+    <td><input type="text" class="form-control form-control-sm" value="${panjang}"></td>
     <td class="actions-cell">
       <div class="btn-group btn-group-sm" role="group">
         <button type="button" class="btn btn-success btn-save">Simpan</button>
@@ -218,21 +287,23 @@ function enterEditMode(tr) {
     const [namaI, kadarI, beratI, panjangI] = Array.from(tr.querySelectorAll("input"));
     const newNama = namaI.value.trim();
     const newKadar = kadarI.value.trim();
-    const newBerat = parseFloat(beratI.value || "0");
-    const newPanjang = parseFloat(panjangI.value || "0");
-    if (!newNama || !newKadar || isNaN(newBerat) || newBerat < 0 || isNaN(newPanjang) || newPanjang < 0) {
-      alert("Input tidak valid");
+    const newBerat = beratI.value.trim();
+    const newPanjang = panjangI.value.trim();
+    if (!newNama || !newKadar) {
+      alert("Nama dan kadar wajib diisi");
       return;
     }
     try {
       await updateDoc(doc(firestore, "restokBarang", id), {
         nama: newNama,
         kadar: newKadar,
+        // berat & panjang disimpan sebagai string (opsional)
         berat: newBerat,
         panjang: newPanjang,
         updatedAt: Date.now(),
       });
       await fetchAndRender();
+      toastSuccess("Perubahan disimpan");
     } catch (err) {
       console.error("Gagal mengubah data:", err);
       alert("Gagal mengubah data");
@@ -248,10 +319,12 @@ async function deleteRow(tr) {
   if (!tr) return;
   const id = tr.dataset.id;
   if (!id) return;
-  if (!confirm("Hapus data ini?")) return;
+  const ok = await confirmDelete("Hapus data ini?");
+  if (!ok) return;
   try {
     await deleteDoc(doc(firestore, "restokBarang", id));
     tr.remove();
+    toastSuccess("Data dihapus");
   } catch (err) {
     console.error("Gagal menghapus data:", err);
     alert("Gagal menghapus data");
@@ -264,6 +337,10 @@ if (btnSendWA) {
     const rows = Array.from(dataTbody.querySelectorAll("tr"));
     if (rows.length === 0) {
       alert("Tidak ada data untuk dikirim");
+      return;
+    }
+    if (!SUPPLIER_PHONE) {
+      alert("Nomor WhatsApp pemasok belum tersedia");
       return;
     }
     const lines = ["Data Restok Barang:"];
@@ -286,6 +363,8 @@ if (btnTampilkan) {
 
 // Init
 document.addEventListener("DOMContentLoaded", () => {
+  // Load supplier phone on start
+  loadSupplierPhone();
   setDefaultDates();
   if (inputTbody && inputTbody.children.length === 0) {
     makeRow();

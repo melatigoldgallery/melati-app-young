@@ -1,6 +1,12 @@
 // Laporan Stok Harian
 import { firestore } from "./configFirebase.js";
-import { doc, getDoc, setDoc, collection } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  collection,
+  updateDoc,
+} from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
 // Copy subset constants (pastikan sinkron dengan manajemenStok.js)
 const mainCategories = ["KALUNG", "LIONTIN", "ANTING", "CINCIN", "HALA", "GELANG", "GIWANG"];
@@ -15,6 +21,25 @@ const summaryCategories = [
   "contoh-custom",
   "DP",
 ];
+
+// Untuk tampilan nama kategori breakdown yang lebih ramah
+const breakdownDisplayMap = {
+  brankas: "Stok Brankas",
+  posting: "Belum Posting",
+  "barang-display": "Display",
+  "barang-rusak": "Rusak",
+  "batu-lepas": "Batu Lepas",
+  manual: "Manual",
+  admin: "Admin",
+  DP: "DP",
+  "contoh-custom": "Contoh Custom",
+};
+
+// State untuk menyimpan snapshot yang sedang ditampilkan
+let currentSnapshotData = null;
+let currentReportDateKey = null; // yyyy-mm-dd from date input
+let currentModalMainCat = null; // current category shown in modal
+let isEditMode = false;
 
 // Cache ringan untuk stok agar tidak fetch berulang via window.stockData jika halaman ini dibuka terpisah
 let stockDataSnapshot = {};
@@ -69,10 +94,14 @@ function computeCurrentSummarySnapshot() {
   const snapshot = {};
   mainCategories.forEach((mainCat) => {
     let total = 0;
+    const breakdown = {};
     summaryCategories.forEach((cat) => {
-      if (stockDataSnapshot[cat] && stockDataSnapshot[cat][mainCat]) {
-        total += parseInt(stockDataSnapshot[cat][mainCat].quantity) || 0;
-      }
+      const qty =
+        stockDataSnapshot[cat] && stockDataSnapshot[cat][mainCat]
+          ? parseInt(stockDataSnapshot[cat][mainCat].quantity) || 0
+          : 0;
+      breakdown[cat] = qty;
+      total += qty;
     });
     let komputer = 0;
     if (stockDataSnapshot["stok-komputer"] && stockDataSnapshot["stok-komputer"][mainCat]) {
@@ -82,7 +111,7 @@ function computeCurrentSummarySnapshot() {
     if (total === komputer) status = "Klop";
     else if (total < komputer) status = `Kurang ${komputer - total}`;
     else status = `Lebih ${total - komputer}`;
-    snapshot[mainCat] = { total, komputer, status };
+    snapshot[mainCat] = { total, komputer, status, breakdown };
   });
   return snapshot;
 }
@@ -152,7 +181,7 @@ function renderDailyReportTable(dataObj) {
     if (!dataObj || !dataObj.items) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="5" class="text-center text-muted py-4">
+          <td colspan="6" class="text-center text-muted py-4">
             <i class="fas fa-inbox fa-2x mb-2 d-block text-muted"></i>
             <span>Tidak ada data untuk tanggal ini</span>
           </td>
@@ -200,6 +229,11 @@ function renderDailyReportTable(dataObj) {
           <i class="${statusIcon} me-1"></i>
           <strong>${rowData.status}</strong>
         </td>
+        <td class="text-center">
+          <button type="button" class="btn btn-primary btn-sm btn-eye" data-cat="${mainCat}">
+            <i class="fas fa-eye"></i>
+          </button>
+        </td>
       `;
       tbody.appendChild(tr);
     });
@@ -212,7 +246,213 @@ function renderDailyReportTable(dataObj) {
       const createdDate = dataObj.createdAt ? formatDate(dataObj.createdAt) : "-";
       meta.innerHTML = `<i class="fas fa-clock me-1"></i>Snapshot: ${createdDate}`;
     }
+
+    // Simpan snapshot aktif untuk dipakai oleh modal breakdown
+    currentSnapshotData = dataObj;
   }, 300); // Small delay for better UX
+}
+
+// Hitung breakdown live jika diperlukan (untuk hari ini)
+function computeLiveBreakdownFor(mainCat) {
+  const breakdown = {};
+  let total = 0;
+  summaryCategories.forEach((cat) => {
+    const qty =
+      stockDataSnapshot[cat] && stockDataSnapshot[cat][mainCat]
+        ? parseInt(stockDataSnapshot[cat][mainCat].quantity) || 0
+        : 0;
+    breakdown[cat] = qty;
+    total += qty;
+  });
+  let komputer = 0;
+  if (stockDataSnapshot["stok-komputer"] && stockDataSnapshot["stok-komputer"][mainCat]) {
+    komputer = parseInt(stockDataSnapshot["stok-komputer"][mainCat].quantity) || 0;
+  }
+  return { breakdown, total, komputer };
+}
+
+async function showCategoryBreakdown(mainCat) {
+  try {
+    const modalEl = document.getElementById("categoryBreakdownModal");
+    const modalTitle = document.getElementById("categoryBreakdownTitle");
+    const modalBody = document.getElementById("categoryBreakdownBody");
+    if (!modalEl || !modalBody || !modalTitle) return;
+
+    const dateInput = document.getElementById("dailyReportDate");
+    const selectedDate = dateInput?.value || null;
+    const todayKey = formatDateKey(getNowInWita());
+    currentReportDateKey = selectedDate;
+    currentModalMainCat = mainCat;
+
+    let detail = null;
+    // Coba ambil dari snapshot yang sedang ditampilkan
+    if (currentSnapshotData && currentSnapshotData.items && currentSnapshotData.items[mainCat]) {
+      const entry = currentSnapshotData.items[mainCat];
+      if (entry.breakdown) {
+        detail = { breakdown: entry.breakdown, total: entry.total, komputer: entry.komputer };
+      }
+    }
+
+    // Jika belum ada breakdown dan tanggal adalah hari ini, hitung live
+    if (!detail && selectedDate === todayKey) {
+      await fetchStockSnapshot();
+      detail = computeLiveBreakdownFor(mainCat);
+    }
+
+    modalTitle.textContent = `Rincian ${mainCat} — ${selectedDate || "-"}`;
+    if (!detail) {
+      modalBody.innerHTML = `
+        <div class="text-center text-muted py-3">
+          <i class="fas fa-circle-info fa-2x mb-2 d-block"></i>
+          <div>Detail tidak tersedia untuk tanggal ini.</div>
+        </div>`;
+      // Hide edit buttons when no detail
+      const btnEdit = document.getElementById("btnEditBreakdown");
+      const btnSave = document.getElementById("btnSaveBreakdown");
+      const btnCancel = document.getElementById("btnCancelBreakdown");
+      if (btnEdit && btnSave && btnCancel) {
+        btnEdit.classList.add("d-none");
+        btnSave.classList.add("d-none");
+        btnCancel.classList.add("d-none");
+      }
+    } else {
+      // Render tabel breakdown
+      const rowsHtml = summaryCategories
+        .map((cat) => {
+          const label = breakdownDisplayMap[cat] || cat;
+          const qty = detail.breakdown[cat] ?? 0;
+          return `<tr data-key="${cat}"><td>${label}</td><td class="text-end fw-semibold" data-type="value">${qty}</td></tr>`;
+        })
+        .join("");
+      modalBody.innerHTML = `
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-2" id="breakdownTable">
+            <thead class="table-light">
+              <tr>
+                <th>Kategori</th>
+                <th class="text-end">Jumlah</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+        <div class="d-flex justify-content-between small text-muted">
+          <div>Total: <strong id="breakdownTotal">${detail.total}</strong></div>
+          <div>Komputer: <strong id="breakdownKomputer">${detail.komputer}</strong></div>
+        </div>`;
+
+      // Show/hide edit buttons based on date and snapshot availability
+      const btnEdit = document.getElementById("btnEditBreakdown");
+      const btnSave = document.getElementById("btnSaveBreakdown");
+      const btnCancel = document.getElementById("btnCancelBreakdown");
+      const hasSnapshotBreakdown = !!(
+        currentSnapshotData &&
+        currentSnapshotData.items &&
+        currentSnapshotData.items[mainCat] &&
+        currentSnapshotData.items[mainCat].breakdown
+      );
+      const editable = selectedDate && selectedDate !== todayKey && hasSnapshotBreakdown;
+      isEditMode = false;
+      if (btnEdit && btnSave && btnCancel) {
+        btnEdit.classList.toggle("d-none", !editable);
+        btnSave.classList.add("d-none");
+        btnCancel.classList.add("d-none");
+
+        btnEdit.onclick = () => enterEditModeBreakdown();
+        btnSave.onclick = () => saveBreakdownChanges();
+        btnCancel.onclick = () => cancelEditBreakdown();
+      }
+    }
+
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+  } catch (e) {
+    console.error(e);
+    showToast("Gagal menampilkan rincian", "error");
+  }
+}
+
+function enterEditModeBreakdown() {
+  const tbody = document.querySelector("#breakdownTable tbody");
+  if (!tbody) return;
+  isEditMode = true;
+  // Switch cells to inputs
+  tbody.querySelectorAll("tr").forEach((tr) => {
+    const valCell = tr.querySelector('[data-type="value"]');
+    const val = parseInt(valCell.textContent.trim()) || 0;
+    valCell.innerHTML = `<input type=\"number\" class=\"form-control form-control-sm text-end\" min=\"0\" step=\"1\" value=\"${val}\">`;
+  });
+  // Toggle buttons
+  document.getElementById("btnEditBreakdown")?.classList.add("d-none");
+  document.getElementById("btnSaveBreakdown")?.classList.remove("d-none");
+  document.getElementById("btnCancelBreakdown")?.classList.remove("d-none");
+}
+
+function readBreakdownInputs() {
+  const tbody = document.querySelector("#breakdownTable tbody");
+  const data = {};
+  let total = 0;
+  let valid = true;
+  if (!tbody) return { data: {}, total: 0, valid: false };
+  tbody.querySelectorAll("tr").forEach((tr) => {
+    const key = tr.getAttribute("data-key");
+    const input = tr.querySelector("input");
+    let val = input ? parseInt(input.value, 10) : parseInt(tr.querySelector('[data-type="value"]').textContent, 10);
+    if (isNaN(val) || val < 0) {
+      valid = false;
+      if (input) input.classList.add("is-invalid");
+      val = 0;
+    } else if (input) {
+      input.classList.remove("is-invalid");
+    }
+    data[key] = val;
+    total += val;
+  });
+  return { data, total, valid };
+}
+
+async function saveBreakdownChanges() {
+  if (!currentReportDateKey || !currentModalMainCat) return;
+  const { data, total, valid } = readBreakdownInputs();
+  if (!valid) {
+    showToast("Nilai breakdown harus angka ≥ 0", "error");
+    return;
+  }
+  const komputer = currentSnapshotData?.items?.[currentModalMainCat]?.komputer || 0;
+  let status = "Klop";
+  if (total < komputer) status = `Kurang ${komputer - total}`;
+  else if (total > komputer) status = `Lebih ${total - komputer}`;
+
+  try {
+    const ref = doc(firestore, "daily_stock_reports", currentReportDateKey);
+    const payload = {};
+    payload[`items.${currentModalMainCat}.breakdown`] = data;
+    payload[`items.${currentModalMainCat}.total`] = total;
+    payload[`items.${currentModalMainCat}.status`] = status;
+    payload[`items.${currentModalMainCat}.updatedAt`] = new Date().toISOString();
+    await updateDoc(ref, payload);
+
+    // Update local snapshot
+    if (currentSnapshotData?.items?.[currentModalMainCat]) {
+      currentSnapshotData.items[currentModalMainCat].breakdown = data;
+      currentSnapshotData.items[currentModalMainCat].total = total;
+      currentSnapshotData.items[currentModalMainCat].status = status;
+    }
+
+    isEditMode = false;
+    showToast("Perubahan breakdown disimpan", "success");
+    // Refresh modal and main table row
+    showCategoryBreakdown(currentModalMainCat);
+    renderDailyReportTable(currentSnapshotData);
+  } catch (e) {
+    console.error(e);
+    showToast("Gagal menyimpan breakdown", "error");
+  }
+}
+
+function cancelEditBreakdown() {
+  isEditMode = false;
+  showCategoryBreakdown(currentModalMainCat);
 }
 
 function exportTableToCSV() {
@@ -319,10 +559,12 @@ function initDailyReportPage() {
         const data = await loadDailyStockSnapshot(val);
         if (data) {
           renderDailyReportTable(data);
+          currentSnapshotData = data;
         } else {
           await fetchStockSnapshot();
           const current = { items: computeCurrentSummarySnapshot(), createdAt: null };
           renderDailyReportTable(current);
+          currentSnapshotData = current;
         }
         showToast("Data berhasil dimuat", "success");
       } catch (e) {
@@ -347,6 +589,18 @@ function initDailyReportPage() {
   ensureTodaySnapshotIfPassed();
   // Jadwalkan snapshot otomatis berikutnya.
   scheduleAutoSnapshot();
+
+  // Delegasi klik untuk tombol eye di tabel
+  const tbody = document.getElementById("daily-report-table-body");
+  if (tbody) {
+    tbody.addEventListener("click", (e) => {
+      const btn = e.target.closest(".btn-eye");
+      if (btn) {
+        const cat = btn.getAttribute("data-cat");
+        if (cat) showCategoryBreakdown(cat);
+      }
+    });
+  }
 }
 
 function showToast(message, type = "success") {
