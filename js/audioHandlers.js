@@ -82,7 +82,7 @@ export async function playTakeQueueMessage() {
   try {
     isAudioPlaying = true;
 
-    await playAudio
+    await playAudio(AUDIO_PATHS.informasi);
     const message =
       "Kepada pelanggan yang belum mendapat nomor antrian, harap mengambil nomor antrian terlebih dahulu di tempat yang sudah disediakan. Terima kasih atas perhatiannya";
     await speak(message);
