@@ -240,7 +240,7 @@ export async function playClosingAnnouncement(message, infoBoxId = "infoBox") {
 
     await playAudio(AUDIO_PATHS.informasi);
 
-    await speak(message, 0.75, 1.25);
+    await speak(message, 0.75, 1.2);
 
     await playAudio(AUDIO_PATHS.informasiEnd);
 
