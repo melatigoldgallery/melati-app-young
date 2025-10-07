@@ -745,9 +745,7 @@
             const MESSAGE =
               "Kepada pelanggan Melati, kami informasikan toko akan tutup pada jam 9 malam. Silakan melanjutkan berbelanja dan kami akan membantu hingga selesai. Terima kasih atas perhatiannya";
 
-            const SLOTS = [
-              { h: 20, m: 55 },
-            ];
+            const SLOTS = [{ h: 20, m: 55, repeat: 2 }];
 
             let lastAutoRunSlot = null;
             const AUTO_RUN_STORAGE_KEY = "closing_auto_run_slot";
@@ -760,7 +758,7 @@
               return `${day}|${hm}`;
             };
 
-            async function triggerAutoForSlot(targetHour, targetMinute) {
+            async function triggerAutoForSlot(targetHour, targetMinute, repeatCount = 1) {
               const slotKey = makeSlotKey(new Date(), targetHour, targetMinute);
               if (lastAutoRunSlot === slotKey) return;
               if (localStorage.getItem(AUTO_RUN_STORAGE_KEY) === slotKey) {
@@ -771,7 +769,12 @@
                 localStorage.setItem(AUTO_RUN_STORAGE_KEY, slotKey);
               } catch (e) {}
               lastAutoRunSlot = slotKey;
-              await playClosingAnnouncement(MESSAGE);
+              for (let i = 0; i < repeatCount; i++) {
+                await playClosingAnnouncement(MESSAGE);
+                if (i < repeatCount - 1) {
+                  await new Promise((r) => setTimeout(r, 1000));
+                }
+              }
             }
 
             function scheduleDailyCheck() {
@@ -786,25 +789,25 @@
                 return delay;
               };
 
-              const scheduleSlot = (hour, minute) => {
+              const scheduleSlot = (hour, minute, repeat = 1) => {
                 const delay = computeNextDelayFor(hour, minute);
                 setTimeout(async () => {
-                  await triggerAutoForSlot(hour, minute);
-                  scheduleSlot(hour, minute);
+                  await triggerAutoForSlot(hour, minute, repeat);
+                  scheduleSlot(hour, minute, repeat);
                 }, delay);
               };
 
-              SLOTS.forEach(({ h, m }) => scheduleSlot(h, m));
+              SLOTS.forEach(({ h, m, repeat = 1 }) => scheduleSlot(h, m, repeat));
               const POLL_MS = 60 * 1000;
               const WINDOW_MS = 5 * 60 * 1000;
               setInterval(async () => {
                 const now = new Date();
-                for (const { h, m } of SLOTS) {
+                for (const { h, m, repeat = 1 } of SLOTS) {
                   const target = new Date();
                   target.setHours(h, m, 0, 0);
                   const diff = now.getTime() - target.getTime();
                   if (diff >= 0 && diff < WINDOW_MS) {
-                    await triggerAutoForSlot(h, m);
+                    await triggerAutoForSlot(h, m, repeat);
                   }
                 }
               }, POLL_MS);
