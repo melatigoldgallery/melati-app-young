@@ -1619,44 +1619,27 @@ const penjualanHandler = {
         const hasValidKode = kode && kode !== "-";
         const hasValidKodeLock = item.kodeLock && item.kodeLock !== "-";
 
-        // Skip hanya jika tidak ada kode valid sama sekali
-        if (!hasValidKode && !hasValidKodeLock) continue;
-
         if (salesType === "manual") {
-          // Proses kode barang utama jika ada
-          if (hasValidKode) {
-            const currentStock = this.getStockForItem(kode);
-            const jumlah = parseInt(item.jumlah) || 1;
-            const newStock = Math.max(0, currentStock - jumlah);
+          // Untuk manual sales, skip jika tidak ada kodeLock
+          if (!hasValidKodeLock) continue;
 
-            updatePromises.push(
-              this.processSingleStockUpdate(kode, {
-                item,
-                currentStock,
-                newStock,
-                jumlah,
-                isGantiLock: false,
-              })
-            );
-          }
+          // Proses kode lock saja - tidak proses kodeText
+          const currentStock = this.getStockForItem(item.kodeLock);
+          const jumlah = parseInt(item.jumlah) || 1;
+          const newStock = Math.max(0, currentStock - jumlah);
 
-          // Proses kode lock jika ada
-          if (hasValidKodeLock) {
-            const currentStock = this.getStockForItem(item.kodeLock);
-            const jumlah = parseInt(item.jumlah) || 1;
-            const newStock = Math.max(0, currentStock - jumlah);
-
-            updatePromises.push(
-              this.processSingleStockUpdate(item.kodeLock, {
-                item: { ...item, kodeText: item.kodeLock, nama: `Ganti lock untuk ${item.nama}` },
-                currentStock,
-                newStock,
-                jumlah,
-                isGantiLock: true,
-              })
-            );
-          }
+          updatePromises.push(
+            this.processSingleStockUpdate(item.kodeLock, {
+              item: { ...item, kodeText: item.kodeLock, nama: `Ganti lock untuk ${item.nama}` },
+              currentStock,
+              newStock,
+              jumlah,
+              isGantiLock: true,
+            })
+          );
         } else {
+          // Untuk aksesoris/kotak, tetap cek kodeText
+          if (!hasValidKode) continue;
           // Untuk penjualan aksesoris dan kotak
           const currentStock = this.getStockForItem(kode);
           const jumlah = parseInt(item.jumlah) || 1;
@@ -1678,37 +1661,39 @@ const penjualanHandler = {
 
       // Update local cache
       for (const item of items) {
-        // Update cache untuk kode barang utama jika ada
-        if (item.kodeText && item.kodeText !== "-") {
-          const kode = item.kodeText;
-          const currentStock = this.getStockForItem(kode);
-          const jumlah = parseInt(item.jumlah) || 1;
-          const newStock = Math.max(0, currentStock - jumlah);
+        if (salesType === "manual") {
+          // Untuk manual, hanya update cache kodeLock
+          if (item.kodeLock && item.kodeLock !== "-") {
+            const kodeLock = item.kodeLock;
+            const currentStock = this.getStockForItem(kodeLock);
+            const jumlah = parseInt(item.jumlah) || 1;
+            const newStock = Math.max(0, currentStock - jumlah);
 
-          // Update stock cache
-          this.stockCache.set(kode, newStock);
+            // Update stock cache
+            this.stockCache.set(kodeLock, newStock);
 
-          // Update stockData array
-          const stockIndex = this.stockData.findIndex((stockItem) => stockItem.kode === kode);
-          if (stockIndex !== -1) {
-            this.stockData[stockIndex].stokAkhir = newStock;
+            // Update stockData array
+            const stockIndex = this.stockData.findIndex((stockItem) => stockItem.kode === kodeLock);
+            if (stockIndex !== -1) {
+              this.stockData[stockIndex].stokAkhir = newStock;
+            }
           }
-        }
+        } else {
+          // Untuk aksesoris/kotak, update cache kodeText
+          if (item.kodeText && item.kodeText !== "-") {
+            const kode = item.kodeText;
+            const currentStock = this.getStockForItem(kode);
+            const jumlah = parseInt(item.jumlah) || 1;
+            const newStock = Math.max(0, currentStock - jumlah);
 
-        // Update cache untuk kode lock jika ada
-        if (salesType === "manual" && item.kodeLock && item.kodeLock !== "-") {
-          const kodeLock = item.kodeLock;
-          const currentStock = this.getStockForItem(kodeLock);
-          const jumlah = parseInt(item.jumlah) || 1;
-          const newStock = Math.max(0, currentStock - jumlah);
+            // Update stock cache
+            this.stockCache.set(kode, newStock);
 
-          // Update stock cache
-          this.stockCache.set(kodeLock, newStock);
-
-          // Update stockData array
-          const stockIndex = this.stockData.findIndex((stockItem) => stockItem.kode === kodeLock);
-          if (stockIndex !== -1) {
-            this.stockData[stockIndex].stokAkhir = newStock;
+            // Update stockData array
+            const stockIndex = this.stockData.findIndex((stockItem) => stockItem.kode === kode);
+            if (stockIndex !== -1) {
+              this.stockData[stockIndex].stokAkhir = newStock;
+            }
           }
         }
       }
