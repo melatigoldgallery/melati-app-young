@@ -519,14 +519,12 @@ async function updateChart() {
 
   try {
     const perluItems = await fetchByMonthAndStatus(monthStr, "perlu");
-    const sudahItems = await fetchByMonthAndStatus(monthStr, "sudah");
-    const allItems = [...perluItems, ...sudahItems];
 
     const jenisCount = {};
     const jenisTypes = ["KALUNG", "LIONTIN", "ANTING", "CINCIN", "GELANG", "GIWANG"];
 
     jenisTypes.forEach((jenis) => (jenisCount[jenis] = 0));
-    allItems.forEach((item) => {
+    perluItems.forEach((item) => {
       const jenis = item.jenis?.toUpperCase();
       if (jenisCount.hasOwnProperty(jenis)) jenisCount[jenis]++;
     });
