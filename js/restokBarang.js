@@ -531,8 +531,15 @@ async function updateChart() {
 
     const labels = [];
     const data = [];
-    const colors = ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40"];
-
+    // Definisi warna gradient: [warna_start, warna_end]
+    const colorGradients = [
+      ["#007f1eff", "#8aff9eff"], // Pink gradient
+      ["#a50000ff", "#ff9191ff"], // Blue gradient
+      ["#ffe100ff", "#fff187ff"], // Yellow gradient
+      ["#4BC0C0", "#9dfcf1ff"], // Teal gradient
+      ["#30008fff", "#a2a9fcff"], // Purple gradient
+      ["#994c00ff", "#fcb791ff"], // Orange gradient
+    ];
     jenisTypes.forEach((jenis) => {
       if (jenisCount[jenis] > 0) {
         labels.push(jenis);
@@ -545,6 +552,15 @@ async function updateChart() {
     if (jenisChart) jenisChart.destroy();
 
     if (data.length > 0) {
+      // Buat gradient backgrounds untuk setiap segment
+      const gradientBackgrounds = labels.map((_, index) => {
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        const [startColor, endColor] = colorGradients[index % colorGradients.length];
+        gradient.addColorStop(0, startColor);
+        gradient.addColorStop(1, endColor);
+        return gradient;
+      });
+
       jenisChart = new Chart(ctx, {
         type: "pie",
         data: {
@@ -552,7 +568,9 @@ async function updateChart() {
           datasets: [
             {
               data: data,
-              backgroundColor: colors.slice(0, labels.length),
+              backgroundColor: gradientBackgrounds,
+              borderWidth: 2,
+              borderColor: "#ffffff",
             },
           ],
         },
@@ -571,7 +589,8 @@ async function updateChart() {
 
     labels.forEach((label, index) => {
       const percentage = total > 0 ? ((data[index] / total) * 100).toFixed(1) : 0;
-      summaryHtml += `<li><span style="color:${colors[index]}">●</span> ${label}: ${data[index]} (${percentage}%)</li>`;
+      const startColor = colorGradients[index % colorGradients.length][0]; // Gunakan warna start dari gradient
+      summaryHtml += `<li><span style="color:${startColor}">●</span> ${label}: ${data[index]} (${percentage}%)</li>`;
     });
 
     summaryHtml += "</ul>";

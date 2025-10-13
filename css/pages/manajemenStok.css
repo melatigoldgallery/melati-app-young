@@ -114,7 +114,7 @@
 .nav-tabs {
   border-bottom: 3px solid #e9ecef;
   margin-bottom: 30px;
-  background: linear-gradient(135deg, #bcdaf5 0%, #dbe9fc 100%);
+  background: linear-gradient(135deg, #eff5bc 0%, #f5fcdb 100%);
   border-radius: 15px 15px 0 0;
   padding: 15px 15px 0 15px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -147,13 +147,12 @@
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, rgba(89, 102, 224, 0.1) 0%, rgba(89, 102, 224, 0.05) 100%);
   transition: left 0.3s ease;
   z-index: -1;
 }
 
 .nav-tabs .nav-link:hover {
-  color: #5966e0;
+  color: #484c05;
   background: rgba(89, 102, 224, 0.08);
   transform: translateY(-3px);
   box-shadow: 0 6px 16px rgba(89, 102, 224, 0.15);
@@ -164,23 +163,13 @@
 }
 
 .nav-tabs .nav-link.active {
-  background: linear-gradient(135deg, #5966e0 0%, #4c63d2 100%);
+  background: linear-gradient(320deg, var(--warning-color) 0%, var(--dark-color) 100%);
   color: white;
-  border-color: #5966e0;
   transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(89, 102, 224, 0.3);
   position: relative;
 }
 
-.nav-tabs .nav-link.active::after {
-  content: "";
-  position: absolute;
-  bottom: -3px;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: #5966e0;
-}
+
 
 .nav-tabs .nav-link i {
   margin-right: 8px;

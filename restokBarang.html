@@ -41,6 +41,34 @@
       #chartSummary {
         font-size: 0.9rem;
       }
+      
+      /* Custom styling untuk form input table */
+      #inputTable {
+        border-left: none;
+        border-right: none;
+      }
+      #inputTable th,
+      #inputTable td {
+        border-left: none;
+        border-right: none;
+        padding: 0.375rem 0.5rem; /* Reduced padding from default 0.75rem */
+      }
+      #inputTable thead th {
+        padding: 0.5rem 0.5rem; /* Reduced thead padding */
+        font-weight: 600;
+        font-size: 0.875rem;
+      }
+      #inputTable .form-control,
+      #inputTable .form-select {
+        padding: 0.5rem 0.5rem; /* Smaller form control padding */
+        font-size: 0.875rem;
+        border-left: none;
+        border-right: none;
+      }
+      #inputTable .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+      }
     </style>
   </head>
   <body>
@@ -274,7 +302,7 @@
               <div class="card-header py-2">
                 <h2 class="h5 m-0 text-light">
                   <i class="fa-solid fa-chart-pie me-2"></i>
-                  Statistik Jenis Barang
+                  Statistik Jenis Barang Perlu Restok
                 </h2>
               </div>
               <div class="card-body">
