@@ -9,6 +9,7 @@ import {
   updateDoc,
   deleteDoc,
   getDoc,
+  setDoc,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
 // DOM refs
@@ -30,6 +31,13 @@ const btnSendWA = document.getElementById("btnSendWA");
 const editStatusModal = document.getElementById("editStatusModal");
 const statusSelect = document.getElementById("statusSelect");
 const saveStatusBtn = document.getElementById("saveStatusBtn");
+
+// WhatsApp Setting Modal refs
+const settingWAModal = document.getElementById("settingWAModal");
+const btnSettingWA = document.getElementById("btnSettingWA");
+const supplierPhoneInput = document.getElementById("supplierPhoneInput");
+const savePhoneBtn = document.getElementById("savePhoneBtn");
+const phoneError = document.getElementById("phoneError");
 
 // Chart refs
 const chartBulan = document.getElementById("chartBulan");
@@ -75,6 +83,87 @@ async function loadSupplierPhone() {
   } catch (err) {
     console.error("Failed to load supplier phone:", err);
     return false;
+  }
+}
+
+// WhatsApp Setting Functions
+function openWhatsAppSettingModal() {
+  if (supplierPhoneInput) {
+    // Display current phone number
+    const displayPhone = SUPPLIER_PHONE
+      ? SUPPLIER_PHONE.startsWith("62")
+        ? `0${SUPPLIER_PHONE.slice(2)}`
+        : SUPPLIER_PHONE
+      : "";
+    supplierPhoneInput.value = displayPhone;
+    supplierPhoneInput.classList.remove("is-invalid");
+  }
+  new bootstrap.Modal(settingWAModal).show();
+}
+
+function validatePhoneNumber(phone) {
+  // Remove all non-digit characters except +
+  const cleaned = phone.replace(/[^+\d]/g, "");
+
+  // Check if empty
+  if (!cleaned) {
+    return { valid: false, message: "Nomor telepon tidak boleh kosong" };
+  }
+
+  // Check valid formats: 08xxx (min 10 digits) or +628xxx (min 12 digits)
+  if (cleaned.startsWith("08") && cleaned.length >= 10) {
+    return { valid: true, formatted: "62" + cleaned.slice(1) };
+  } else if (cleaned.startsWith("+628") && cleaned.length >= 13) {
+    return { valid: true, formatted: cleaned.slice(1) };
+  } else if (cleaned.startsWith("628") && cleaned.length >= 12) {
+    return { valid: true, formatted: cleaned };
+  } else {
+    return { valid: false, message: "Format nomor tidak valid. Gunakan 08xxx atau +628xxx" };
+  }
+}
+
+async function saveSupplierPhone() {
+  const phone = supplierPhoneInput.value.trim();
+  const validation = validatePhoneNumber(phone);
+
+  if (!validation.valid) {
+    supplierPhoneInput.classList.add("is-invalid");
+    phoneError.textContent = validation.message;
+    return;
+  }
+
+  supplierPhoneInput.classList.remove("is-invalid");
+  savePhoneBtn.disabled = true;
+
+  try {
+    // Save to settings/whatsapp with field supplierPhone
+    const ref = doc(firestore, "settings", "whatsapp");
+    await updateDoc(ref, {
+      supplierPhone: validation.formatted,
+      updatedAt: Date.now(),
+    }).catch(async (err) => {
+      // If document doesn't exist, create it
+      if (err.code === "not-found") {
+        await setDoc(ref, {
+          supplierPhone: validation.formatted,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      } else {
+        throw err;
+      }
+    });
+
+    // Update global variable
+    SUPPLIER_PHONE = validation.formatted;
+
+    bootstrap.Modal.getInstance(settingWAModal).hide();
+    toastSuccess("Nomor WhatsApp supplier berhasil disimpan");
+  } catch (err) {
+    console.error("Gagal menyimpan nomor:", err);
+    alert("Gagal menyimpan nomor WhatsApp");
+  } finally {
+    savePhoneBtn.disabled = false;
   }
 }
 
@@ -615,6 +704,25 @@ if (saveStatusBtn) {
 
 if (btnUpdateChart) {
   btnUpdateChart.addEventListener("click", updateChart);
+}
+
+// WhatsApp Setting Event Listeners
+if (btnSettingWA) {
+  btnSettingWA.addEventListener("click", openWhatsAppSettingModal);
+}
+
+if (savePhoneBtn) {
+  savePhoneBtn.addEventListener("click", saveSupplierPhone);
+}
+
+// Handle Enter key in phone input
+if (supplierPhoneInput) {
+  supplierPhoneInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveSupplierPhone();
+    }
+  });
 }
 
 // Tab switching

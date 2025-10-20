@@ -41,7 +41,7 @@
       #chartSummary {
         font-size: 0.9rem;
       }
-      
+
       /* Custom styling untuk form input table */
       #inputTable {
         border-left: none;
@@ -401,6 +401,9 @@
                       <i class="fa-brands fa-whatsapp me-2"></i>
                       Kirim Data Perlu Restok
                     </button>
+                    <button id="btnSettingWA" class="btn btn-outline-secondary" title="Setting Nomor WhatsApp Supplier">
+                      <i class="fa-solid fa-cog"></i>
+                    </button>
                   </div>
                   <div class="card-body">
                     <div class="table-responsive">
@@ -478,6 +481,39 @@
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
             <button type="button" class="btn btn-primary" id="saveStatusBtn">Simpan</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Setting WhatsApp Supplier -->
+    <div class="modal fade" id="settingWAModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Setting Nomor WhatsApp Supplier</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label for="supplierPhoneInput" class="form-label">Nomor WhatsApp Supplier</label>
+              <input
+                type="text"
+                class="form-control"
+                id="supplierPhoneInput"
+                placeholder="Contoh: 08123456789 atau +628123456789"
+              />
+              <div class="form-text">Format: 08xxx atau +628xxx (tanpa spasi atau tanda hubung)</div>
+              <div class="invalid-feedback" id="phoneError"></div>
+            </div>
+            <div class="alert alert-info small mb-0">
+              <i class="fa-solid fa-info-circle me-2"></i>
+              Nomor ini akan digunakan untuk mengirim data restok barang via WhatsApp
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="button" class="btn btn-primary" id="savePhoneBtn">Simpan</button>
           </div>
         </div>
       </div>
