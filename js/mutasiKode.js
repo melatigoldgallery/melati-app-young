@@ -1076,8 +1076,8 @@ function renderKodeTable(data, type) {
   tableBody.empty();
 
   if (data.length === 0) {
-    // Active has 8 columns, Mutated now has 9 columns
-    const colspan = type === "active" ? 8 : 9;
+    // Active has 9 columns, Mutated now has 10 columns
+    const colspan = type === "active" ? 9 : 10;
     tableBody.html(`<tr><td colspan="${colspan}" class="text-center">Tidak ada data kode</td></tr>`);
     return;
   }
@@ -1090,6 +1090,7 @@ function renderKodeTable(data, type) {
           <input type="checkbox" class="form-check-input kode-checkbox" data-id="${item.id}" data-type="${type}">
         </td>
         <td>${item.kode}</td>
+        <td>${item.sales || "-"}</td>
         <td>${item.nama}</td>
         <td>${item.kadar}</td>
         <td>${item.berat}</td>
@@ -1213,6 +1214,7 @@ function showKodeDetail(id, type) {
   }
 
   $("#detailKode").val(item.kode);
+  $("#detailSales").val(item.sales || "-");
   $("#detailNama").val(item.nama);
   $("#detailKadar").val(item.kadar);
   $("#detailBerat").val(item.berat);
@@ -1307,6 +1309,7 @@ function exportToExcel(data, filename, sheetName = "Data") {
 
     const exportData = data.map((item) => ({
       Kode: item.kode,
+      Sales: item.sales || "-",
       "Nama Barang": item.nama,
       Kadar: item.kadar,
       Berat: item.berat,
@@ -1322,16 +1325,17 @@ function exportToExcel(data, filename, sheetName = "Data") {
     const ws = XLSX.utils.json_to_sheet(exportData);
 
     const colWidths = [
-      { wch: 10 },
-      { wch: 25 },
-      { wch: 7 },
-      { wch: 7 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 25 },
-      { wch: 25 },
-      { wch: 10 },
+      { wch: 10 }, // Kode
+      { wch: 12 }, // Sales
+      { wch: 25 }, // Nama Barang
+      { wch: 7 }, // Kadar
+      { wch: 7 }, // Berat
+      { wch: 15 }, // Tanggal Input
+      { wch: 15 }, // Status
+      { wch: 15 }, // Tanggal Mutasi
+      { wch: 25 }, // Keterangan Mutasi
+      { wch: 25 }, // Keterangan
+      { wch: 10 }, // Sumber Data
     ];
     ws["!cols"] = colWidths;
 
