@@ -820,10 +820,12 @@ const laporanPenjualanHandler = {
         return isNaN(n) ? 0 : n;
       };
 
-      // Compute DP paid: prefer nominalDP, but also sum any payment entries if present
-      let dpPaid = toNumber(transaction.nominalDP);
-      if (Array.isArray(transaction.pembayaran)) {
-        dpPaid = transaction.pembayaran.reduce((sum, p) => sum + toNumber(p.nominal || p.amount || 0), dpPaid);
+      // Compute DP paid: use nominalDP if exists, otherwise sum from pembayaran array
+      let dpPaid = 0;
+      if (transaction.nominalDP) {
+        dpPaid = toNumber(transaction.nominalDP);
+      } else if (Array.isArray(transaction.pembayaran)) {
+        dpPaid = transaction.pembayaran.reduce((sum, p) => sum + toNumber(p.nominal || p.amount || 0), 0);
       }
 
       // Only show DP amount in status as requested
