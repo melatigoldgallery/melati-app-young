@@ -199,6 +199,7 @@ const penjualanHandler = {
   stockData: [],
   salesData: [],
   stockCache: new Map(),
+  isSaving: false,
 
   // Real-time listeners
   stockListener: null,
@@ -381,53 +382,7 @@ const penjualanHandler = {
       }
     );
 
-    // Sales listener - perubahan penjualan hari ini
-    const todayStr = utils.formatDate(new Date());
-    const salesQuery = query(collection(firestore, "penjualanAksesoris"), where("tanggal", "==", todayStr));
-
-    this.salesListener = onSnapshot(
-      salesQuery,
-      (snapshot) => {
-        if (!snapshot.metadata.hasPendingWrites) {
-          this.handleSalesUpdates(snapshot.docChanges());
-        }
-      },
-      (error) => {
-        console.error("Sales listener error:", error);
-        this.salesListener = null;
-      }
-    );
-
     console.log("🔊 Real-time listeners activated (changes only)");
-  },
-
-  // Load today's sales data (cache-first)
-  async loadTodaySales() {
-    try {
-      const dateKey = new Date().toISOString().split("T")[0];
-      const cached = simpleCache.get(`salesData_${dateKey}`);
-      if (cached && Array.isArray(cached)) {
-        this.salesData = cached;
-        return;
-      }
-
-      const todayStr = utils.formatDate(new Date());
-      const qSales = query(collection(firestore, "penjualanAksesoris"), where("tanggal", "==", todayStr));
-      const snap = await getDocs(qSales);
-      readsMonitor.increment("Load Today Sales", snap.size || 1);
-
-      const list = [];
-      snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-      list.sort((a, b) => {
-        const ta = a.timestamp?.toMillis ? a.timestamp.toMillis() : 0;
-        const tb = b.timestamp?.toMillis ? b.timestamp.toMillis() : 0;
-        return tb - ta;
-      });
-      this.salesData = list;
-      simpleCache.set(`salesData_${dateKey}`, list);
-    } catch (err) {
-      console.error("Error loading today sales:", err);
-    }
   },
 
   // TAMBAH: Method baru untuk handle stock changes
@@ -1033,17 +988,13 @@ const penjualanHandler = {
       $("#totalOngkos").val("0");
     } else if (method === "dp") {
       if (salesType === "manual") {
-        // Sesuai aksesoris-app: pada manual + DP tampilkan keduanya (DP dan pembayaran)
         $(".payment-field, .dp-field").show();
       } else {
-        // DP hanya untuk manual; fallback ke tunai
         $("#metodeBayar").val("tunai");
         $(".payment-field").show();
         $(".dp-field").hide();
       }
       this.updateTotal();
-      // Hitung ulang sisa dan kembalian (jika ada)
-      this.calculateSisaPembayaran();
     } else {
       $(".payment-field").show();
       $(".dp-field").hide();
@@ -1276,19 +1227,26 @@ const penjualanHandler = {
   calculateSisaPembayaran() {
     const total = parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0;
     const nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "")) || 0;
-    const sisa = total - nominalDP;
-    $("#sisaPembayaran").val(utils.formatRupiah(sisa > 0 ? sisa : 0));
 
-    // Jika DP melebihi total, tampilkan kembalian secara langsung (untuk UX yang jelas)
-    const method = $("#metodeBayar").val();
-    if (method === "dp" && nominalDP > total) {
-      const kembalianDP = nominalDP - total;
-      $("#kembalian").val(utils.formatRupiah(kembalianDP));
-    } else if (!$("#jumlahBayar").val()) {
-      // Kosongkan jika tidak ada input jumlah bayar dan tidak ada kelebihan DP
-      $("#kembalian").val("");
+    if (nominalDP >= total) {
+      // Jika DP >= total, tidak ada sisa pembayaran
+      $("#sisaPembayaran").val("0");
+
+      // Jika DP > total, ada kembalian
+      if (nominalDP > total) {
+        const kembalian = nominalDP - total;
+        $("#kembalian").val(utils.formatRupiah(kembalian));
+      } else {
+        $("#kembalian").val("0");
+      }
+    } else {
+      // Jika DP < total, hitung sisa pembayaran
+      const sisa = total - nominalDP;
+      $("#sisaPembayaran").val(utils.formatRupiah(sisa));
+      $("#kembalian").val("0");
     }
 
+    // Update jumlah bayar jika sudah ada input
     if ($("#jumlahBayar").val()) {
       this.calculateKembalian();
     }
@@ -1300,10 +1258,21 @@ const penjualanHandler = {
     const jumlahBayar = parseFloat($("#jumlahBayar").val().replace(/\./g, "")) || 0;
 
     if (paymentMethod === "dp") {
-      const sisaPembayaran = parseFloat($("#sisaPembayaran").val().replace(/\./g, "")) || 0;
-      const kembalian = jumlahBayar - sisaPembayaran;
-      $("#kembalian").val(utils.formatRupiah(kembalian >= 0 ? kembalian : 0));
+      const total = parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0;
+      const nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "")) || 0;
+
+      if (nominalDP >= total) {
+        // Jika DP sudah menutupi total, kembalian = (DP - total) + jumlah bayar
+        const kembalian = nominalDP - total + jumlahBayar;
+        $("#kembalian").val(utils.formatRupiah(kembalian));
+      } else {
+        // Jika masih ada sisa, hitung kembalian dari sisa pembayaran
+        const sisaPembayaran = parseFloat($("#sisaPembayaran").val().replace(/\./g, "")) || 0;
+        const kembalian = jumlahBayar - sisaPembayaran;
+        $("#kembalian").val(utils.formatRupiah(kembalian >= 0 ? kembalian : 0));
+      }
     } else {
+      // Untuk pembayaran tunai
       const total = parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0;
       const kembalian = jumlahBayar - total;
       $("#kembalian").val(utils.formatRupiah(kembalian >= 0 ? kembalian : 0));
@@ -1339,19 +1308,6 @@ const penjualanHandler = {
       $("#sales").removeClass("is-invalid").addClass("is-valid");
       $("#sales").next(".invalid-feedback").remove();
     }
-    // Optional: simple phone format hint (digits only)
-    const tel = $("#noTelp").val().trim();
-    if (tel && !/^\d{8,15}$/.test(tel)) {
-      if (!$("#noTelp").next(".invalid-feedback").length) {
-        $("#noTelp").after('<div class="invalid-feedback">No. Tlp 8-15 digit angka</div>');
-      }
-      $("#noTelp").addClass("is-invalid");
-    } else {
-      $("#noTelp")
-        .removeClass("is-invalid")
-        .addClass(tel ? "is-valid" : "");
-      $("#noTelp").next(".invalid-feedback").remove();
-    }
   },
 
   // Save transaction
@@ -1363,25 +1319,6 @@ const penjualanHandler = {
         utils.showAlert("Nama sales harus diisi!");
         $("#sales").focus();
         return;
-      }
-
-      // Ambil customer info
-      const customerName = $("#namaCustomer").val().trim();
-      const customerPhone = $("#noTelp").val().trim();
-
-      // Jika DP dipilih, wajib ada nama dan no telp (untuk follow up)
-      const selectedMethod = $("#metodeBayar").val();
-      if (selectedMethod === "dp") {
-        if (!customerName) {
-          utils.showAlert("Nama customer wajib diisi untuk transaksi DP!");
-          $("#namaCustomer").focus();
-          return;
-        }
-        if (!/^\d{8,15}$/.test(customerPhone)) {
-          utils.showAlert("No. Tlp harus 8-15 digit angka untuk transaksi DP!");
-          $("#noTelp").focus();
-          return;
-        }
       }
 
       const salesType = $("#jenisPenjualan").val();
@@ -1398,18 +1335,23 @@ const penjualanHandler = {
         return;
       }
 
-      // Validasi pembayaran
+      // PERBAIKAN: Validasi pembayaran yang disederhanakan
       const paymentMethod = $("#metodeBayar").val();
+      const total = parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0;
+
       if (paymentMethod === "dp") {
         const nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "")) || 0;
+
+        // Validasi DP harus diisi dan > 0
         if (nominalDP <= 0) {
-          utils.showAlert("Nominal DP harus diisi!");
+          utils.showAlert("Nominal DP harus diisi dan lebih dari 0!");
           $("#nominalDP").focus();
           return;
         }
+
+        // HAPUS validasi yang membatasi DP - sekarang DP boleh >= total
       } else if (paymentMethod !== "free") {
         const jumlahBayar = parseFloat($("#jumlahBayar").val().replace(/\./g, "")) || 0;
-        const total = parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0;
 
         if (jumlahBayar < total) {
           utils.showAlert("Jumlah bayar kurang dari total!");
@@ -1428,10 +1370,10 @@ const penjualanHandler = {
         jenisPenjualan: salesType,
         tanggal: $("#tanggal").val(),
         sales: salesName,
-        customerName: customerName || null,
-        customerPhone: customerPhone || null,
+        customerName: ($("#customerName").val() || "").trim(),
+        customerPhone: ($("#customerPhone").val() || "").trim(),
         metodeBayar: paymentMethod,
-        totalHarga: parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0,
+        totalHarga: total,
         timestamp: serverTimestamp(),
         items: items,
       };
@@ -1441,35 +1383,23 @@ const penjualanHandler = {
         transactionData.isGantiLock = true;
       }
 
-      // Add payment details
+      // PERBAIKAN: Add payment details dengan logika yang benar
       if (paymentMethod === "dp") {
-        const dpNominal = parseFloat($("#nominalDP").val().replace(/\./g, "")) || 0;
-        const totalHarga = parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0;
-        const sisa = Math.max(totalHarga - dpNominal, 0);
-        const kembalianDP = Math.max(dpNominal - totalHarga, 0);
+        const nominalDP = parseFloat($("#nominalDP").val().replace(/\./g, "")) || 0;
+        const sisaPembayaran = parseFloat($("#sisaPembayaran").val().replace(/\./g, "")) || 0;
+        const jumlahBayar = parseFloat($("#jumlahBayar").val().replace(/\./g, "")) || 0;
+        const kembalian = parseFloat($("#kembalian").val().replace(/\./g, "")) || 0;
 
-        transactionData.nominalDP = dpNominal;
-        transactionData.sisaPembayaran = sisa;
-        if (kembalianDP > 0 || sisa === 0) {
-          // DP menutupi total (atau lebih) -> anggap lunas di sisi status
-          transactionData.statusPembayaran = "Lunas";
-          transactionData.kembalian = kembalianDP;
-          transactionData.jumlahBayar = dpNominal; // catat untuk konsistensi struk
-        } else {
-          transactionData.statusPembayaran = "DP";
-        }
-        // Align with aksesoris-app: store pembayaran breakdown entry for DP
-        transactionData.pembayaran = [
-          {
-            jenis: "DP",
-            method: "dp",
-            nominal: dpNominal,
-            tanggal: transactionData.tanggal,
-            sales: salesName,
-            // Firestore does not allow serverTimestamp() inside arrays
-            timestamp: Timestamp.now(),
-          },
-        ];
+        transactionData.nominalDP = nominalDP;
+        transactionData.sisaPembayaran = sisaPembayaran;
+        transactionData.jumlahBayar = jumlahBayar;
+        transactionData.kembalian = kembalian;
+
+        // PERBAIKAN: Status pembayaran selalu "DP" dengan nominal
+        transactionData.statusPembayaran = `DP ${utils.formatRupiah(nominalDP)}`;
+
+        // TAMBAHAN: Flag untuk menandai apakah DP sudah menutupi total
+        transactionData.isDPComplete = nominalDP >= total;
       } else if (paymentMethod === "free") {
         transactionData.statusPembayaran = "Free";
       } else {
@@ -1494,7 +1424,7 @@ const penjualanHandler = {
       const newTransaction = { id: docRef.id, ...transactionData };
       this.salesData.unshift(newTransaction);
 
-      const dateKey = new Date().toISOString().split("T")[0]; // Format: YYYY-MM-DD
+      const dateKey = new Date().toISOString().split("T")[0];
       simpleCache.set(`salesData_${dateKey}`, this.salesData);
 
       utils.showAlert("Transaksi berhasil disimpan!", "Sukses", "success");
@@ -1505,23 +1435,20 @@ const penjualanHandler = {
         salesType: salesType,
         tanggal: $("#tanggal").val(),
         sales: salesName,
-        customerName,
-        customerPhone,
+        customerName: ($("#customerName").val() || "").trim(),
+        customerPhone: ($("#customerPhone").val() || "").trim(),
         totalHarga: $("#totalOngkos").val(),
         items: items,
         metodeBayar: paymentMethod,
       };
 
-      // Add DP information if applicable
+      // PERBAIKAN: Add DP information dengan data yang lengkap
       if (paymentMethod === "dp") {
         currentTransactionData.nominalDP = $("#nominalDP").val();
         currentTransactionData.sisaPembayaran = $("#sisaPembayaran").val();
-        // Simpan kembalian jika DP >= total
-        const dpNominalStr = $("#nominalDP").val();
-        const dpNominal = parseFloat((dpNominalStr || "0").replace(/\./g, "")) || 0;
-        const totalHarga = parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0;
-        const kembalianDP = Math.max(dpNominal - totalHarga, 0);
-        currentTransactionData.kembalian = utils.formatRupiah(kembalianDP);
+        currentTransactionData.jumlahBayar = $("#jumlahBayar").val();
+        currentTransactionData.kembalian = $("#kembalian").val();
+        currentTransactionData.statusPembayaran = transactionData.statusPembayaran;
       }
 
       // Show print modal
@@ -1616,30 +1543,27 @@ const penjualanHandler = {
 
       for (const item of items) {
         const kode = item.kodeText;
-        const hasValidKode = kode && kode !== "-";
-        const hasValidKodeLock = item.kodeLock && item.kodeLock !== "-";
+        if (!kode || kode === "-") continue;
 
         if (salesType === "manual") {
-          // Untuk manual sales, skip jika tidak ada kodeLock
-          if (!hasValidKodeLock) continue;
+          // Untuk penjualan manual
+          if (item.kodeLock && item.kodeLock !== "-") {
+            // Kode aksesoris yang dipilih - mengurangi stok sebagai ganti lock
+            const currentStock = this.getStockForItem(item.kodeLock);
+            const jumlah = parseInt(item.jumlah) || 1;
+            const newStock = Math.max(0, currentStock - jumlah);
 
-          // Proses kode lock saja - tidak proses kodeText
-          const currentStock = this.getStockForItem(item.kodeLock);
-          const jumlah = parseInt(item.jumlah) || 1;
-          const newStock = Math.max(0, currentStock - jumlah);
-
-          updatePromises.push(
-            this.processSingleStockUpdate(item.kodeLock, {
-              item: { ...item, kodeText: item.kodeLock, nama: `Ganti lock untuk ${item.nama}` },
-              currentStock,
-              newStock,
-              jumlah,
-              isGantiLock: true,
-            })
-          );
+            updatePromises.push(
+              this.processSingleStockUpdate(item.kodeLock, {
+                item: { ...item, kodeText: item.kodeLock, nama: `Ganti lock untuk ${item.nama}` },
+                currentStock,
+                newStock,
+                jumlah,
+                isGantiLock: true,
+              })
+            );
+          }
         } else {
-          // Untuk aksesoris/kotak, tetap cek kodeText
-          if (!hasValidKode) continue;
           // Untuk penjualan aksesoris dan kotak
           const currentStock = this.getStockForItem(kode);
           const jumlah = parseInt(item.jumlah) || 1;
@@ -1661,39 +1585,19 @@ const penjualanHandler = {
 
       // Update local cache
       for (const item of items) {
-        if (salesType === "manual") {
-          // Untuk manual, hanya update cache kodeLock
-          if (item.kodeLock && item.kodeLock !== "-") {
-            const kodeLock = item.kodeLock;
-            const currentStock = this.getStockForItem(kodeLock);
-            const jumlah = parseInt(item.jumlah) || 1;
-            const newStock = Math.max(0, currentStock - jumlah);
+        const kode = item.kodeText;
+        if (kode && kode !== "-") {
+          const currentStock = this.getStockForItem(kode);
+          const jumlah = parseInt(item.jumlah) || 1;
+          const newStock = Math.max(0, currentStock - jumlah);
 
-            // Update stock cache
-            this.stockCache.set(kodeLock, newStock);
+          // Update stock cache
+          this.stockCache.set(kode, newStock);
 
-            // Update stockData array
-            const stockIndex = this.stockData.findIndex((stockItem) => stockItem.kode === kodeLock);
-            if (stockIndex !== -1) {
-              this.stockData[stockIndex].stokAkhir = newStock;
-            }
-          }
-        } else {
-          // Untuk aksesoris/kotak, update cache kodeText
-          if (item.kodeText && item.kodeText !== "-") {
-            const kode = item.kodeText;
-            const currentStock = this.getStockForItem(kode);
-            const jumlah = parseInt(item.jumlah) || 1;
-            const newStock = Math.max(0, currentStock - jumlah);
-
-            // Update stock cache
-            this.stockCache.set(kode, newStock);
-
-            // Update stockData array
-            const stockIndex = this.stockData.findIndex((stockItem) => stockItem.kode === kode);
-            if (stockIndex !== -1) {
-              this.stockData[stockIndex].stokAkhir = newStock;
-            }
+          // Update stockData array
+          const stockIndex = this.stockData.findIndex((stockItem) => stockItem.kode === kode);
+          if (stockIndex !== -1) {
+            this.stockData[stockIndex].stokAkhir = newStock;
           }
         }
       }
@@ -1855,6 +1759,7 @@ const penjualanHandler = {
   },
 
   // Print receipt
+  // Print receipt - PERBAIKAN LOGIKA DP > TOTAL
   printReceipt() {
     if (!currentTransactionData) {
       utils.showAlert("Tidak ada data transaksi untuk dicetak!");
@@ -1870,84 +1775,77 @@ const penjualanHandler = {
     }
 
     let receiptHTML = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Struk Kasir</title>
-            <style>
-              body {
-                font-family: consolas;
-                font-size: 12px;
-                margin: 0;
-                padding: 0;
-                width: 80mm;
-              }
-              .receipt {          
-                margin: 0 auto;
-                padding: 5mm;
-              }
-              .receipt h3, .receipt h4 {
-                text-align: center;
-                margin: 2mm 0;
-              }
-              .receipt hr {
-                border-top: 1px dashed #000;
-              }
-              .receipt table {
-                width: 100%;
-                border-collapse: collapse;
-              }
-              .receipt th, .receipt td {
-                text-align: left;
-                padding: 1mm 2mm;
-              }
-              .receipt .tanggal {
-              margin-left: 10px
-              }
-              .text-center {
-                text-align: center;
-              }
-              .text-right {
-                text-align: right;
-              }
-              .keterangan {
-                font-style: italic;
-                font-size: 14px;
-                margin-top: 2mm;
-                border-top: 1px dotted #000;
-                padding-top: 2mm;
-              }
-              .payment-info {
-                margin-top: 2mm;
-                border-top: 1px dotted #000;
-                padding-top: 2mm;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="receipt">
-              <h3>MELATI 3</h3>
-              <h4>JL. DIPONEGORO NO. 116</h4>
-              <h4>NOTA PENJUALAN ${transaction.salesType.toUpperCase()}</h4>
-              <hr>
-              <p class="tanggal">Tanggal: ${transaction.tanggal}<br>Sales: ${transaction.sales}</p>
-              ${
-                transaction.customerName || transaction.customerPhone
-                  ? `<p class="tanggal">Customer: ${transaction.customerName || "-"}${
-                      transaction.customerPhone ? ` | Tlp: ${transaction.customerPhone}` : ""
-                    }</p>`
-                  : ""
-              }
-              <hr>
-              <table>
-                <tr>
-                  <th>Kode</th>
-                  <th>Nama</th>
-                  <th>Kadar</th>
-                  <th>Gr</th>
-                  <th>Harga</th>
-                </tr>
-        `;
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Struk Kasir</title>
+          <style>
+            body {
+              font-family: consolas;
+              font-size: 12px;
+              margin: 0;
+              padding: 0;
+              width: 80mm;
+            }
+            .receipt {          
+              margin: 0 auto;
+              padding: 5mm;
+            }
+            .receipt h3, .receipt h4 {
+              text-align: center;
+              margin: 2mm 0;
+            }
+            .receipt hr {
+              border-top: 1px dashed #000;
+            }
+            .receipt table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            .receipt th, .receipt td {
+              text-align: left;
+              padding: 1mm 2mm;
+            }
+            .receipt .tanggal {
+            margin-left: 10px
+            }
+            .text-center {
+              text-align: center;
+            }
+            .text-right {
+              text-align: right;
+            }
+            .keterangan {
+              font-style: italic;
+              font-size: 14px;
+              margin-top: 2mm;
+              border-top: 1px dotted #000;
+              padding-top: 2mm;
+            }
+            .payment-info {
+              margin-top: 2mm;
+              border-top: 1px dotted #000;
+              padding-top: 2mm;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="receipt">
+            <h3>MELATI 3</h3>
+            <h4>JL. DIPONEGORO NO. 116</h4>
+            <h4>NOTA PENJUALAN ${transaction.salesType.toUpperCase()}</h4>
+            <hr>
+            <p class="tanggal">Tanggal: ${transaction.tanggal}<br>Sales: ${transaction.sales}</p>
+            <hr>
+            <table>
+              <tr>
+                <th>Kode</th>
+                <th>Nama</th>
+                <th>Kadar</th>
+                <th>Gr</th>
+                <th>Harga</th>
+              </tr>
+      `;
 
     let hasKeterangan = false;
     let keteranganText = "";
@@ -1955,14 +1853,14 @@ const penjualanHandler = {
     transaction.items.forEach((item) => {
       const itemHarga = parseInt(item.totalHarga) || 0;
       receiptHTML += `
-            <tr>
-              <td>${item.kodeText || "-"}</td>
-              <td>${item.nama || "-"}</td>
-              <td>${item.kadar || "-"}</td>
-              <td>${item.berat || "-"}</td>
-              <td class="text-right">${utils.formatRupiah(itemHarga)}</td>
-            </tr>
-          `;
+          <tr>
+            <td>${item.kodeText || "-"}</td>
+            <td>${item.nama || "-"}</td>
+            <td>${item.kadar || "-"}</td>
+            <td>${item.berat || "-"}</td>
+            <td class="text-right">${utils.formatRupiah(itemHarga)}</td>
+          </tr>
+        `;
 
       if (item.keterangan && item.keterangan.trim() !== "") {
         hasKeterangan = true;
@@ -1972,84 +1870,92 @@ const penjualanHandler = {
 
     const totalHarga = parseInt(transaction.totalHarga.replace(/\./g, "")) || 0;
     receiptHTML += `
-                <tr>
-                  <td colspan="4" class="text-right"><strong>Total:</strong></td>
-                  <td class="text-right"><strong>${utils.formatRupiah(totalHarga)}</strong></td>
-                </tr>
-              </table>
-        `;
+              <tr>
+                <td colspan="4" class="text-right"><strong>Total:</strong></td>
+                <td class="text-right"><strong>${utils.formatRupiah(totalHarga)}</strong></td>
+              </tr>
+            </table>
+      `;
 
-    // Add DP information if applicable
+    // PERBAIKAN: Add DP information dengan logika yang benar
     if (transaction.metodeBayar === "dp") {
-      const dpAmount = parseInt((transaction.nominalDP || "0").toString().replace(/\./g, "")) || 0;
-      const remainingAmount = parseInt((transaction.sisaPembayaran || "0").toString().replace(/\./g, "")) || 0;
-      const changeAmount = parseInt((transaction.kembalian || "0").toString().replace(/\./g, "")) || 0;
+      const dpAmount = parseInt(transaction.nominalDP.replace(/\./g, "")) || 0;
 
-      const showChange = dpAmount >= totalHarga;
       receiptHTML += `
-              <div class="payment-info">
-                <table>
-                  <tr>
-                    <td>Total Harga:</td>
-                    <td class="text-right">${utils.formatRupiah(totalHarga)}</td>
-                  </tr>
-                  <tr>
-                    <td>DP:</td>
-                    <td class="text-right">${utils.formatRupiah(dpAmount)}</td>
-                  </tr>
-                  <tr>
-                    <td><strong>${showChange ? "KEMBALIAN" : "SISA"}:</strong></td>
-                    <td class="text-right"><strong>${utils.formatRupiah(
-                      showChange ? changeAmount : remainingAmount
-                    )}</strong></td>
-                  </tr>
-                </table>
-              </div>
-          `;
+            <div class="payment-info">
+              <table>
+                <tr>
+                  <td>Total Harga:</td>
+                  <td class="text-right">${utils.formatRupiah(totalHarga)}</td>
+                </tr>
+                <tr>
+                  <td>DP:</td>
+                  <td class="text-right">${utils.formatRupiah(dpAmount)}</td>
+                </tr>
+    `;
+
+      // PERBAIKAN: Logika untuk menampilkan SISA atau KEMBALIAN
+      if (dpAmount >= totalHarga) {
+        // Jika DP >= total, tampilkan kembalian (jika ada)
+        if (dpAmount > totalHarga) {
+          const kembalian = dpAmount - totalHarga;
+          receiptHTML += `
+                <tr>
+                  <td><strong>KEMBALIAN:</strong></td>
+                  <td class="text-right"><strong>${utils.formatRupiah(kembalian)}</strong></td>
+                </tr>
+        `;
+        } else {
+          // Jika DP = total, tampilkan LUNAS
+          receiptHTML += `
+                <tr>
+                  <td colspan="2" class="text-center"><strong>LUNAS</strong></td>
+                </tr>
+        `;
+        }
+      } else {
+        // Jika DP < total, tampilkan sisa pembayaran
+        const remainingAmount = parseInt(transaction.sisaPembayaran.replace(/\./g, "")) || 0;
+        receiptHTML += `
+                <tr>
+                  <td><strong>SISA:</strong></td>
+                  <td class="text-right"><strong>${utils.formatRupiah(remainingAmount)}</strong></td>
+                </tr>
+      `;
+      }
+
+      receiptHTML += `
+              </table>
+            </div>
+        `;
     }
 
     // Add keterangan if exists and is manual sale
     if (hasKeterangan && transaction.salesType === "manual") {
       receiptHTML += `
-              <div class="keterangan">
-                <strong>Keterangan:</strong> ${keteranganText.trim()}
-              </div>
-          `;
+            <div class="keterangan">
+              <strong>Keterangan:</strong> ${keteranganText.trim()}
+            </div>
+        `;
     }
 
     receiptHTML += `
-              <hr>
-              <p class="text-center">Terima Kasih<br>Atas Kunjungan Anda</p>
-            </div>
-            <script>
-              window.onload = function() {
-                window.print();
-                setTimeout(function() { window.close(); }, 500);
-              };
-            </script>
-          </body>
-          </html>
-        `;
+            <hr>
+            <p class="text-center">Terima Kasih<br>Atas Kunjungan Anda</p>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+        </html>
+      `;
 
     printWindow.document.write(receiptHTML);
     printWindow.document.close();
   },
-
-  // Shared CSS for invoice printing (aligned with aksesoris-app)
-  INVOICE_CSS: `
-    @page { size: 10cm 20cm; margin: 0; }
-    body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; box-sizing: border-box; }
-    .invoice { width: 100%; }
-    .header-info { text-align: right; margin-bottom: 0.5cm; margin-right: 3cm; margin-top: 0.8cm; }
-    .customer-info { text-align: right; margin-bottom: 0.9cm; margin-right: 3cm; font-size: 11px; line-height: 1.2; }
-    .total-row { margin-top: 0.7cm; text-align: right; font-weight: bold; margin-right: 3cm; }
-    .sales { text-align: right; margin-top: 0.6cm; margin-right: 2cm; }
-    .keterangan { font-style: italic; font-size: 10px; margin-top: 1.2cm; margin-bottom: 0.4cm; padding-top: 2mm; text-align: left; margin-left: 0.5cm; margin-right: 3cm; }
-    .keterangan-spacer { height: 1.6cm; }
-    .item-details { display: flex; flex-wrap: wrap; }
-    .item-data { display: grid; grid-template-columns: 2cm 2.7cm 4.6cm 1.8cm 1.8cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 0.5cm; margin-top: 1cm; margin-right: 3cm; }
-    .item-data span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  `,
 
   // Print invoice
   printInvoice() {
@@ -2066,42 +1972,63 @@ const penjualanHandler = {
       return;
     }
 
+    // PERBAIKAN: Gunakan tanggal langsung karena sudah dalam format string dd/mm/yyyy
+    // Jika timestamp ada (Firestore Timestamp), format dulu, jika tidak pakai tanggal string
+    let tanggal = transaction.tanggal;
+    if (transaction.timestamp && transaction.timestamp.toDate) {
+      tanggal = utils.formatDate(transaction.timestamp);
+    }
+
     let invoiceHTML = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Invoice Customer</title>
-          <style>
-            ${this.INVOICE_CSS}
-          </style>
-        </head>
-        <body>
-          <div class="invoice">
-            <div class="header-info"><p>${transaction.tanggal}</p></div>
-            <div class="customer-info">
-              <div>${transaction.customerName || "-"}</div>
-              <div>${transaction.customerPhone || ""}</div>
-            </div>
-      `;
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Invoice Customer</title>
+      <style>
+        @page { size: 10cm 20cm; margin: 0; }
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; box-sizing: border-box; }
+        .invoice { width: 100%; }
+        .header-info { text-align: right; margin-bottom: 0.5cm; margin-right: 3cm; margin-top: 0.8cm; }
+        .customer-info { text-align: right; margin-bottom: 1.1cm; margin-right: 3cm; font-size: 11px; line-height: 1.2; }
+        .total-row { margin-top: 0.7cm; text-align: right; font-weight: bold; margin-right: 3cm; }
+        .sales { text-align: right; margin-top: 0.6cm; margin-right: 2cm; }
+        .keterangan { font-style: italic; font-size: 10px; margin-top: 1.2cm; margin-bottom: 0.5cm; padding-top: 2mm; text-align: left; margin-left: 0.5cm; margin-right: 3cm; }
+        .keterangan-spacer { height: 1.6cm; }
+        .item-details { display: flex; flex-wrap: wrap; }
+        .item-data { display: grid; grid-template-columns: 2cm 2.7cm 4.6cm 1.8cm 1.8cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 0.5cm; margin-top: 1cm; margin-right: 3cm; }
+        .item-data span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .item-data span:nth-child(3) { white-space: normal; overflow: visible; text-overflow: clip; word-wrap: break-word; }
+      </style>
+    </head>
+    <body>
+      <div class="invoice">
+        <div class="header-info">
+          <p>${tanggal}</p>
+        </div>
+        <div class="customer-info">
+          <div>${transaction.customerName || "-"}</div>
+          <div>${transaction.customerPhone || ""}</div>
+        </div>
+  `;
 
     let hasKeterangan = false;
     let keteranganText = "";
     let totalHarga = 0;
 
-    // Loop untuk menampilkan semua item-data terlebih dahulu
+    // Loop untuk menampilkan semua item-data
     transaction.items.forEach((item) => {
-      const itemHarga = parseInt(item.totalHarga) || 0;
+      const itemHarga = parseInt(item.totalHarga || 0);
       totalHarga += itemHarga;
 
       invoiceHTML += `
-          <div class="item-details">
-            <div class="item-data">
-              <span>${item.kodeText || "-"}</span>
-              <span>${item.jumlah || "1"}pcs</span>
-              <span>${item.nama || "-"}</span>
-              <span>${item.kadar || "-"}</span>
-              <span>${item.berat || "-"}gr</span>
-              <span>${utils.formatRupiah(itemHarga)}</span>
+      <div class="item-details">
+        <div class="item-data">
+          <span>${item.kodeText || "-"}</span>
+          <span>${item.jumlah || " "}pcs</span>
+          <span>${item.nama || "-"}</span>
+          <span>${item.kadar || "-"}</span>
+          <span>${item.berat || "-"}gr</span>
+          <span>${utils.formatRupiah(itemHarga)}</span>
         </div>
       </div>
     `;
@@ -2113,7 +2040,7 @@ const penjualanHandler = {
       }
     });
 
-    // Tampilkan keterangan atau spacer untuk menjaga posisi total-row
+    // Tampilkan keterangan atau spacer
     if (hasKeterangan && transaction.salesType === "manual") {
       invoiceHTML += `
       <div class="keterangan">
@@ -2122,10 +2049,7 @@ const penjualanHandler = {
       </div>
     `;
     } else {
-      // Tambahkan spacer jika tidak ada keterangan untuk menjaga posisi total-row
-      invoiceHTML += `
-      <div class="keterangan-spacer"></div>
-    `;
+      invoiceHTML += `<div class="keterangan-spacer"></div>`;
     }
 
     // Tampilkan total dan sales
@@ -2134,9 +2058,6 @@ const penjualanHandler = {
         Rp ${utils.formatRupiah(totalHarga)}
       </div>
       <div class="sales">${transaction.sales || "-"}</div>
-  `;
-
-    invoiceHTML += `
       </div>
       <script>
         window.onload = function() {
@@ -2160,45 +2081,80 @@ const penjualanHandler = {
     }
 
     const tx = currentTransactionData;
-    if (tx.salesType !== "manual" || !Array.isArray(tx.items) || tx.items.length === 0) {
-      // Fallback to normal invoice
+    const items = Array.isArray(tx.items) ? tx.items : [];
+
+    // Fallback jika bukan manual atau hanya 1 item
+    if ((tx.salesType || tx.jenisPenjualan) !== "manual" || items.length <= 1) {
       this.printInvoice();
       return;
     }
-    // Helpers to build HTML and print via hidden iframe (avoids popup blockers)
+
+    const parseHarga = (val) => {
+      if (val == null) return 0;
+      if (typeof val === "number") return val;
+      const s = String(val);
+      return parseInt(s.replace(/\./g, "")) || 0;
+    };
+
+    const fmt = (n) => utils.formatRupiah(parseInt(n) || 0);
+
+    const getField = (obj, keys, def = "-") => {
+      for (const k of keys) {
+        const v = obj[k];
+        if (v !== undefined && v !== null && String(v) !== "") return v;
+      }
+      return def;
+    };
+
     const buildItemHTML = (item) => {
-      const itemHarga = parseInt(item.totalHarga) || 0;
-      const tanggal = tx.tanggal || "";
-      const sales = tx.sales || "-";
-      const keterangan = item.keterangan ? String(item.keterangan).trim() : "";
+      const kode = getField(item, ["kode", "kodeText", "kodeLock"], "-");
+      const nama = getField(item, ["nama", "namaBarang"], "-");
+      const kadar = getField(item, ["kadar"], "-");
+      const berat = getField(item, ["berat", "gr"], 0);
+      const total = parseHarga(getField(item, ["totalHarga"], 0));
+      const keterangan = getField(item, ["keterangan"], "");
 
       return `
         <!DOCTYPE html>
         <html>
         <head>
           <title>Invoice Customer</title>
-          <style>${this.INVOICE_CSS}</style>
+          <style>
+            @page { size: 10cm 20cm; margin: 0; }
+            body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; box-sizing: border-box; }
+            .invoice { width: 100%; }
+            .header-info { text-align: right; margin-bottom: 0.5cm; margin-right: 3cm; margin-top: 0.8cm; }
+            .customer-info { text-align: right; margin-bottom: 1.1cm; margin-right: 3cm; font-size: 11px; line-height: 1.2; } 
+            .total-row { margin-top: 0.7cm; text-align: right; font-weight: bold; margin-right: 3cm; }
+            .sales { text-align: right; margin-top: 0.6cm; margin-right: 2cm; }
+            .item-details { display: flex; flex-wrap: wrap; }
+            .item-data { display: grid; grid-template-columns: 2cm 2.7cm 4.6cm 1.8cm 1.8cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 0.5cm; margin-top: 1cm; margin-right: 3cm; }
+            .item-data span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .item-data span:nth-child(3) { white-space: normal; overflow: visible; text-overflow: clip; word-wrap: break-word; }
+            .keterangan { font-style: italic; font-size: 10px; margin-top: 1.2cm; margin-bottom: 0.5cm; padding-top: 2mm; text-align: left; margin-left: 0.5cm; margin-right: 3cm; }
+          </style>
         </head>
         <body>
           <div class="invoice">
-            <div class="header-info"><p>${tanggal}</p></div>
+            <div class="header-info"><p>${tx.tanggal || ""}</p></div>
             <div class="customer-info">
               <div>${tx.customerName || "-"}</div>
               <div>${tx.customerPhone || ""}</div>
             </div>
+            
             <div class="item-details">
               <div class="item-data">
-                <span>${item.kodeText || "-"}</span>
-                <span>${item.jumlah || "1"}pcs</span>
-                <span>${item.nama || "-"}</span>
-                <span>${item.kadar || "-"}</span>
-                <span>${item.berat || "-"}gr</span>
-                <span>${utils.formatRupiah(itemHarga)}</span>
+                <span>${kode}</span>
+                <span> pcs</span>
+                <span>${nama}</span>
+                <span>${kadar}</span>
+                <span>${berat}gr</span>
+                <span>${fmt(total)}</span>
               </div>
             </div>
             ${keterangan ? `<div class="keterangan"><strong>Keterangan:</strong><br>${keterangan}</div>` : ""}
-            <div class="total-row">Rp ${utils.formatRupiah(itemHarga)}</div>
-            <div class="sales">${sales}</div>
+            <div class="total-row">Rp ${fmt(total)}</div>
+            <div class="sales">${tx.sales || "-"}</div>
           </div>
         </body>
         </html>
@@ -2216,45 +2172,51 @@ const penjualanHandler = {
         iframe.style.border = "0";
         document.body.appendChild(iframe);
 
-        const doc = iframe.contentWindow || iframe.contentDocument;
         const w = iframe.contentWindow;
-        const d = doc.document || doc;
+        const d = w.document;
         d.open();
         d.write(html);
         d.close();
 
         const cleanup = () => {
           setTimeout(() => {
-            document.body.removeChild(iframe);
+            if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
             resolve();
           }, 150);
         };
 
-        // Try afterprint; fallback to timeout if not supported
         const onAfterPrint = () => {
-          w.removeEventListener && w.removeEventListener("afterprint", onAfterPrint);
+          try {
+            w.removeEventListener && w.removeEventListener("afterprint", onAfterPrint);
+          } catch (e) {}
           cleanup();
         };
-
         try {
-          if (w.addEventListener) {
-            w.addEventListener("afterprint", onAfterPrint);
-          }
-        } catch (e) {
-          /* ignore */
-        }
+          w.addEventListener && w.addEventListener("afterprint", onAfterPrint);
+        } catch (e) {}
 
-        w.focus();
-        setTimeout(() => {
-          w.print();
-          // Fallback cleanup in case afterprint doesn't fire
-          setTimeout(cleanup, 1000);
-        }, 50);
+        // Wait for content to fully load before printing to avoid duplicate triggers
+        const tryPrint = () => {
+          try {
+            w.focus();
+            w.print();
+            // Fallback cleanup if afterprint not fired
+            setTimeout(cleanup, 1000);
+          } catch (e) {
+            // Retry once shortly if print isn't ready
+            setTimeout(tryPrint, 100);
+          }
+        };
+        // Ensure styles applied before printing
+        if (d.readyState === "complete") {
+          setTimeout(tryPrint, 50);
+        } else {
+          w.onload = () => setTimeout(tryPrint, 50);
+        }
       });
 
-    // Print each item sequentially
     (async () => {
-      for (const item of tx.items) {
+      for (const item of items) {
         const html = buildItemHTML(item);
         await printViaIframe(html);
       }
@@ -2272,10 +2234,8 @@ const penjualanHandler = {
 
       // Reset sales name field
       $("#sales").val("").removeClass("is-valid is-invalid");
-
-      // Reset customer fields
-      $("#namaCustomer, #noTelp").val("").removeClass("is-valid is-invalid");
-      $("#namaCustomer, #noTelp").next(".invalid-feedback").remove();
+      $("#customerName").val("");
+      $("#customerPhone").val("");
 
       // Clear all tables
       $("#tableAksesorisDetail tbody, #tableKotakDetail tbody, #tableManualDetail tbody").empty();
@@ -2304,10 +2264,10 @@ const penjualanHandler = {
     if (type === "receipt") {
       this.printReceipt();
     } else if (type === "invoice") {
-      // If manual sale with more than one item, print per item
+      // Jika penjualan manual dan item > 1, cetak terpisah per item
       if (
         currentTransactionData &&
-        currentTransactionData.salesType === "manual" &&
+        (currentTransactionData.salesType || currentTransactionData.jenisPenjualan) === "manual" &&
         Array.isArray(currentTransactionData.items) &&
         currentTransactionData.items.length > 1
       ) {
@@ -2441,7 +2401,7 @@ setInterval(() => {
   const readsStats = readsMonitor.getStats();
 
   console.log("📊 System Health Check:", {
-    stockItems: penjualanHandler.stockData?.length || 0,
+    stockItems: this.stockData?.length || 0,
     reads: `${readsStats.total}/${readsMonitor.dailyLimit} (${readsStats.percentage.toFixed(1)}%)`,
   });
 }, 10 * 60 * 1000); // Every 10 minutes
@@ -2455,28 +2415,18 @@ window.addEventListener("unhandledrejection", (event) => {
   }
 });
 
-// Add remove listeners method to penjualanHandler (extend original to also clear DOM listeners)
-(function enhanceRemoveListeners() {
-  const original = penjualanHandler.removeListeners.bind(penjualanHandler);
-  penjualanHandler.removeListeners = function () {
-    // Ensure Firestore listeners are unsubscribed
-    try {
-      original();
-    } catch (e) {
-      console.warn("Error during Firestore listener cleanup:", e);
-    }
+// Add remove listeners method to penjualanHandler
+penjualanHandler.removeListeners = function () {
+  // Remove all event listeners to prevent memory leaks
+  $(document).off(".penjualan");
+  $(window).off(".penjualan");
 
-    // Remove DOM-scoped listeners to prevent memory leaks
-    $(document).off(".penjualan");
-    $(window).off(".penjualan");
-
-    // Clear any intervals
-    if (this.refreshInterval) {
-      clearInterval(this.refreshInterval);
-      this.refreshInterval = null;
-    }
-  };
-})();
+  // Clear intervals
+  if (this.refreshInterval) {
+    clearInterval(this.refreshInterval);
+    this.refreshInterval = null;
+  }
+};
 
 // Export for potential use in other modules
 window.penjualanHandler = penjualanHandler;
@@ -2649,42 +2599,42 @@ const validators = {
 };
 
 // Add form validation to save transaction
-// Tambahkan flag isSaving untuk mencegah double submit
-penjualanHandler.isSaving = false;
 const originalSaveTransaction = penjualanHandler.saveTransaction;
+
+// Tambahkan guard isSaving + loadingStates agar tidak double submit
 penjualanHandler.saveTransaction = async function () {
-  if (this.isSaving) return; // Prevent double submit
+  if (this.isSaving) return; // cegah double-click/submit
   this.isSaving = true;
   loadingStates.show("#btnSimpanPenjualan", "Menyimpan...");
+
   try {
-    // Validate form data
+    // Validasi form (tetap)
     const salesName = $("#sales").val().trim();
     validators.required(salesName, "Nama sales");
     validators.maxLength(salesName, 50, "Nama sales");
 
     const totalHarga = parseFloat($("#totalOngkos").val().replace(/\./g, "")) || 0;
     const metodeBayar = $("#metodeBayar").val();
-
-    // PERBAIKAN: Gunakan validator khusus untuk total harga
     validators.totalHarga(totalHarga, metodeBayar, "Total harga");
 
-    // Call original function
+    // Panggil fungsi simpan asli
     const result = await originalSaveTransaction.call(this);
 
-    // Pastikan modal print hanya trigger resetForm sekali
+    // Pastikan handler resetForm pada printModal tidak terduplikasi
     $("#printModal")
       .off("hidden.bs.modal")
       .on("hidden.bs.modal", () => {
         this.resetForm();
+        $("#sales").focus();
       });
 
     return result;
   } catch (error) {
     if (
-      error.message.includes("harus") ||
-      error.message.includes("tidak boleh") ||
-      error.message.includes("minimal") ||
-      error.message.includes("maksimal")
+      error?.message?.includes("harus") ||
+      error?.message?.includes("tidak boleh") ||
+      error?.message?.includes("minimal") ||
+      error?.message?.includes("maksimal")
     ) {
       utils.showAlert(error.message, "Validasi Error", "warning");
       return;

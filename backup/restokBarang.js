@@ -21,6 +21,8 @@ const inputTbody = document.querySelector("#inputTable tbody");
 
 const filterBulan = document.getElementById("filterBulan");
 const filterBulanSudah = document.getElementById("filterBulanSudah");
+const btnTampilkan = document.getElementById("btnTampilkan");
+const btnTampilkanSudah = document.getElementById("btnTampilkanSudah");
 const dataTablePerlu = document.querySelector("#dataTablePerlu tbody");
 const dataTableSudah = document.querySelector("#dataTableSudah tbody");
 const btnSendWA = document.getElementById("btnSendWA");
@@ -235,7 +237,7 @@ function makeRow() {
   const tr = document.createElement("tr");
   tr.innerHTML = `
     <td>
-      <select class="form-select form-select-sm" required>
+      <select class="form-control" required>
         <option value="">Pilih Jenis</option>
         <option value="KALUNG">KALUNG</option>
         <option value="LIONTIN">LIONTIN</option>
@@ -245,10 +247,10 @@ function makeRow() {
         <option value="GIWANG">GIWANG</option>
       </select>
     </td>
-    <td><input type="text" class="form-control form-control-sm" placeholder="Nama barang" required></td>
-    <td><input type="text" class="form-control form-control-sm" placeholder="Kadar" required></td>
-    <td><input type="text" class="form-control form-control-sm" placeholder="Berat (gr)"></td>
-    <td><input type="text" class="form-control form-control-sm" placeholder="Panjang (cm)"></td>
+    <td><input type="text" class="form-control" placeholder="Nama barang" required></td>
+    <td><input type="text" class="form-control" placeholder="Kadar" required></td>
+    <td><input type="text" class="form-control" placeholder="Berat (gr)"></td>
+    <td><input type="text" class="form-control" placeholder="Panjang (cm)"></td>
     <td class="actions-cell"><button type="button" class="btn btn-danger btn-sm btn-remove">Hapus</button></td>
   `;
   tr.querySelector(".btn-remove").addEventListener("click", () => {
@@ -369,21 +371,12 @@ async function fetchByMonthAndStatus(monthStr, status) {
       items.push({ id: docSnap.id, ...data });
     });
     items.sort((a, b) => {
-      // Sort by jenis first (alphabetical)
-      const jenisA = (a.jenis || "").toUpperCase();
-      const jenisB = (b.jenis || "").toUpperCase();
-      if (jenisA !== jenisB) {
-        return jenisA.localeCompare(jenisB);
-      }
-
-      // Then by date within same jenis
+      // Sort by date first, then by createdAt
       const dateA = a.tanggal || "";
       const dateB = b.tanggal || "";
       if (dateA !== dateB) {
         return dateA.localeCompare(dateB);
       }
-
-      // Finally by createdAt
       return (a.createdAt || 0) - (b.createdAt || 0);
     });
     return items;
@@ -393,7 +386,7 @@ async function fetchByMonthAndStatus(monthStr, status) {
   }
 }
 
-function renderRowsPerlu(items, tbody) {
+function renderRows(items, tbody, status) {
   tbody.innerHTML = items
     .map(
       (x) => `
@@ -401,11 +394,11 @@ function renderRowsPerlu(items, tbody) {
       <td>${x.tanggal || ""}</td>
       <td>${x.jenis || ""}</td>
       <td>${x.nama || ""}</td>
-      <td>${x.kadar || ""}</td>
+      <td >${x.kadar || ""}</td>
       <td>${x.berat ?? ""}</td>
       <td>${x.panjang ?? ""}</td>
       <td class="status-cell">
-        <button type="button" class="btn btn-warning btn-sm btn-edit-status" data-status="perlu" title="Edit Status">
+        <button type="button" class="btn btn-warning btn-sm btn-edit-status" data-status="${status}" title="Edit Status">
           <i class="fa-solid fa-edit me-1"></i>Edit Status
         </button>
       </td>
@@ -429,36 +422,8 @@ function renderRowsPerlu(items, tbody) {
     btn.addEventListener("click", () => openEditStatusModal(btn.closest("tr")));
   });
   tbody.querySelectorAll(".btn-edit").forEach((btn) => {
-    btn.addEventListener("click", () => enterEditMode(btn.closest("tr"), "perlu"));
+    btn.addEventListener("click", () => enterEditMode(btn.closest("tr"), status));
   });
-  tbody.querySelectorAll(".btn-delete").forEach((btn) => {
-    btn.addEventListener("click", () => deleteRow(btn.closest("tr")));
-  });
-}
-
-function renderRowsSudah(items, tbody) {
-  tbody.innerHTML = items
-    .map(
-      (x) => `
-    <tr data-id="${x.id}">
-      <td>${x.tanggal || ""}</td>
-      <td>${x.jenis || ""}</td>
-      <td>${x.nama || ""}</td>
-      <td>${x.kadar || ""}</td>
-      <td>${x.berat ?? ""}</td>
-      <td>${x.panjang ?? ""}</td>
-      <td class="text-center">${x.tanggalRestok || "-"}</td>
-      <td class="actions-cell">
-        <button type="button" class="btn btn-danger btn-sm btn-delete" title="Hapus">
-          <i class="fa-solid fa-trash"></i>
-        </button>
-      </td>
-    </tr>
-  `
-    )
-    .join("");
-
-  // Bind actions
   tbody.querySelectorAll(".btn-delete").forEach((btn) => {
     btn.addEventListener("click", () => deleteRow(btn.closest("tr")));
   });
@@ -467,13 +432,13 @@ function renderRowsSudah(items, tbody) {
 async function fetchAndRenderPerlu() {
   const monthStr = filterBulan?.value || currentMonthStr();
   const items = await fetchByMonthAndStatus(monthStr, "perlu");
-  renderRowsPerlu(items, dataTablePerlu);
+  renderRows(items, dataTablePerlu, "perlu");
 }
 
 async function fetchAndRenderSudah() {
   const monthStr = filterBulanSudah?.value || currentMonthStr();
   const items = await fetchByMonthAndStatus(monthStr, "sudah");
-  renderRowsSudah(items, dataTableSudah);
+  renderRows(items, dataTableSudah, "sudah");
 }
 
 // Modal functions
@@ -489,21 +454,10 @@ async function saveStatus() {
   if (!currentEditId) return;
   const newStatus = statusSelect.value;
   try {
-    const updateData = {
+    await updateDoc(doc(firestore, "restokBarang", currentEditId), {
       status: newStatus,
       updatedAt: Date.now(),
-    };
-
-    // Simpan tanggal restok saat status diubah ke "sudah"
-    if (newStatus === "sudah") {
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, "0");
-      const dd = String(today.getDate()).padStart(2, "0");
-      updateData.tanggalRestok = `${yyyy}-${mm}-${dd}`;
-    }
-
-    await updateDoc(doc(firestore, "restokBarang", currentEditId), updateData);
+    });
     // Refresh both tabs
     await fetchAndRenderPerlu();
     await fetchAndRenderSudah();
@@ -533,19 +487,10 @@ function enterEditMode(tr, currentStatus) {
   const berat = tds[4].textContent.trim();
   const panjang = tds[5].textContent.trim();
 
-  const statusColumn =
-    currentStatus === "perlu"
-      ? `<td class="status-cell">
-        <span class="badge bg-warning text-dark mb-1">Perlu Restok</span>
-        <br>
-        <small class="text-muted">Status tidak bisa diubah saat edit</small>
-      </td>`
-      : `<td class="text-center">${tds[6].textContent.trim()}</td>`;
-
   tr.innerHTML = `
     <td>${tanggal}</td>
     <td>
-      <select class="form-select form-select-sm">
+      <select class="form-control form-control-sm">
         <option value="">Pilih Jenis...</option>
         <option value="KALUNG" ${jenis === "KALUNG" ? "selected" : ""}>Kalung</option>
         <option value="LIONTIN" ${jenis === "LIONTIN" ? "selected" : ""}>Liontin</option>
@@ -559,7 +504,13 @@ function enterEditMode(tr, currentStatus) {
     <td><input type="text" class="form-control form-control-sm" value="${kadar}"></td>
     <td><input type="text" class="form-control form-control-sm" value="${berat}"></td>
     <td><input type="text" class="form-control form-control-sm" value="${panjang}"></td>
-    ${statusColumn}
+    <td class="status-cell">
+      <span class="badge ${currentStatus === "perlu" ? "bg-warning text-dark" : "bg-success"} mb-1">
+        ${currentStatus === "perlu" ? "Perlu Restok" : "Sudah Restok"}
+      </span>
+      <br>
+      <small class="text-muted">Status tidak bisa diubah saat edit</small>
+    </td>
     <td class="actions-cell">
       <div class="btn-group btn-group-sm" role="group">
         <button type="button" class="btn btn-success btn-save">Simpan</button>
@@ -626,9 +577,9 @@ async function deleteRow(tr) {
   }
 }
 
-// WhatsApp send untuk data perlu restok saja dengan PDF
+// WhatsApp send untuk data perlu restok saja
 if (btnSendWA) {
-  btnSendWA.addEventListener("click", async () => {
+  btnSendWA.addEventListener("click", () => {
     const rows = Array.from(dataTablePerlu.querySelectorAll("tr"));
     if (rows.length === 0) {
       alert("Tidak ada data perlu restok untuk dikirim");
@@ -638,160 +589,17 @@ if (btnSendWA) {
       alert("Nomor WhatsApp pemasok belum tersedia");
       return;
     }
-
-    try {
-      btnSendWA.disabled = true;
-      btnSendWA.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Membuat PDF...';
-
-      await generateAndSendPDF(rows);
-    } catch (err) {
-      console.error("Gagal membuat PDF:", err);
-      alert("Gagal membuat PDF");
-    } finally {
-      btnSendWA.disabled = false;
-      btnSendWA.innerHTML = '<i class="fa-brands fa-whatsapp me-2"></i>Kirim Data Perlu Restok';
-    }
-  });
-}
-
-async function generateAndSendPDF(rows) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-
-  // Load logo as base64
-  const logoImg = new Image();
-  logoImg.src = "img/logo.png";
-
-  await new Promise((resolve, reject) => {
-    logoImg.onload = resolve;
-    logoImg.onerror = () => {
-      console.warn("Logo tidak ditemukan, lanjut tanpa logo");
-      resolve();
-    };
-    setTimeout(resolve, 2000); // Fallback timeout
-  });
-
-  // Header with logo
-  const pageWidth = doc.internal.pageSize.getWidth();
-
-  // Add logo if loaded
-  if (logoImg.complete && logoImg.naturalHeight !== 0) {
-    try {
-      doc.addImage(logoImg, "PNG", pageWidth / 2 - 15, 10, 30, 30);
-    } catch (e) {
-      console.warn("Gagal menambahkan logo");
-    }
-  }
-
-  // Title
-  doc.setFontSize(18);
-  doc.setFont(undefined, "bold");
-  doc.text("MELATI GOLD SHOP", pageWidth / 2, 45, { align: "center" });
-
-  doc.setFontSize(14);
-  doc.text("Daftar Barang Perlu Restok", pageWidth / 2, 55, { align: "center" });
-
-  // Date
-  doc.setFontSize(10);
-  doc.setFont(undefined, "normal");
-  const today = new Date();
-  const dateStr = `${pad(today.getDate())}-${pad(today.getMonth() + 1)}-${today.getFullYear()}`;
-  doc.text(`Tanggal: ${dateStr}`, 14, 65);
-
-  // Prepare table data
-  const tableData = [];
-  rows.forEach((tr, idx) => {
-    const [tgl, jenis, nama, kadar, berat, panjang] = Array.from(tr.children)
-      .slice(0, 6)
-      .map((td) => td.textContent.trim());
-    tableData.push([idx + 1, tgl, jenis, nama, kadar, berat, panjang]);
-  });
-
-  // Table
-  doc.autoTable({
-    startY: 72,
-    head: [["No", "Tanggal", "Jenis", "Nama Barang", "Kadar", "Berat", "Panjang"]],
-    body: tableData,
-    theme: "grid",
-    headStyles: {
-      fillColor: [212, 175, 55], // Gold color
-      textColor: [255, 255, 255],
-      fontStyle: "bold",
-      halign: "center",
-    },
-    columnStyles: {
-      0: { cellWidth: 12, halign: "center" },
-      1: { cellWidth: 25, halign: "center" },
-      2: { cellWidth: 22, halign: "center" },
-      3: { cellWidth: 50 },
-      4: { cellWidth: 20, halign: "center" },
-      5: { cellWidth: 20, halign: "center" },
-      6: { cellWidth: 20, halign: "center" },
-    },
-    styles: {
-      fontSize: 9,
-      cellPadding: 3,
-    },
-    alternateRowStyles: {
-      fillColor: [245, 245, 245],
-    },
-  });
-
-  // Footer - Total items
-  const finalY = doc.lastAutoTable.finalY || 72;
-  doc.setFontSize(11);
-  doc.setFont(undefined, "bold");
-  doc.text(`Total: ${rows.length} items`, 14, finalY + 10);
-
-  // Generate blob for WhatsApp
-  const pdfBlob = doc.output("blob");
-  const pdfFile = new File([pdfBlob], `Restok_${dateStr}.pdf`, { type: "application/pdf" });
-
-  // Check if Web Share API with files is supported
-  if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-    try {
-      await navigator.share({
-        files: [pdfFile],
-        title: "Daftar Barang Perlu Restok",
-        text: `Data Perlu Restok - ${dateStr}`,
-      });
-    } catch (err) {
-      if (err.name !== "AbortError") {
-        console.error("Share error:", err);
-        fallbackPDFDownload(doc, dateStr);
-      }
-    }
-  } else {
-    // Fallback: Download PDF + open WhatsApp
-    fallbackPDFDownload(doc, dateStr);
-  }
-}
-
-function fallbackPDFDownload(doc, dateStr) {
-  // Download PDF
-  doc.save(`Restok_${dateStr}.pdf`);
-
-  // Open WhatsApp with text message
-  const message = encodeURIComponent(
-    `Halo, terlampir daftar barang perlu restok tanggal ${dateStr}.\n\nSilakan cek file PDF yang saya kirim.`
-  );
-  const url = `https://wa.me/${SUPPLIER_PHONE}?text=${message}`;
-
-  // Show instruction
-  if (window.Swal) {
-    Swal.fire({
-      icon: "info",
-      title: "PDF Berhasil Diunduh",
-      html: "Silakan attach file PDF yang sudah didownload ke WhatsApp yang akan terbuka.",
-      confirmButtonText: "Buka WhatsApp",
-      timer: 5000,
-    }).then(() => {
-      window.open(url, "_blank");
+    const lines = ["Data Perlu Restok:"];
+    rows.forEach((tr) => {
+      const [tgl, jenis, nama, kadar, berat, panjang] = Array.from(tr.children)
+        .slice(0, 6)
+        .map((td) => td.textContent.trim());
+      lines.push(`- ${tgl} | ${jenis} | ${nama} | ${kadar} | ${berat} gr | ${panjang} cm`);
     });
-  } else {
-    alert("PDF berhasil diunduh. Silakan attach ke WhatsApp.");
+    const text = encodeURIComponent(lines.join("\n"));
+    const url = `https://wa.me/${SUPPLIER_PHONE}?text=${text}`;
     window.open(url, "_blank");
-  }
+  });
 }
 
 // Chart Functions
@@ -812,17 +620,15 @@ async function updateChart() {
 
     const labels = [];
     const data = [];
-
-    // Define base colors for gradients
-    const baseColors = [
-      { start: "#007f1eff", end: "#8aff9eff" },
-      { start: "#a50000ff", end: "#ff9191ff" },
-      { start: "#ffe100ff", end: "#fff187ff" },
-      { start: "#4BC0C0", end: "#9dfcf1ff" },
-      { start: "#30008fff", end: "#a2a9fcff" },
-      { start: "#994c00ff", end: "#fcb791ff" },
+    // Definisi warna gradient: [warna_start, warna_end]
+    const colorGradients = [
+      ["#007f1eff", "#8aff9eff"], // Pink gradient
+      ["#a50000ff", "#ff9191ff"], // Blue gradient
+      ["#ffe100ff", "#fff187ff"], // Yellow gradient
+      ["#4BC0C0", "#9dfcf1ff"], // Teal gradient
+      ["#30008fff", "#a2a9fcff"], // Purple gradient
+      ["#994c00ff", "#fcb791ff"], // Orange gradient
     ];
-
     jenisTypes.forEach((jenis) => {
       if (jenisCount[jenis] > 0) {
         labels.push(jenis);
@@ -835,14 +641,14 @@ async function updateChart() {
     if (jenisChart) jenisChart.destroy();
 
     if (data.length > 0) {
-      // Create gradients for Chart.js
-      const gradients = [];
-      for (let i = 0; i < labels.length; i++) {
+      // Buat gradient backgrounds untuk setiap segment
+      const gradientBackgrounds = labels.map((_, index) => {
         const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-        gradient.addColorStop(0, baseColors[i].start);
-        gradient.addColorStop(1, baseColors[i].end);
-        gradients.push(gradient);
-      }
+        const [startColor, endColor] = colorGradients[index % colorGradients.length];
+        gradient.addColorStop(0, startColor);
+        gradient.addColorStop(1, endColor);
+        return gradient;
+      });
 
       jenisChart = new Chart(ctx, {
         type: "pie",
@@ -851,7 +657,9 @@ async function updateChart() {
           datasets: [
             {
               data: data,
-              backgroundColor: gradients,
+              backgroundColor: gradientBackgrounds,
+              borderWidth: 2,
+              borderColor: "#ffffff",
             },
           ],
         },
@@ -870,8 +678,8 @@ async function updateChart() {
 
     labels.forEach((label, index) => {
       const percentage = total > 0 ? ((data[index] / total) * 100).toFixed(1) : 0;
-      const color = baseColors[index] ? baseColors[index].start : "#333";
-      summaryHtml += `<li><span style="color:${color}">●</span> ${label}: ${data[index]} (${percentage}%)</li>`;
+      const startColor = colorGradients[index % colorGradients.length][0]; // Gunakan warna start dari gradient
+      summaryHtml += `<li><span style="color:${startColor}">●</span> ${label}: ${data[index]} (${percentage}%)</li>`;
     });
 
     summaryHtml += "</ul>";
@@ -882,6 +690,22 @@ async function updateChart() {
 }
 
 // Event listeners
+if (btnTampilkan) {
+  btnTampilkan.addEventListener("click", fetchAndRenderPerlu);
+}
+
+if (btnTampilkanSudah) {
+  btnTampilkanSudah.addEventListener("click", fetchAndRenderSudah);
+}
+
+if (saveStatusBtn) {
+  saveStatusBtn.addEventListener("click", saveStatus);
+}
+
+if (btnUpdateChart) {
+  btnUpdateChart.addEventListener("click", updateChart);
+}
+
 // WhatsApp Setting Event Listeners
 if (btnSettingWA) {
   btnSettingWA.addEventListener("click", openWhatsAppSettingModal);
@@ -899,23 +723,6 @@ if (supplierPhoneInput) {
       saveSupplierPhone();
     }
   });
-}
-
-// Auto-refresh when month filter changes
-if (filterBulan) {
-  filterBulan.addEventListener("change", fetchAndRenderPerlu);
-}
-
-if (filterBulanSudah) {
-  filterBulanSudah.addEventListener("change", fetchAndRenderSudah);
-}
-
-if (saveStatusBtn) {
-  saveStatusBtn.addEventListener("click", saveStatus);
-}
-
-if (btnUpdateChart) {
-  btnUpdateChart.addEventListener("click", updateChart);
 }
 
 // Tab switching

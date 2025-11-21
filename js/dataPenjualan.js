@@ -166,6 +166,49 @@ const utils = {
     }
   },
 
+  formatTime: (date) => {
+    if (!date) return "-";
+
+    try {
+      let dateObj = null;
+
+      // Handle Firestore Timestamp
+      if (date && typeof date.toDate === "function") {
+        dateObj = date.toDate();
+      }
+      // Handle Date object
+      else if (date instanceof Date) {
+        dateObj = date;
+      }
+      // Handle timestamp number
+      else if (typeof date === "number") {
+        dateObj = new Date(date);
+      }
+      // Handle string
+      else if (typeof date === "string") {
+        dateObj = new Date(date);
+      }
+      // Handle object with seconds (Firestore timestamp format)
+      else if (date && typeof date === "object" && date.seconds) {
+        dateObj = new Date(date.seconds * 1000);
+      }
+
+      // Validate the date
+      if (!dateObj || isNaN(dateObj.getTime())) {
+        return "-";
+      }
+
+      const hours = String(dateObj.getHours()).padStart(2, "0");
+      const minutes = String(dateObj.getMinutes()).padStart(2, "0");
+      const seconds = String(dateObj.getSeconds()).padStart(2, "0");
+
+      return `${hours}:${minutes}:${seconds}`;
+    } catch (error) {
+      console.error("Error formatting time:", date, error);
+      return "-";
+    }
+  },
+
   // ✅ PERBAIKAN: Parse date dengan validasi yang lebih ketat
   parseDate: (dateString) => {
     if (!dateString) return null;
@@ -276,22 +319,6 @@ class OptimizedDataPenjualanApp {
     // ✅ PERBAIKAN: Bind inactivity methods
     this.resetInactivityTimer = this.resetInactivityTimer.bind(this);
     this.handleUserInactivity = this.handleUserInactivity.bind(this);
-
-    // Shared CSS for printing invoice (aligned with aksesoris-app)
-    this.INVOICE_CSS = `
-      @page { size: 10cm 20cm; margin: 0; }
-      body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; box-sizing: border-box; }
-      .invoice { width: 100%; }
-      .header-info { text-align: right; margin-bottom: 0.5cm; margin-right: 3cm; margin-top: 0.8cm; }
-      .customer-info { text-align: right; margin-bottom: 0.9cm; margin-right: 3cm; font-size: 11px; line-height: 1.2; }
-      .total-row { margin-top: 0.7cm; text-align: right; font-weight: bold; margin-right: 3cm; }
-      .sales { text-align: right; margin-top: 0.6cm; margin-right: 2cm; }
-      .keterangan { font-style: italic; font-size: 10px; margin-top: 1.2cm; margin-bottom: 0.4cm; padding-top: 2mm; text-align: left; margin-left: 0.5cm; margin-right: 3cm; }
-      .keterangan-spacer { height: 1.6cm; }
-      .item-details { display: flex; flex-wrap: wrap; }
-      .item-data { display: grid; grid-template-columns: 2cm 2.7cm 4.6cm 1.8cm 1.8cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 0.5cm; margin-top: 1cm; margin-right: 3cm; }
-      .item-data span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    `;
   }
 
   // ✅ PERBAIKAN: Tambahkan method untuk handle inactivity
@@ -745,6 +772,7 @@ class OptimizedDataPenjualanApp {
       data: [],
       columns: [
         { title: "Tanggal", width: "90px", className: "text-center" },
+        { title: "Jam", width: "75px", className: "text-center" },
         { title: "Sales", width: "80px", className: "text-center" },
         { title: "Jenis", width: "85px", className: "text-center" },
         { title: "Kode", width: "100px", className: "text-center" },
@@ -765,7 +793,7 @@ class OptimizedDataPenjualanApp {
       autoWidth: false,
       columnDefs: [
         { targets: "_all", className: "text-nowrap" },
-        { targets: [10], className: "text-wrap" },
+        { targets: [11], className: "text-wrap" },
       ],
       language: {
         decimal: "",
@@ -954,26 +982,32 @@ class OptimizedDataPenjualanApp {
     uniqueFilteredData.forEach((transaction) => {
       // ✅ PERBAIKAN: Handle timestamp dengan lebih robust
       let displayDate = "-";
+      let displayTime = "-";
 
       if (transaction.timestamp) {
         if (typeof transaction.timestamp.toDate === "function") {
           try {
             displayDate = utils.formatDate(transaction.timestamp.toDate());
+            displayTime = utils.formatTime(transaction.timestamp.toDate());
           } catch (error) {
             console.warn("Error formatting timestamp:", error);
             displayDate = utils.formatDate(transaction.tanggal) || "-";
           }
         } else if (transaction.timestamp instanceof Date) {
           displayDate = utils.formatDate(transaction.timestamp);
+          displayTime = utils.formatTime(transaction.timestamp);
         } else if (
           transaction.timestamp &&
           typeof transaction.timestamp === "object" &&
           transaction.timestamp.seconds
         ) {
-          displayDate = utils.formatDate(new Date(transaction.timestamp.seconds * 1000));
+          const tempDate = new Date(transaction.timestamp.seconds * 1000);
+          displayDate = utils.formatDate(tempDate);
+          displayTime = utils.formatTime(tempDate);
         } else {
           const parsedDate = new Date(transaction.timestamp);
           displayDate = isNaN(parsedDate.getTime()) ? "-" : utils.formatDate(parsedDate);
+          displayTime = isNaN(parsedDate.getTime()) ? "-" : utils.formatTime(parsedDate);
         }
       } else if (transaction.tanggal) {
         displayDate = utils.formatDate(transaction.tanggal);
@@ -981,6 +1015,7 @@ class OptimizedDataPenjualanApp {
 
       const baseData = {
         date: displayDate,
+        time: displayTime,
         sales: transaction.sales || "Admin",
         jenis: this.formatJenisPenjualan(transaction),
         status: this.getStatusBadge(transaction),
@@ -991,6 +1026,7 @@ class OptimizedDataPenjualanApp {
         transaction.items.forEach((item) => {
           tableData.push([
             baseData.date,
+            baseData.time,
             baseData.sales,
             baseData.jenis,
             item.kodeText || item.barcode || "-",
@@ -1007,6 +1043,7 @@ class OptimizedDataPenjualanApp {
       } else {
         tableData.push([
           baseData.date,
+          baseData.time,
           baseData.sales,
           baseData.jenis,
           "-",
@@ -1608,117 +1645,30 @@ class OptimizedDataPenjualanApp {
       return utils.showAlert("Tidak ada data transaksi untuk dicetak!");
     }
 
-    const tx = this.currentTransaction;
+    const transaction = this.currentTransaction;
 
+    // Khusus invoice manual dengan >1 item: cetak per item satu-satu via iframe (anti duplikat)
     if (
       type === "invoice" &&
-      (tx.jenisPenjualan === "manual" || tx.isGantiLock) &&
-      Array.isArray(tx.items) &&
-      tx.items.length > 1
+      transaction &&
+      transaction.jenisPenjualan === "manual" &&
+      Array.isArray(transaction.items) &&
+      transaction.items.length > 1
     ) {
-      // Cetak invoice per item untuk penjualan manual dengan banyak item
-      this.printInvoicePerItem(tx);
-      return;
+      try {
+        $("#printModal").modal("hide");
+      } catch (_) {}
+      return this.printInvoicePerItem(transaction);
     }
 
+    // Fallback: gunakan window.open untuk struk atau invoice biasa (single)
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
       return utils.showAlert("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak.", "Error", "error");
     }
-
-    const html = type === "receipt" ? this.generateReceiptHTML(tx) : this.generateInvoiceHTML(tx);
+    const html = type === "receipt" ? this.generateReceiptHTML(transaction) : this.generateInvoiceHTML(transaction);
     printWindow.document.write(html);
     printWindow.document.close();
-  }
-
-  // Print separate invoices per item for manual sales
-  printInvoicePerItem(tx) {
-    const buildItemHTML = (item) => {
-      const tanggal = utils.formatDate(tx.timestamp || tx.tanggal) || "";
-      const itemHarga = parseInt(item.totalHarga || 0) || 0;
-      const keterangan = item.keterangan ? String(item.keterangan).trim() : "";
-
-      return `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Invoice Customer</title>
-          <style>${this.INVOICE_CSS}</style>
-        </head>
-        <body>
-          <div class="invoice">
-            <div class="header-info"><p>${tanggal}</p></div>
-            <div class="customer-info">
-              <div>${tx.customerName || "-"}</div>
-              <div>${tx.customerPhone || ""}</div>
-            </div>
-            <div class="item-details">
-              <div class="item-data">
-                <span>${item.kodeText || item.kode || "-"}</span>
-                <span>${item.jumlah || "1"}pcs</span>
-                <span>${item.nama || item.namaBarang || "-"}</span>
-                <span>${item.kadar || "-"}</span>
-                <span>${item.berat || item.gr || "-"}gr</span>
-                <span>${utils.formatRupiah(itemHarga)}</span>
-              </div>
-            </div>
-            ${keterangan ? `<div class="keterangan"><strong>Keterangan:</strong><br>${keterangan}</div>` : ""}
-            <div class="total-row">Rp ${utils.formatRupiah(itemHarga)}</div>
-            <div class="sales">${tx.sales || "-"}</div>
-          </div>
-        </body>
-        </html>
-      `;
-    };
-
-    const printViaIframe = (html) =>
-      new Promise((resolve) => {
-        const iframe = document.createElement("iframe");
-        iframe.style.position = "fixed";
-        iframe.style.right = "0";
-        iframe.style.bottom = "0";
-        iframe.style.width = "0";
-        iframe.style.height = "0";
-        iframe.style.border = "0";
-        document.body.appendChild(iframe);
-
-        const w = iframe.contentWindow;
-        const d = w.document;
-        d.open();
-        d.write(html);
-        d.close();
-
-        const cleanup = () => {
-          setTimeout(() => {
-            document.body.removeChild(iframe);
-            resolve();
-          }, 150);
-        };
-
-        const onAfterPrint = () => {
-          try {
-            w.removeEventListener("afterprint", onAfterPrint);
-          } catch (e) {}
-          cleanup();
-        };
-
-        try {
-          w.addEventListener("afterprint", onAfterPrint);
-        } catch (e) {}
-
-        w.focus();
-        setTimeout(() => {
-          w.print();
-          setTimeout(cleanup, 1000);
-        }, 50);
-      });
-
-    (async () => {
-      for (const item of tx.items || []) {
-        const html = buildItemHTML(item);
-        await printViaIframe(html);
-      }
-    })();
   }
 
   // Generate receipt HTML
@@ -1728,48 +1678,41 @@ class OptimizedDataPenjualanApp {
     if (salesType === "manual") salesType = "manual";
 
     let receiptHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Struk Kasir</title>
-        <style>
-          body { font-family: consolas; font-size: 12px; margin: 0; padding: 0; width: 80mm; }
-          .receipt { margin: 0 auto; padding: 5mm; }
-          .receipt h3, .receipt h4 { text-align: center; margin: 2mm 0; }
-          .receipt hr { border-top: 1px dashed #000; }
-          .receipt table { width: 100%; border-collapse: collapse; }
-          .receipt th, .receipt td { text-align: left; padding: 1mm 2mm; }
-          .tanggal {margin-left: 10px}
-          .text-center { text-align: center; }
-          .text-right { text-align: right; }
-          .keterangan { font-style: italic; font-size: 14px; margin-top: 2mm; border-top: 1px dotted #000; padding-top: 2mm; }
-          .payment-info { margin-top: 2mm; border-top: 1px dotted #000; padding-top: 2mm; }
-        </style>
-      </head>
-      <body>
-        <div class="receipt">
-          <h3>MELATI 3</h3>
-          <h4>JL. DIPONEGORO NO. 116</h4>
-          <h4>NOTA PENJUALAN ${salesType.toUpperCase()}</h4>
-          <hr>
-          <p class="tanggal">Tanggal: ${tanggal}<br>Sales: ${transaction.sales || "-"}</p>
-          ${
-            transaction.customerName || transaction.customerPhone
-              ? `<p class="tanggal">Customer: ${transaction.customerName || "-"}${
-                  transaction.customerPhone ? ` | Tlp: ${transaction.customerPhone}` : ""
-                }</p>`
-              : ""
-          }
-          <hr>
-          <table>
-            <tr>
-              <th>Kode</th>
-              <th>Nama</th>
-              <th>Kadar</th>
-              <th>Gr</th>
-              <th>Harga</th>
-            </tr>
-    `;
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Struk Kasir</title>
+      <style>
+        body { font-family: consolas; font-size: 12px; margin: 0; padding: 0; width: 80mm;}
+        .receipt { margin: 0 auto; padding: 5mm; }
+        .receipt h3, .receipt h4 { text-align: center; margin: 2mm 0; }
+        .receipt hr { border-top: 1px dashed #000; }
+        .receipt table { width: 100%; border-collapse: collapse; }
+        .receipt th, .receipt td { text-align: left; padding: 1mm 2mm; }
+        .tanggal {margin-left: 10px}
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .keterangan { font-style: italic; font-size: 14px; margin-top: 2mm; border-top: 1px dotted #000; padding-top: 2mm; }
+        .payment-info { margin-top: 2mm; border-top: 1px dotted #000; padding-top: 2mm; }
+      </style>
+    </head>
+    <body>
+      <div class="receipt d-flex justify-content-center">
+        <h3>MELATI 3</h3>
+        <h4>JL. DIPONEGORO NO. 116</h4>
+        <h4>NOTA PENJUALAN ${salesType.toUpperCase()}</h4>
+        <hr>
+        <p class="tanggal">Tanggal: ${tanggal}<br>Sales: ${transaction.sales || "-"}</p>
+        <hr>
+        <table>
+          <tr>
+            <th>Kode</th>
+            <th>Nama</th>
+            <th>Kadar</th>
+            <th>Gr</th>
+            <th>Harga</th>
+          </tr>
+  `;
 
     let hasKeterangan = false;
     let keteranganText = "";
@@ -1777,14 +1720,14 @@ class OptimizedDataPenjualanApp {
     transaction.items?.forEach((item) => {
       const itemHarga = parseInt(item.totalHarga || 0);
       receiptHTML += `
-        <tr>
-          <td>${item.kodeText || "-"}</td>
-          <td>${item.nama || "-"}</td>
-          <td>${item.kadar || "-"}</td>
-          <td>${item.berat || "-"}</td>
-          <td class="text-right">${utils.formatRupiah(itemHarga)}</td>
-        </tr>
-      `;
+      <tr>
+        <td>${item.kodeText || "-"}</td>
+        <td>${item.nama || "-"}</td>
+        <td>${item.kadar || "-"}</td>
+        <td>${item.berat || "-"}</td>
+        <td class="text-right">${utils.formatRupiah(itemHarga)}</td>
+      </tr>
+    `;
 
       if (item.keterangan && item.keterangan.trim() !== "") {
         hasKeterangan = true;
@@ -1794,59 +1737,87 @@ class OptimizedDataPenjualanApp {
 
     const totalHarga = parseInt(transaction.totalHarga || 0);
     receiptHTML += `
-            <tr>
-              <td colspan="4" class="text-right"><strong>Total:</strong></td>
-              <td class="text-right"><strong>${utils.formatRupiah(totalHarga)}</strong></td>
-            </tr>
-          </table>
-    `;
+          <tr>
+            <td colspan="4" class="text-right"><strong>Total:</strong></td>
+            <td class="text-right"><strong>${utils.formatRupiah(totalHarga)}</strong></td>
+          </tr>
+        </table>
+  `;
 
-    // Add DP information if applicable
+    // PERBAIKAN: Add DP information dengan logika yang benar
     if (transaction.metodeBayar === "dp" || transaction.statusPembayaran === "DP") {
       const dpAmount = parseInt(transaction.nominalDP || 0);
-      const remainingAmount = parseInt(transaction.sisaPembayaran || 0);
 
       receiptHTML += `
-        <div class="payment-info">
-          <table>
-            <tr>
-              <td>Total Harga:</td>
-              <td class="text-right">${utils.formatRupiah(totalHarga)}</td>
-            </tr>
-            <tr>
-              <td>DP:</td>
-              <td class="text-right">${utils.formatRupiah(dpAmount)}</td>
-            </tr>
-            <tr>
-              <td><strong>SISA:</strong></td>
-              <td class="text-right"><strong>${utils.formatRupiah(remainingAmount)}</strong></td>
-            </tr>
-          </table>
-        </div>
+      <div class="payment-info">
+        <table>
+          <tr>
+            <td>Total Harga:</td>
+            <td class="text-right">${utils.formatRupiah(totalHarga)}</td>
+          </tr>
+          <tr>
+            <td>DP:</td>
+            <td class="text-right">${utils.formatRupiah(dpAmount)}</td>
+          </tr>
+    `;
+
+      // PERBAIKAN: Logika untuk menampilkan SISA atau KEMBALIAN
+      if (dpAmount >= totalHarga) {
+        // Jika DP >= total, tampilkan kembalian (jika ada)
+        if (dpAmount > totalHarga) {
+          const kembalian = dpAmount - totalHarga;
+          receiptHTML += `
+          <tr>
+            <td><strong>KEMBALIAN:</strong></td>
+            <td class="text-right"><strong>${utils.formatRupiah(kembalian)}</strong></td>
+          </tr>
+        `;
+        } else {
+          // Jika DP = total, tampilkan LUNAS
+          receiptHTML += `
+          <tr>
+            <td colspan="2" class="text-center"><strong>LUNAS</strong></td>
+          </tr>
+        `;
+        }
+      } else {
+        // Jika DP < total, tampilkan sisa pembayaran
+        const remainingAmount = parseInt(transaction.sisaPembayaran || 0);
+        receiptHTML += `
+        <tr>
+          <td><strong>SISA:</strong></td>
+          <td class="text-right"><strong>${utils.formatRupiah(remainingAmount)}</strong></td>
+        </tr>
       `;
+      }
+
+      receiptHTML += `
+        </table>
+      </div>
+    `;
     }
 
     if (hasKeterangan && transaction.jenisPenjualan === "manual") {
       receiptHTML += `
-        <div class="keterangan">
-          <strong>Keterangan:</strong> ${keteranganText.trim()}
-        </div>
-      `;
+      <div class="keterangan">
+        <strong>Keterangan:</strong> ${keteranganText.trim()}
+      </div>
+    `;
     }
 
     receiptHTML += `
-          <hr>
-          <p class="text-center">Terima Kasih<br>Atas Kunjungan Anda</p>
-        </div>
-        <script>
-          window.onload = function() {
-            window.print();
-            setTimeout(function() { window.close(); }, 500);
-          };
-        </script>
-      </body>
-      </html>
-    `;
+        <hr>
+        <p class="text-center">Terima Kasih<br>Atas Kunjungan Anda</p>
+      </div>
+      <script>
+        window.onload = function() {
+          window.print();
+          setTimeout(function() { window.close(); }, 500);
+        };
+      </script>
+    </body>
+    </html>
+  `;
 
     return receiptHTML;
   }
@@ -1860,11 +1831,27 @@ class OptimizedDataPenjualanApp {
     <html>
     <head>
       <title>Invoice Customer</title>
-      <style>${this.INVOICE_CSS}</style>
+      <style>
+        @page { size: 10cm 20cm; margin: 0; }
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; box-sizing: border-box; }
+        .invoice { width: 100%; }
+        .header-info { text-align: right; margin-bottom: 0.5cm; margin-right: 3cm; margin-top: 0.8cm; }
+        .customer-info { text-align: right; margin-bottom: 1.1cm; margin-right: 3cm; font-size: 11px; line-height: 1.2; }
+        .total-row { margin-top: 0.7cm; text-align: right; font-weight: bold; margin-right: 3cm; }
+        .sales { text-align: right; margin-top: 0.6cm; margin-right: 2cm; }
+        .keterangan { font-style: italic; font-size: 10px; margin-top: 1.2cm; margin-bottom: 0.5cm; padding-top: 2mm; text-align: left; margin-left: 0.5cm; margin-right: 3cm; }
+        .keterangan-spacer { height: 1.6cm; }
+        .item-details { display: flex; flex-wrap: wrap; }
+        .item-data { display: grid; grid-template-columns: 2cm 2.7cm 4.6cm 1.8cm 1.8cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 0.5cm; margin-top: 1cm; margin-right: 3cm; }
+        .item-data span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .item-data span:nth-child(3) { white-space: normal; overflow: visible; text-overflow: clip; word-wrap: break-word; }
+      </style>
     </head>
     <body>
       <div class="invoice">
-        <div class="header-info"><p>${tanggal}</p></div>
+        <div class="header-info">
+          <p>${tanggal}</p>
+        </div>
         <div class="customer-info">
           <div>${transaction.customerName || "-"}</div>
           <div>${transaction.customerPhone || ""}</div>
@@ -1884,7 +1871,7 @@ class OptimizedDataPenjualanApp {
       <div class="item-details">
         <div class="item-data">
           <span>${item.kodeText || "-"}</span>
-          <span>${item.jumlah || "1"}pcs</span>
+          <span>${item.jumlah || " "}pcs</span>
           <span>${item.nama || "-"}</span>
           <span>${item.kadar || "-"}</span>
           <span>${item.berat || "-"}gr</span>
@@ -1930,6 +1917,156 @@ class OptimizedDataPenjualanApp {
   `;
 
     return invoiceHTML;
+  }
+
+  // Cetak invoice per item (khusus penjualan manual > 1 item)
+  printInvoicePerItem(transaction) {
+    if (!transaction?.items || transaction.items.length === 0) {
+      return utils.showAlert("Tidak ada item untuk dicetak.", "Info", "info");
+    }
+
+    const totalItems = transaction.items.length;
+    let index = 0;
+
+    const printNext = () => {
+      if (index >= totalItems) {
+        return; // selesai
+      }
+
+      const item = transaction.items[index];
+      const html = this.generateSingleItemInvoiceHTML(transaction, item, index + 1, totalItems);
+      this.printViaIframe(html, () => {
+        index += 1;
+        // beri jeda singkat antar cetak untuk stabilitas printer
+        setTimeout(printNext, 200);
+      });
+    };
+
+    printNext();
+  }
+
+  // Template invoice untuk satu item (tanpa auto window.print di onload)
+  generateSingleItemInvoiceHTML(transaction, item, itemIndex, itemTotal) {
+    const tanggal = utils.formatDate(transaction.timestamp || transaction.tanggal);
+    const itemHarga = parseInt(item?.totalHarga || 0);
+    const keteranganText =
+      transaction.jenisPenjualan === "manual" && item?.keterangan && item.keterangan.trim() !== ""
+        ? `<div class="keterangan"><strong>Keterangan:</strong><br>${item.keterangan.trim()}</div>`
+        : `<div class="keterangan-spacer"></div>`;
+
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Invoice Customer - Item ${itemIndex}/${itemTotal}</title>
+      <style>
+        @page { size: 10cm 20cm; margin: 0; }
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; box-sizing: border-box; }
+        .invoice { width: 100%; }
+        .header-info { text-align: right; margin-bottom: 0.5cm; margin-right: 3cm; margin-top: 0.8cm; }
+        .customer-info { text-align: right; margin-bottom: 1.1cm; margin-right: 3cm; font-size: 11px; line-height: 1.2; }
+        .total-row { margin-top: 0.7cm; text-align: right; font-weight: bold; margin-right: 3cm; }
+        .sales { text-align: right; margin-top: 0.6cm; margin-right: 2cm; }
+        .keterangan { font-style: italic; font-size: 10px; margin-top: 1.2cm; margin-bottom: 0.5cm; padding-top: 2mm; text-align: left; margin-left: 0.5cm; margin-right: 3cm; }
+        .keterangan-spacer { height: 1.6cm; }
+        .item-details { display: flex; flex-wrap: wrap; }
+        .item-data { display: grid; grid-template-columns: 2cm 2.7cm 4.6cm 1.8cm 1.8cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 0.5cm; margin-top: 1cm; margin-right: 3cm; }
+        .item-data span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .item-data span:nth-child(3) { white-space: normal; overflow: visible; text-overflow: clip; word-wrap: break-word; }
+      </style>
+    </head>
+    <body>
+      <div class="invoice">
+        <div class="header-info">
+          <p>${tanggal}</p>
+        </div>
+        <div class="customer-info">
+          <div>${transaction.customerName || "-"}</div>
+          <div>${transaction.customerPhone || ""}</div>
+        </div>
+        <div class="item-details">
+          <div class="item-data">
+            <span>${item?.kodeText || "-"}</span>
+            <span>${item?.jumlah || " "}pcs</span>
+            <span>${item?.nama || "-"}</span>
+            <span>${item?.kadar || "-"}</span>
+            <span>${item?.berat || "-"}gr</span>
+            <span>${utils.formatRupiah(itemHarga)}</span>
+          </div>
+        </div>
+        ${keteranganText}
+        <div class="total-row">Rp ${utils.formatRupiah(itemHarga)}</div>
+        <div class="sales">${transaction.sales || "-"}</div>
+      </div>
+    </body>
+    </html>`;
+  }
+
+  // Controller cetak via iframe tersembunyi (hindari duplikasi)
+  printViaIframe(html, onDone) {
+    try {
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentDocument || iframe.contentWindow.document;
+      doc.open();
+      doc.write(html);
+      doc.close();
+
+      const cleanup = () => {
+        try {
+          if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        } catch (_) {}
+      };
+
+      const handleAfterPrint = () => {
+        try {
+          iframe.contentWindow.removeEventListener("afterprint", handleAfterPrint);
+        } catch (_) {}
+        cleanup();
+        if (typeof onDone === "function") onDone();
+      };
+
+      // Listener afterprint untuk memastikan 1x cetak
+      try {
+        iframe.contentWindow.addEventListener("afterprint", handleAfterPrint);
+      } catch (_) {}
+
+      const tryPrint = () => {
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        } catch (e) {
+          // jika dokumen belum siap, coba lagi
+          return setTimeout(tryPrint, 150);
+        }
+        // Fallback jika afterprint tidak terpanggil
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            try {
+              iframe.contentWindow.removeEventListener("afterprint", handleAfterPrint);
+            } catch (_) {}
+            cleanup();
+            if (typeof onDone === "function") onDone();
+          }
+        }, 2500);
+      };
+
+      if (doc.readyState === "complete") {
+        setTimeout(tryPrint, 50);
+      } else {
+        iframe.onload = () => setTimeout(tryPrint, 50);
+      }
+    } catch (err) {
+      console.error("Print via iframe failed:", err);
+      if (typeof onDone === "function") onDone();
+    }
   }
 
   // Refresh data manually
