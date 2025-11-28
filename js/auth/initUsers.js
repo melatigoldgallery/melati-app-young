@@ -10,7 +10,7 @@ const authorizedUsers = {
     role: 'admin'
   },
   'supervisor': {
-    password: 'svmlt116',
+    password: 'smlt116',
     role: 'supervisor'
   }
 };
