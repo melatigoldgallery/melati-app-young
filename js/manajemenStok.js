@@ -426,7 +426,7 @@ export async function populateTables(options = {}) {
           </td>
           ${actionColumn}
           <td class="text-center">
-            <button class="btn btn-info btn-sm show-history-btn"
+            <button class="btn btn-primary btn-sm show-history-btn"
                     data-main="${mainCat}"
                     data-category="${categoryKey}"
                     title="Lihat Riwayat">

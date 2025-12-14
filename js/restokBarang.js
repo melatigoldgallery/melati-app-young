@@ -29,6 +29,8 @@ const btnSendWA = document.getElementById("btnSendWA");
 const editStatusModal = document.getElementById("editStatusModal");
 const statusSelect = document.getElementById("statusSelect");
 const saveStatusBtn = document.getElementById("saveStatusBtn");
+const inputBarangModal = document.getElementById("inputBarangModal");
+const btnTambahBarang = document.getElementById("btnTambahBarang");
 
 // WhatsApp Setting Modal refs
 const settingWAModal = document.getElementById("settingWAModal");
@@ -328,6 +330,9 @@ if (form) {
           updatedAt: Date.now(),
         });
       }
+      // Close modal
+      const modalInstance = bootstrap.Modal.getInstance(inputBarangModal);
+      if (modalInstance) modalInstance.hide();
       // reset
       inputTbody.innerHTML = "";
       makeRow();
@@ -815,12 +820,12 @@ async function updateChart() {
 
     // Define base colors for gradients
     const baseColors = [
-      { start: "#007f1eff", end: "#8aff9eff" },
-      { start: "#a50000ff", end: "#ff9191ff" },
-      { start: "#ffe100ff", end: "#fff187ff" },
-      { start: "#4BC0C0", end: "#9dfcf1ff" },
-      { start: "#30008fff", end: "#a2a9fcff" },
-      { start: "#994c00ff", end: "#fcb791ff" },
+      { start: "#00ff3cff", end: "#003a0aff" },
+      { start: "#ff0000ff", end: "#570000ff" },
+      { start: "#ffe202ff", end: "#d1b900ff" },
+      { start: "#00ffffff", end: "#008f81ff" },
+      { start: "#5300f8ff", end: "#35008aff" },
+      { start: "#d400ffff", end: "#680091ff" },
     ];
 
     jenisTypes.forEach((jenis) => {
@@ -881,7 +886,20 @@ async function updateChart() {
   }
 }
 
+// Modal Input Barang Functions
+function openInputBarangModal() {
+  // Reset form to clean state
+  inputTbody.innerHTML = "";
+  makeRow();
+  if (tanggalInput) tanggalInput.value = todayStr();
+  new bootstrap.Modal(inputBarangModal).show();
+}
+
 // Event listeners
+if (btnTambahBarang) {
+  btnTambahBarang.addEventListener("click", openInputBarangModal);
+}
+
 // WhatsApp Setting Event Listeners
 if (btnSettingWA) {
   btnSettingWA.addEventListener("click", openWhatsAppSettingModal);

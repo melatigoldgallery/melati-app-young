@@ -10,10 +10,16 @@
       rel="stylesheet"
     />
     <script src="js/jquery-3.6.3.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
     <link rel="stylesheet" href="css/pages/absensi-modern.css" />
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
     <title>Sistem Antrian - Melati Gold Young</title>
@@ -21,186 +27,10 @@
   <body>
     <div class="app-container">
       <aside class="sidebar">
-        <div class="sidebar-header">
-          <img src="img/Melati.jfif" alt="Logo" class="logo" />
-          <h1 class="brand-name">Melati Gold Young</h1>
-        </div>
-        <div class="sidebar-menu">
-          <ul class="nav flex-column" id="sidebarAccordion">
-            <li class="nav-item">
-              <a class="nav-link" href="dashboard.html">
-                <i class="fas fa-tachometer-alt"></i>
-                <span class="menu-text">Dashboard</span>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link active" href="maintenance.html">
-                <i class="fas fa-tools"></i>
-                <span class="menu-text">Maintenance</span>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a
-                class="nav-link collapsed"
-                href="#"
-                data-bs-toggle="collapse"
-                data-bs-target="#barangSubmenu"
-                aria-expanded="false"
-              >
-                <i class="fa-solid fa-cubes"></i>
-                <span class="menu-text">Inventory Barang</span>
-                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
-              </a>
-              <div class="collapse" id="barangSubmenu" data-bs-parent="#sidebarAccordion">
-                <ul class="nav flex-column ms-3">
-                  <li class="nav-item">
-                    <a class="nav-link" href="manajemenStok.html">
-                      <i class="fa-solid fa-boxes-stacked"></i>
-                      <span class="menu-text">Manajemen Stok</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="laporanStokHarian.html">
-                      <i class="fa-solid fa-calendar-xmark"></i>
-                      <span class="menu-text">Laporan Stok Harian</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link active" href="restokBarang.html">
-                      <i class="fa-solid fa-box-open"></i>
-                      <span class="menu-text">Restok Barang</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="mutasiKode.html">
-                      <i class="fa-solid fa-undo-alt"></i>
-                      <span class="menu-text">Mutasi Kode</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-            </li>
-            <li class="nav-item d-none">
-              <a class="nav-link" href="buyback.html">
-                <i class="fas fa-exchange-alt"></i>
-                <span class="menu-text">Buyback</span>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a
-                class="nav-link collapsed"
-                href="#"
-                data-bs-toggle="collapse"
-                data-bs-target="#promosiSubmenu"
-                aria-expanded="false"
-              >
-                <i class="fas fa-ad"></i>
-                <span class="menu-text">Promosi</span>
-                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
-              </a>
-              <div class="collapse" id="promosiSubmenu" data-bs-parent="#sidebarAccordion">
-                <ul class="nav flex-column ms-3">
-                  <li class="nav-item">
-                    <a class="nav-link" href="promosi.html">
-                      <i class="fas fa-cog"></i>
-                      <span class="menu-text">Setting Promosi</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="promosi-display.html">
-                      <i class="fas fa-desktop"></i>
-                      <span class="menu-text">Display Promosi</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-            </li>
-            <li class="nav-item">
-              <a
-                class="nav-link collapsed"
-                href="#"
-                data-bs-toggle="collapse"
-                data-bs-target="#antrianSubmenu"
-                aria-expanded="false"
-              >
-                <i class="fas fa-ticket-alt"></i>
-                <span class="menu-text">Antrian</span>
-                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
-              </a>
-              <div class="collapse" id="antrianSubmenu" data-bs-parent="#sidebarAccordion">
-                <ul class="nav flex-column ms-3">
-                  <li class="nav-item">
-                    <a class="nav-link" href="admin.html">
-                      <i class="fas fa-user-cog"></i>
-                      <span class="menu-text">Admin Antrian</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="display.html">
-                      <i class="fas fa-desktop"></i>
-                      <span class="menu-text">Display Antrian</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="analisis.html">
-                      <i class="fas fa-chart-bar"></i>
-                      <span class="menu-text">Laporan Antrian</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-            </li>
-            <li class="nav-item">
-              <a
-                class="nav-link collapsed"
-                href="#"
-                data-bs-toggle="collapse"
-                data-bs-target="#aksesorisSubmenu"
-                aria-expanded="false"
-              >
-                <i class="fas fa-gem"></i>
-                <span class="menu-text">Aksesoris</span>
-                <i class="fas fa-angle-down ms-auto submenu-icon"></i>
-              </a>
-              <div class="collapse" id="aksesorisSubmenu" data-bs-parent="#sidebarAccordion">
-                <ul class="nav flex-column ms-3">
-                  <li class="nav-item">
-                    <a class="nav-link" href="tambahAksesoris.html">
-                      <i class="fas fa-plus-circle"></i>
-                      <span class="menu-text">Tambah Aksesoris</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="dataPenjualan.html">
-                      <i class="fas fa-shopping-cart"></i>
-                      <span class="menu-text">Penjualan Aksesoris</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="return.html">
-                      <i class="fa-solid fa-arrow-rotate-left"></i>
-                      <span class="menu-text">Return Aksesoris</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="laporanPenjualan.html">
-                      <i class="fas fa-chart-line"></i>
-                      <span class="menu-text">Laporan Penjualan</span>
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="laporanStok.html">
-                      <i class="fas fa-boxes"></i>
-                      <span class="menu-text">Laporan Stok</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-            </li>
-          </ul>
-        </div>
-        <div class="sidebar-footer">
-          <p>© 2025 Melati Gold Shop</p>
+        <div class="text-center p-3">
+          <div class="spinner-border spinner-border-sm text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
         </div>
       </aside>
 
@@ -379,15 +209,30 @@
               <div class="row">
                 <div class="col-md-4 mb-3">
                   <label for="vehicleType" class="form-label">Jenis Kendaraan</label>
-                  <input type="text" class="form-control" id="carType" placeholder="Contoh: Mobil Alphard" />
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="carType"
+                    placeholder="Contoh: Mobil Alphard"
+                  />
                 </div>
                 <div class="col-md-4 mb-3">
                   <label for="vehicleColor" class="form-label">Warna Kendaraan</label>
-                  <input type="text" class="form-control" id="vehicleColor" placeholder="Contoh: Hitam" />
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="vehicleColor"
+                    placeholder="Contoh: Hitam"
+                  />
                 </div>
                 <div class="col-md-4 mb-3">
                   <label for="vehiclePlate" class="form-label">Nomor Plat</label>
-                  <input type="text" class="form-control" id="plateNumber" placeholder="Contoh: B 1234 ABC" />
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="plateNumber"
+                    placeholder="Contoh: B 1234 ABC"
+                  />
                 </div>
               </div>
               <div class="d-flex justify-content-end">
@@ -465,11 +310,19 @@
                 <div class="modal-body">
                   <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    <span>Anda akan menandai nomor antrian tertunda ini sebagai sudah dilayani.</span>
+                    <span
+                      >Anda akan menandai nomor antrian tertunda ini sebagai sudah dilayani.</span
+                    >
                   </div>
                   <div class="form-group mb-3">
-                    <label for="delayedQueueSelect" class="form-label">Pilih nomor antrian yang sudah dilayani:</label>
-                    <select class="form-select" id="delayedQueueSelect" aria-label="Pilih nomor antrian"></select>
+                    <label for="delayedQueueSelect" class="form-label"
+                      >Pilih nomor antrian yang sudah dilayani:</label
+                    >
+                    <select
+                      class="form-select"
+                      id="delayedQueueSelect"
+                      aria-label="Pilih nomor antrian"
+                    ></select>
                   </div>
                 </div>
                 <div class="modal-footer">
@@ -527,7 +380,9 @@
                     </select>
                   </div>
                   <div class="mb-3">
-                    <label for="skipQueueNumberInput" class="form-label">Nomor Antrian yang Akan Dilewati (1-50)</label>
+                    <label for="skipQueueNumberInput" class="form-label"
+                      >Nomor Antrian yang Akan Dilewati (1-50)</label
+                    >
                     <input
                       type="number"
                       class="form-control"
@@ -721,10 +576,15 @@
                     <strong>Perhatian!</strong>
                     Tindakan ini akan mereset nomor antrian.
                   </div>
-                  <p>Apakah Anda yakin ingin mereset nomor antrian? Tindakan ini tidak dapat dibatalkan.</p>
+                  <p>
+                    Apakah Anda yakin ingin mereset nomor antrian? Tindakan ini tidak dapat
+                    dibatalkan.
+                  </p>
                 </div>
                 <div class="modal-footer">
-                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Batal
+                  </button>
                   <button type="button" class="btn btn-danger" id="confirmResetBtn">
                     <i class="fas fa-redo-alt me-2"></i>
                     Ya, Reset Antrian
@@ -733,103 +593,108 @@
               </div>
             </div>
           </div>
+          <script src="js/sidebar-loader.js"></script>
           <script type="module" src="js/melati.js"></script>
           <script type="module" src="js/main.js"></script>
           <script type="module">
-            import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
-            import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+            import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js'
+            import {
+              getDatabase,
+              ref,
+              onValue,
+            } from 'https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js'
           </script>
           <script type="module">
-            import { playClosingAnnouncement, primeAudioPlayback } from "./js/audioHandlers.js";
+            import { playClosingAnnouncement, primeAudioPlayback } from './js/audioHandlers.js'
 
             const MESSAGE =
-              "Kepada pelanggan Melati, kami informasikan, toko akan tutup pada jam 9 malam. Silakan melanjutkan berbelanja dan kami akan membantu hingga selesai. Terima kasih atas perhatiannya";
+              'Kepada pelanggan Melati, kami informasikan, toko akan tutup pada jam 9 malam. Silakan melanjutkan berbelanja dan kami akan membantu hingga selesai. Terima kasih atas perhatiannya'
 
-            const SLOTS = [{ h: 20, m: 55, repeat: 2 }];
+            const SLOTS = [{ h: 20, m: 55, repeat: 2 }]
 
-            let lastAutoRunSlot = null;
-            const AUTO_RUN_STORAGE_KEY = "closing_auto_run_slot";
+            let lastAutoRunSlot = null
+            const AUTO_RUN_STORAGE_KEY = 'closing_auto_run_slot'
             const makeSlotKey = (dateObj, hour, minute) => {
-              const d = dateObj || new Date();
-              const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+              const d = dateObj || new Date()
+              const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
                 d.getDate()
-              ).padStart(2, "0")}`;
-              const hm = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-              return `${day}|${hm}`;
-            };
+              ).padStart(2, '0')}`
+              const hm = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+              return `${day}|${hm}`
+            }
 
             async function triggerAutoForSlot(targetHour, targetMinute, repeatCount = 1) {
-              const slotKey = makeSlotKey(new Date(), targetHour, targetMinute);
-              if (lastAutoRunSlot === slotKey) return;
+              const slotKey = makeSlotKey(new Date(), targetHour, targetMinute)
+              if (lastAutoRunSlot === slotKey) return
               if (localStorage.getItem(AUTO_RUN_STORAGE_KEY) === slotKey) {
-                lastAutoRunSlot = slotKey;
-                return;
+                lastAutoRunSlot = slotKey
+                return
               }
               try {
-                localStorage.setItem(AUTO_RUN_STORAGE_KEY, slotKey);
+                localStorage.setItem(AUTO_RUN_STORAGE_KEY, slotKey)
               } catch (e) {}
-              lastAutoRunSlot = slotKey;
+              lastAutoRunSlot = slotKey
               for (let i = 0; i < repeatCount; i++) {
-                await playClosingAnnouncement(MESSAGE);
+                await playClosingAnnouncement(MESSAGE)
                 if (i < repeatCount - 1) {
-                  await new Promise((r) => setTimeout(r, 1000));
+                  await new Promise((r) => setTimeout(r, 1000))
                 }
               }
             }
 
             function scheduleDailyCheck() {
-              const ONE_DAY = 24 * 60 * 60 * 1000;
+              const ONE_DAY = 24 * 60 * 60 * 1000
 
               const computeNextDelayFor = (hour, minute) => {
-                const now = new Date();
-                const target = new Date();
-                target.setHours(hour, minute, 0, 0);
-                let delay = target.getTime() - now.getTime();
-                if (delay < 0) delay += ONE_DAY;
-                return delay;
-              };
+                const now = new Date()
+                const target = new Date()
+                target.setHours(hour, minute, 0, 0)
+                let delay = target.getTime() - now.getTime()
+                if (delay < 0) delay += ONE_DAY
+                return delay
+              }
 
               const scheduleSlot = (hour, minute, repeat = 1) => {
-                const delay = computeNextDelayFor(hour, minute);
+                const delay = computeNextDelayFor(hour, minute)
                 setTimeout(async () => {
-                  await triggerAutoForSlot(hour, minute, repeat);
-                  scheduleSlot(hour, minute, repeat);
-                }, delay);
-              };
+                  await triggerAutoForSlot(hour, minute, repeat)
+                  scheduleSlot(hour, minute, repeat)
+                }, delay)
+              }
 
-              SLOTS.forEach(({ h, m, repeat = 1 }) => scheduleSlot(h, m, repeat));
-              const POLL_MS = 60 * 1000;
-              const WINDOW_MS = 5 * 60 * 1000;
+              SLOTS.forEach(({ h, m, repeat = 1 }) => scheduleSlot(h, m, repeat))
+              const POLL_MS = 60 * 1000
+              const WINDOW_MS = 5 * 60 * 1000
               setInterval(async () => {
-                const now = new Date();
+                const now = new Date()
                 for (const { h, m, repeat = 1 } of SLOTS) {
-                  const target = new Date();
-                  target.setHours(h, m, 0, 0);
-                  const diff = now.getTime() - target.getTime();
+                  const target = new Date()
+                  target.setHours(h, m, 0, 0)
+                  const diff = now.getTime() - target.getTime()
                   if (diff >= 0 && diff < WINDOW_MS) {
-                    await triggerAutoForSlot(h, m, repeat);
+                    await triggerAutoForSlot(h, m, repeat)
                   }
                 }
-              }, POLL_MS);
+              }, POLL_MS)
             }
 
-            document.addEventListener("DOMContentLoaded", () => {
-              scheduleDailyCheck();
-              const btn = document.getElementById("announceClosingNow");
-              if (btn) btn.addEventListener("click", () => playClosingAnnouncement(MESSAGE));
+            document.addEventListener('DOMContentLoaded', () => {
+              scheduleDailyCheck()
+              const btn = document.getElementById('announceClosingNow')
+              if (btn) btn.addEventListener('click', () => playClosingAnnouncement(MESSAGE))
 
               const unlock = () => {
                 try {
-                  primeAudioPlayback();
+                  primeAudioPlayback()
                 } catch (e) {}
-                window.removeEventListener("click", unlock);
-                window.removeEventListener("keydown", unlock);
-                window.removeEventListener("touchstart", unlock);
-              };
-              window.addEventListener("click", unlock);
-              window.addEventListener("keydown", unlock);
-              window.addEventListener("touchstart", unlock);
-            });
+                window.removeEventListener('click', unlock)
+                window.removeEventListener('keydown', unlock)
+                window.removeEventListener('touchstart', unlock)
+              }
+              window.addEventListener('click', unlock)
+              window.addEventListener('keydown', unlock)
+              window.addEventListener('touchstart', unlock)
+            })
           </script>
         </div>
       </main>

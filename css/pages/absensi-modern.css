@@ -3,11 +3,11 @@
   --primary-color: #4361ee;
   --primary-light: #4895ef;
   --primary-dark: #3f37c9;
-  --secondary-color: #f72585;
+  --secondary-color: #a78800;
   --success-color: #05d828;
-  --warning-color: #f0c949;
+  --warning-color: #ffc107;
   --danger-color: #f94144;
-  --light-color: #f8f9fa;
+  --light-color: #ffed9c;
   --dark-color: #212529;
   --gray-100: #f8f9fa;
   --gray-200: #e9ecef;
@@ -115,7 +115,7 @@ body {
     position: relative;
     overflow-x: hidden;
   }
-  
+
   /* Sidebar styling untuk mobile */
   .sidebar {
     position: fixed;
@@ -128,20 +128,20 @@ body {
     z-index: 1050;
     overflow-y: auto;
   }
-  
+
   /* Ketika sidebar aktif */
   .app-container.sidebar-active .sidebar {
     transform: translateX(0); /* Tampilkan sidebar */
     box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
   }
-  
+
   /* Main content selalu penuh di mobile */
   .main-content {
     margin-left: 0 !important;
     width: 100%;
     transition: transform 0.3s ease;
   }
-  
+
   /* Overlay untuk sidebar */
   .sidebar-overlay {
     position: fixed;
@@ -155,54 +155,54 @@ body {
     opacity: 0;
     transition: opacity 0.3s ease;
   }
-  
+
   /* Tampilkan overlay ketika sidebar aktif */
   .app-container.sidebar-active .sidebar-overlay {
     display: block;
     opacity: 1;
   }
-  
+
   /* Pastikan semua elemen di sidebar bisa diklik */
-  .sidebar, 
-  .sidebar *, 
-  .sidebar .nav-link, 
-  .sidebar .collapse, 
+  .sidebar,
+  .sidebar *,
+  .sidebar .nav-link,
+  .sidebar .collapse,
   .sidebar .collapse .nav-link {
     pointer-events: auto !important;
   }
-  
+
   /* Pastikan submenu memiliki z-index yang tepat */
   .sidebar .collapse {
     z-index: 1051;
   }
-  
+
   /* Pastikan top nav sesuai */
   .top-nav {
     left: 0 !important;
     width: 100%;
   }
-  
+
   /* Pastikan hamburger button terlihat */
   .hamburger {
     display: flex !important;
     cursor: pointer;
   }
-  
+
   /* Sembunyikan toggle desktop */
   .menu-toggle {
     display: none !important;
   }
-  
+
   /* Pastikan sidebar-collapsed tidak berpengaruh di mobile */
   .app-container.sidebar-collapsed .sidebar {
     width: var(--sidebar-width);
     transform: translateX(-100%);
   }
-  
+
   .app-container.sidebar-collapsed.sidebar-active .sidebar {
     transform: translateX(0);
   }
-  
+
   .app-container.sidebar-collapsed .main-content {
     margin-left: 0;
   }
@@ -210,18 +210,18 @@ body {
    .dashboard-mobile-content {
     display: block !important;
   }
-  
+
   /* PERBAIKAN: Pastikan konten desktop disembunyikan */
   .dashboard-desktop-content {
     display: none !important;
   }
-  
+
  /* Perbaikan: Menggunakan selector atribut untuk menu Buyback dan Antrian */
 .sidebar-menu .nav-item a[href="buyback.html"], /* Buyback */
 .sidebar-menu .nav-item a[data-bs-target="#antrianSubmenu"] /* Antrian */ {
   display: none;
 }
-  
+
   /* Sembunyikan link absensi bagian kehadiran, laporan kehadiran dan supervisor */
   #absensiSubmenu .nav-item:nth-child(1),
   #absensiSubmenu .nav-item:nth-child(3),
@@ -233,8 +233,8 @@ body {
   padding: 1.5rem;
 }
 
-    #exportExcelBtn, 
-    #exportPdfBtn, 
+    #exportExcelBtn,
+    #exportPdfBtn,
     #deleteDataBtn {
       display: none !important;
     }
@@ -271,6 +271,7 @@ body {
 }
 
 .app-intro-card .card-title {
+  background: linear-gradient(320deg, var(--warning-color) 0%, var(--light-color) 100%);
   font-size: 1.3rem;
   font-weight: 600;
 }
@@ -739,83 +740,11 @@ body {
 }
 
 .queue-card .card-header {
-  background: #f0d16e;
+  background: linear-gradient(320deg, var(--warning-color) 0%, var(--light-color) 100%);
   color: black;
   font-weight: 600;
   border-top-left-radius: var(--border-radius);
   border-top-right-radius: var(--border-radius);
-}
-
-.attendance-summary-card {
-  transition: all 0.3s ease;
-  border-radius: var(--border-radius);
-  overflow: hidden;
-  box-shadow: var(--box-shadow);
-  height: 100%;
-}
-
-.attendance-summary-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
-}
-
-/* Consolidated form styles */
-.form-label {
-  font-weight: 500;
-  color: var(--gray-700);
-  margin-bottom: 8px;
-}
-
-.form-control,
-.form-select {
-  padding: 10px 15px;
-  border: 1px solid var(--gray-300);
-  border-radius: var(--border-radius);
-  font-size: 0.9rem;
-  transition: all 0.2s ease;
-}
-
-.form-control:focus,
-.form-select:focus {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.1);
-}
-
-.form-control::placeholder {
-  color: var(--gray-500);
-}
-
-textarea.form-control {
-  min-height: 100px;
-  resize: vertical;
-}
-
-/* Special form elements */
-.scanner-input-group {
-  display: flex;
-  width: 100%;
-  max-width: 500px;
-  margin-bottom: 15px;
-}
-
-.scanner-input-group input {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-  font-size: 1rem;
-  padding: 12px 15px;
-  border: 2px solid var(--gray-300);
-  border-right: none;
-}
-
-.scanner-input-group input:focus {
-  box-shadow: none;
-  border-color: var(--primary-color);
-}
-
-.scanner-input-group button {
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  padding: 0 20px;
 }
 
 /* Consolidated table styles */
@@ -931,24 +860,13 @@ tr:has(.badge.bg-info) {
   box-shadow: var(--box-shadow);
 }
 
-.modal-header {
-  background-color: var(--primary-color);
-  color: white;
-  border-bottom: none;
-  border-top-left-radius: var(--border-radius);
-  border-top-right-radius: var(--border-radius);
-  padding: 15px 20px;
-}
+
 
 .modal-title {
   font-weight: 600;
 }
 
-.modal-header .btn-close {
-  color: white;
-  box-shadow: none;
-  opacity: 0.8;
-}
+
 
 .modal-body {
   padding: 20px;
@@ -962,8 +880,8 @@ tr:has(.badge.bg-info) {
 /* Sidebar styles */
 .sidebar {
   width: var(--sidebar-width);
-  background: linear-gradient(320deg, var(--warning-color) 0%, var(--dark-color) 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--light-color) 0%, var(--warning-color) 100%);
+  color: rgb(12, 12, 12);
   height: 100vh;
   position: fixed;
   top: 0;
@@ -1018,7 +936,7 @@ tr:has(.badge.bg-info) {
   display: flex;
   align-items: center;
   padding: 8px 15px;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgb(12, 12, 12);
   text-decoration: none;
   transition: all 0.2s ease;
   border-left: 3px solid transparent;
@@ -1027,8 +945,8 @@ tr:has(.badge.bg-info) {
 
 .sidebar .nav-link:hover,
 .sidebar .nav-link.active {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: white;
+  background-color: rgba(250, 250, 250, 0.1);
+  color: rgb(37, 37, 37);
   border-left-color: var(--secondary-color);
 }
 
@@ -1061,7 +979,7 @@ tr:has(.badge.bg-info) {
 }
 
 .sidebar .collapse {
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: rgba(255, 255, 255, 0.137);
   transition: all 0.3s ease;
 }
 
@@ -1074,7 +992,7 @@ tr:has(.badge.bg-info) {
   padding: 15px 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgb(12, 12, 12);
   text-align: center;
   transition: opacity var(--transition-speed) ease;
 }
@@ -1230,15 +1148,15 @@ tr:has(.badge.bg-info) {
 .user-profile {
   display: flex;
   align-items: center;
-  
+
 }
 
 .user-avatar {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: linear-gradient(320deg, var(--warning-color) 0%, var(--dark-color) 100%);
-  color: white;
+  background: linear-gradient(320deg, var(--warning-color) 0%, var(--light-color) 100%);
+  color: rgb(12, 12, 12);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1277,7 +1195,7 @@ tr:has(.badge.bg-info) {
 }
 
 .breadcrumb-item a {
-  color: var(--primary-color);
+  color: var(--dark-color);
   text-decoration: none;
 }
 
@@ -1669,4 +1587,66 @@ tr:has(.badge.bg-info) {
 
 .app-container.sidebar-active .sidebar-overlay {
   display: block;
+}
+
+
+.btn-success, .bg-success {
+  background: linear-gradient(135deg, #24973f 0%, #075840 100%);
+  color: white;
+}
+
+.btn-success:hover, .btn-outline-success:hover {
+  background: linear-gradient(135deg, #3fbe5d 0%, #075840 100%);
+}
+
+.btn-primary, .bg-primary {
+  background: linear-gradient(135deg, #748dff 0%, #3f37c9 100%);
+  color: white;
+  border: none;
+}
+
+.btn-primary:hover, .btn-outline-primary:hover {
+  background: linear-gradient(135deg, #8079ff 0%, #3730a3 100%);
+}
+
+.btn-warning, .bg-warning {
+  background: linear-gradient(135deg, #ffc107 0%, #f8961e 100%);
+  color: rgb(27, 27, 27);
+  border: none;
+}
+
+.btn-warning:hover, .btn-outline-warning:hover {
+  background: linear-gradient(135deg, #ffc074 0%, #e68a00 100%);
+}
+
+.btn-danger, .bg-danger {
+  background: linear-gradient(135deg, #f94144 0%, #d62828 100%);
+  color: white;
+  border: none;
+}
+
+.btn-danger:hover, .btn-outline-danger:hover {
+  background: linear-gradient(135deg, #ff6e6e 0%, #c21616 100%);
+}
+
+.btn-secondary, .bg-secondary {
+  background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+  color: white;
+  border: none;
+}
+
+.btn-secondary:hover, .btn-outline-secondary:hover {
+  background: linear-gradient(135deg, #b9b9b9 0%, #343a40 100%);
+}
+
+.btn-info {
+  background: linear-gradient(135deg, #0dcaf0 0%, #0aa2c0 100%);
+}
+
+.btn-info:hover {
+  background: linear-gradient(135deg, #5ddaf3 0%, #0aa2c0 100%);
+}
+
+.btn-daily {
+  font-size: 0.7rem;
 }
