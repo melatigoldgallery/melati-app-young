@@ -945,7 +945,7 @@ tr:has(.badge.bg-info) {
 
 .sidebar .nav-link:hover,
 .sidebar .nav-link.active {
-  background-color: rgba(250, 250, 250, 0.1);
+  background-color: rgba(250, 250, 250, 0.253);
   color: rgb(37, 37, 37);
   border-left-color: var(--secondary-color);
 }
@@ -979,7 +979,6 @@ tr:has(.badge.bg-info) {
 }
 
 .sidebar .collapse {
-  background-color: rgba(255, 255, 255, 0.137);
   transition: all 0.3s ease;
 }
 
