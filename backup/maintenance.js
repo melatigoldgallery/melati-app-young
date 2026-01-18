@@ -1,9 +1,9 @@
-﻿/**
+/**
  * Maintenance System for Melati Gold Shop
  * Handles data exports and cleanup with enhanced caching
  */
 
-import { firestore } from "../configFirebase.js";
+import { firestore } from "./configFirebase.js";
 import {
   collection,
   getDocs,
@@ -17,46 +17,7 @@ import {
   writeBatch,
   serverTimestamp,
   updateDoc,
-  onSnapshot,
-  getDoc,
-  getCountFromServer,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
-
-/**
- * Collection configurations for maintenance operations
- */
-const COLLECTION_CONFIGS = {
-  dailyStokSnapshot: {
-    name: "dailyStokSnapshot",
-    dateField: "date",
-    dateType: "string", // YYYY-MM-DD format
-    label: "Daily Stok Snapshot",
-  },
-  daily_stock_logs: {
-    name: "daily_stock_logs",
-    dateField: "date",
-    dateType: "string",
-    label: "Daily Stock Logs",
-  },
-  daily_stock_reports: {
-    name: "daily_stock_reports",
-    dateField: "date",
-    dateType: "string",
-    label: "Daily Stock Reports",
-  },
-  penjualanAksesoris: {
-    name: "penjualanAksesoris",
-    dateField: "timestamp",
-    dateType: "timestamp",
-    label: "Penjualan Aksesoris",
-  },
-  stokAksesorisTransaksi: {
-    name: "stokAksesorisTransaksi",
-    dateField: "timestamp",
-    dateType: "timestamp",
-    label: "Stok Transaksi",
-  },
-};
 
 /**
  * Cache Manager for Export Operations
@@ -68,92 +29,8 @@ class MaintenanceCacheManager {
     this.dataCache = new Map(); // In-memory cache
     this.cacheTimestamps = new Map(); // Track cache timestamps
 
-    // Data cache per collection per date: Map<collection_date, Map<docId, data>>
-    this.collectionDataCache = new Map();
-    this.collectionCacheTimestamps = new Map();
-
     // Load cache from sessionStorage on initialization
     this.loadCacheFromStorage();
-  }
-
-  /**
-   * Get cache key for collection data
-   */
-  getCollectionCacheKey(collection, date) {
-    return `${collection}_${date}`;
-  }
-
-  /**
-   * Set collection data cache
-   */
-  setCollectionData(collection, date, docId, data) {
-    const key = this.getCollectionCacheKey(collection, date);
-
-    if (!this.collectionDataCache.has(key)) {
-      this.collectionDataCache.set(key, new Map());
-      this.collectionCacheTimestamps.set(key, Date.now());
-    }
-
-    this.collectionDataCache.get(key).set(docId, data);
-  }
-
-  /**
-   * Get collection data cache
-   */
-  getCollectionData(collection, date) {
-    const key = this.getCollectionCacheKey(collection, date);
-    const timestamp = this.collectionCacheTimestamps.get(key);
-
-    if (!timestamp || Date.now() - timestamp > this.dataTTL) {
-      this.collectionDataCache.delete(key);
-      this.collectionCacheTimestamps.delete(key);
-      return null;
-    }
-
-    return this.collectionDataCache.get(key);
-  }
-
-  /**
-   * Update single document in cache
-   */
-  updateCollectionDoc(collection, date, docId, data) {
-    const key = this.getCollectionCacheKey(collection, date);
-    const cache = this.collectionDataCache.get(key);
-
-    if (cache) {
-      cache.set(docId, data);
-    }
-  }
-
-  /**
-   * Remove document from cache
-   */
-  removeCollectionDoc(collection, date, docId) {
-    const key = this.getCollectionCacheKey(collection, date);
-    const cache = this.collectionDataCache.get(key);
-
-    if (cache) {
-      cache.delete(docId);
-    }
-  }
-
-  /**
-   * Clear collection cache
-   */
-  clearCollectionCache(collection, date = null) {
-    if (date) {
-      const key = this.getCollectionCacheKey(collection, date);
-      this.collectionDataCache.delete(key);
-      this.collectionCacheTimestamps.delete(key);
-    } else {
-      // Clear all cache for collection
-      for (const key of this.collectionDataCache.keys()) {
-        if (key.startsWith(`${collection}_`)) {
-          this.collectionDataCache.delete(key);
-          this.collectionCacheTimestamps.delete(key);
-        }
-      }
-    }
   }
 
   /**
@@ -193,6 +70,8 @@ class MaintenanceCacheManager {
       sessionStorage.setItem(`${this.prefix}cache_data`, JSON.stringify(cacheData));
       sessionStorage.setItem(`${this.prefix}cache_timestamps`, JSON.stringify(cacheTimestamps));
     } catch (error) {
+      console.warn("Failed to save maintenance cache to storage:", error);
+      // Clear old cache if storage is full
       this.clearOldCache();
     }
   }
@@ -250,7 +129,7 @@ class MaintenanceCacheManager {
       sessionStorage.removeItem(`${this.prefix}cache_data`);
       sessionStorage.removeItem(`${this.prefix}cache_timestamps`);
     } catch (error) {
-      // Silent fail
+      console.warn("Failed to clear cache from storage:", error);
     }
   }
 
@@ -284,14 +163,11 @@ class MaintenanceCacheManager {
 class MaintenanceSystem {
   constructor() {
     this.firestore = firestore;
+    this.exportedMonths = new Set(); // Track exported months
     this.cache = new MaintenanceCacheManager();
     this.isLoading = false;
     this.currentOperation = null;
 
-    // Realtime listeners management
-    this.activeListeners = new Map(); // Map<listenerKey, unsubscribe>
-    this.currentDate = null;
-    this.currentPenjualanDate = null;
     this.init();
   }
 
@@ -303,6 +179,9 @@ class MaintenanceSystem {
       this.initializeElements();
       this.attachEventListeners();
       this.setDefaultDates();
+      this.updateDeleteButtonState();
+
+      console.log("Maintenance system initialized successfully");
     } catch (error) {
       console.error("Error initializing maintenance system:", error);
       this.showAlert("Gagal menginisialisasi sistem maintenance", "error");
@@ -314,11 +193,15 @@ class MaintenanceSystem {
    */
   initializeElements() {
     // Input elements
+    this.exportMonthInput = document.getElementById("exportMonth");
     this.deleteMonthInput = document.getElementById("deleteMonth");
-    this.collectionSelect = document.getElementById("collectionSelect");
 
     // Button elements
     this.btnDeleteOldData = document.getElementById("btnDeleteOldData");
+
+    // Export buttons
+    this.btnExportPenjualan = document.getElementById("btnExportPenjualan");
+    this.btnExportStockAdditions = document.getElementById("btnExportStockAdditions");
 
     // Data management elements
     this.filterDateInput = document.getElementById("filterDate");
@@ -331,20 +214,6 @@ class MaintenanceSystem {
     this.btnShowPenjualan = document.getElementById("btnShowPenjualan");
     this.penjualanTableBody = document.getElementById("penjualanTableBody");
     this.penjualanLoading = document.getElementById("penjualanLoading");
-
-    // Validate critical elements
-    const criticalElements = [
-      { name: "deleteMonthInput", element: this.deleteMonthInput },
-      { name: "collectionSelect", element: this.collectionSelect },
-      { name: "btnDeleteOldData", element: this.btnDeleteOldData },
-      { name: "dataTableBody", element: this.dataTableBody },
-    ];
-
-    const missingElements = criticalElements.filter((e) => !e.element).map((e) => e.name);
-
-    if (missingElements.length > 0) {
-      throw new Error(`Missing critical DOM elements: ${missingElements.join(", ")}`);
-    }
   }
 
   /**
@@ -352,27 +221,25 @@ class MaintenanceSystem {
    */
   attachEventListeners() {
     // Delete old data
-    if (this.btnDeleteOldData) {
-      this.btnDeleteOldData.addEventListener("click", () => this.handleDeleteOldData());
-    }
+    this.btnDeleteOldData.addEventListener("click", () => this.handleDeleteOldData());
+
+    // Export buttons
+    this.btnExportPenjualan.addEventListener("click", () => this.handleExportData("penjualanAksesoris"));
+    this.btnExportStockAdditions.addEventListener("click", () => this.handleExportData("stockAdditions"));
+
+    // Month selection change listeners
+    this.exportMonthInput.addEventListener("change", () => this.onExportMonthChange());
+    this.deleteMonthInput.addEventListener("change", () => this.onDeleteMonthChange());
 
     // Data management listeners
-    if (this.btnShowData) {
-      this.btnShowData.addEventListener("click", () => this.handleShowData());
-    }
-    if (this.filterDateInput) {
-      this.filterDateInput.addEventListener("change", () => this.onFilterDateChange());
-    }
+    this.btnShowData.addEventListener("click", () => this.handleShowData());
+    this.filterDateInput.addEventListener("change", () => this.onFilterDateChange());
 
     // Penjualan Aksesoris listeners
-    if (this.btnShowPenjualan) {
-      this.btnShowPenjualan.addEventListener("click", () => this.handleShowPenjualan());
-    }
-    if (this.filterDatePenjualan) {
-      this.filterDatePenjualan.addEventListener("change", () => {
-        if (this.filterDatePenjualan.value) this.handleShowPenjualan();
-      });
-    }
+    this.btnShowPenjualan.addEventListener("click", () => this.handleShowPenjualan());
+    this.filterDatePenjualan.addEventListener("change", () => {
+      if (this.filterDatePenjualan.value) this.handleShowPenjualan();
+    });
   }
 
   /**
@@ -384,12 +251,41 @@ class MaintenanceSystem {
 
     const lastMonthStr = lastMonth.toISOString().slice(0, 7);
 
+    this.exportMonthInput.value = lastMonthStr;
     this.deleteMonthInput.value = lastMonthStr;
 
     // Set default filter date to today
     const today = new Date().toISOString().split("T")[0];
     this.filterDateInput.value = today;
     this.filterDatePenjualan.value = today;
+  }
+
+  // Handle export month change
+  onExportMonthChange() {
+    this.updateDeleteButtonState();
+  }
+
+  /**
+   * Handle delete month change
+   */
+  onDeleteMonthChange() {
+    this.updateDeleteButtonState();
+  }
+
+  /**
+   * Update delete button state based on exported months
+   */
+  updateDeleteButtonState() {
+    const deleteMonth = this.deleteMonthInput.value;
+    const canDelete = deleteMonth && this.exportedMonths.has(deleteMonth);
+
+    this.btnDeleteOldData.disabled = !canDelete;
+
+    if (canDelete) {
+      this.btnDeleteOldData.classList.remove("disabled");
+    } else {
+      this.btnDeleteOldData.classList.add("disabled");
+    }
   }
 
   /**
@@ -416,6 +312,7 @@ class MaintenanceSystem {
       this.showDataLoading(true);
       await this.loadStokTransaksiData(selectedDate);
     } catch (error) {
+      console.error("Error loading data:", error);
       this.showAlert("Gagal memuat data: " + error.message, "error");
     } finally {
       this.showDataLoading(false);
@@ -423,21 +320,10 @@ class MaintenanceSystem {
   }
 
   /**
-   * Setup realtime listener for stok transaksi data
+   * Load stok transaksi data for specific date
    */
   async loadStokTransaksiData(dateStr) {
     try {
-      // Detach previous listener if exists
-      this.detachListener("stokAksesoris");
-
-      // Check cache first
-      const cachedData = this.cache.getCollectionData("stokAksesorisTransaksi", dateStr);
-      if (cachedData) {
-        const dataArray = Array.from(cachedData.values());
-        this.renderDataTable(dataArray);
-      }
-
-      this.currentDate = dateStr;
       const selectedDate = new Date(dateStr);
       const startDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
       const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() + 1);
@@ -446,124 +332,19 @@ class MaintenanceSystem {
         collection(this.firestore, "stokAksesorisTransaksi"),
         where("timestamp", ">=", Timestamp.fromDate(startDate)),
         where("timestamp", "<", Timestamp.fromDate(endDate)),
-        orderBy("timestamp", "desc"),
+        orderBy("timestamp", "desc")
       );
 
-      // Setup realtime listener
-      const unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          snapshot.docChanges().forEach((change) => {
-            const docData = { id: change.doc.id, ...change.doc.data() };
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-            if (change.type === "added") {
-              this.cache.setCollectionData("stokAksesorisTransaksi", dateStr, change.doc.id, docData);
-              if (cachedData) {
-                this.addRowToTable(docData);
-              }
-            } else if (change.type === "modified") {
-              this.cache.updateCollectionDoc("stokAksesorisTransaksi", dateStr, change.doc.id, docData);
-              this.updateRowInTable(docData);
-            } else if (change.type === "removed") {
-              this.cache.removeCollectionDoc("stokAksesorisTransaksi", dateStr, change.doc.id);
-              this.removeRowFromTable(change.doc.id);
-            }
-          });
-
-          // Initial render if no cache
-          if (!cachedData) {
-            const allData = [];
-            snapshot.forEach((doc) => {
-              const docData = { id: doc.id, ...doc.data() };
-              this.cache.setCollectionData("stokAksesorisTransaksi", dateStr, doc.id, docData);
-              allData.push(docData);
-            });
-            this.renderDataTable(allData);
-          }
-        },
-        (error) => {
-          this.showAlert("Error memuat data realtime: " + error.message, "error");
-        },
-      );
-
-      this.activeListeners.set("stokAksesoris", unsubscribe);
+      this.renderDataTable(data);
     } catch (error) {
+      console.error("Error loading stok transaksi data:", error);
       throw error;
-    }
-  }
-
-  /**
-   * Add new row to table (realtime)
-   */
-  addRowToTable(item) {
-    const existingRow = document.querySelector(`tr[data-id="${item.id}"]`);
-    if (existingRow) return; // Already exists
-
-    const date = item.timestamp ? new Date(item.timestamp.seconds * 1000) : null;
-    const dateStr = date ? date.toLocaleDateString("id-ID") : "";
-    const timeStr =
-      item.timestr || (date ? date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "");
-
-    const rowHtml = `
-      <tr data-id="${item.id}" style="animation: fadeIn 0.3s;">
-        <td class="date-cell">${dateStr}</td>
-        <td class="time-cell">${timeStr}</td>
-        <td class="sales-cell">${item.keterangan || ""}</td>
-        <td class="kode-cell">${item.kode || ""}</td>
-        <td class="jumlah-cell">${item.jumlah || 0}</td>
-        <td class="action-cell">
-          <button class="btn btn-sm btn-warning me-1" onclick="maintenanceSystem.editRow('${item.id}')">
-            <i class="fas fa-edit"></i>
-          </button>
-          <button class="btn btn-sm btn-danger" onclick="maintenanceSystem.deleteRow('${item.id}')">
-            <i class="fas fa-trash"></i>
-          </button>
-        </td>
-      </tr>
-    `;
-
-    this.dataTableBody.insertAdjacentHTML("afterbegin", rowHtml);
-  }
-
-  /**
-   * Update existing row in table (realtime)
-   */
-  updateRowInTable(item) {
-    const row = document.querySelector(`tr[data-id="${item.id}"]`);
-    if (!row) return;
-
-    const date = item.timestamp ? new Date(item.timestamp.seconds * 1000) : null;
-    const dateStr = date ? date.toLocaleDateString("id-ID") : "";
-    const timeStr =
-      item.timestr || (date ? date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "");
-
-    row.style.animation = "pulse 0.5s";
-    row.querySelector(".date-cell").textContent = dateStr;
-    row.querySelector(".time-cell").textContent = timeStr;
-    row.querySelector(".sales-cell").textContent = item.keterangan || "";
-    row.querySelector(".kode-cell").textContent = item.kode || "";
-    row.querySelector(".jumlah-cell").textContent = item.jumlah || 0;
-  }
-
-  /**
-   * Remove row from table (realtime)
-   */
-  removeRowFromTable(docId) {
-    const row = document.querySelector(`tr[data-id="${docId}"]`);
-    if (row) {
-      row.style.animation = "fadeOut 0.3s";
-      setTimeout(() => row.remove(), 300);
-    }
-  }
-
-  /**
-   * Detach listener
-   */
-  detachListener(key) {
-    const unsubscribe = this.activeListeners.get(key);
-    if (unsubscribe) {
-      unsubscribe();
-      this.activeListeners.delete(key);
     }
   }
 
@@ -574,7 +355,7 @@ class MaintenanceSystem {
     if (data.length === 0) {
       this.dataTableBody.innerHTML = `
       <tr>
-        <td colspan="6" class="text-center text-muted">
+        <td colspan="8" class="text-center text-muted">
           Tidak ada data untuk tanggal yang dipilih
         </td>
       </tr>
@@ -595,7 +376,9 @@ class MaintenanceSystem {
         <td class="time-cell">${timeStr}</td>
         <td class="sales-cell">${item.keterangan || ""}</td>
         <td class="kode-cell">${item.kode || ""}</td>
-        <td class="jumlah-cell">${item.jumlah || 0}</td>
+        <td class="nama-cell">${item.nama || ""}</td>
+        <td class="stok-sebelum-cell">${item.stokSebelum || 0}</td>
+        <td class="stok-sesudah-cell">${item.stokSesudah || 0}</td>
         <td class="action-cell">
           <button class="btn btn-sm btn-warning me-1" onclick="maintenanceSystem.editRow('${item.id}')">
             <i class="fas fa-edit"></i>
@@ -620,14 +403,16 @@ class MaintenanceSystem {
     const dateCell = row.querySelector(".date-cell");
     const timeCell = row.querySelector(".time-cell");
     const kodeCell = row.querySelector(".kode-cell");
-    const jumlahCell = row.querySelector(".jumlah-cell");
+    const stokSebelumCell = row.querySelector(".stok-sebelum-cell");
+    const stokSesudahCell = row.querySelector(".stok-sesudah-cell");
     const actionCell = row.querySelector(".action-cell");
 
     // Store original values
     const originalDate = dateCell.textContent;
     const originalTime = timeCell.textContent;
     const originalKode = kodeCell.textContent;
-    const originalJumlah = jumlahCell.textContent;
+    const originalStokSebelum = stokSebelumCell.textContent;
+    const originalStokSesudah = stokSesudahCell.textContent;
 
     // Convert to input fields
     const dateValue = originalDate
@@ -637,14 +422,15 @@ class MaintenanceSystem {
     dateCell.innerHTML = `<input type="date" class="form-control form-control-sm" value="${dateValue}">`;
     timeCell.innerHTML = `<input type="time" class="form-control form-control-sm" value="${originalTime}">`;
     kodeCell.innerHTML = `<input type="text" class="form-control form-control-sm" value="${originalKode}">`;
-    jumlahCell.innerHTML = `<input type="number" class="form-control form-control-sm" value="${originalJumlah}">`;
+    stokSebelumCell.innerHTML = `<input type="number" class="form-control form-control-sm" value="${originalStokSebelum}">`;
+    stokSesudahCell.innerHTML = `<input type="number" class="form-control form-control-sm" value="${originalStokSesudah}">`;
 
     // Change action buttons
     actionCell.innerHTML = `
     <button class="btn btn-sm btn-success me-1" onclick="maintenanceSystem.saveRow('${docId}')">
       <i class="fas fa-save"></i> Simpan
     </button>
-    <button class="btn btn-sm btn-secondary" onclick="maintenanceSystem.cancelEdit('${docId}', '${originalDate}', '${originalTime}', '${originalKode}', '${originalJumlah}')">
+    <button class="btn btn-sm btn-secondary" onclick="maintenanceSystem.cancelEdit('${docId}', '${originalDate}', '${originalTime}', '${originalKode}', '${originalStokSebelum}', '${originalStokSesudah}')">
       <i class="fas fa-times"></i> Batal
     </button>
   `;
@@ -653,21 +439,23 @@ class MaintenanceSystem {
   /**
    * Cancel edit
    */
-  cancelEdit(docId, originalDate, originalTime, originalKode, originalJumlah) {
+  cancelEdit(docId, originalDate, originalTime, originalKode, originalStokSebelum, originalStokSesudah) {
     const row = document.querySelector(`tr[data-id="${docId}"]`);
     if (!row) return;
 
     const dateCell = row.querySelector(".date-cell");
     const timeCell = row.querySelector(".time-cell");
     const kodeCell = row.querySelector(".kode-cell");
-    const jumlahCell = row.querySelector(".jumlah-cell");
+    const stokSebelumCell = row.querySelector(".stok-sebelum-cell");
+    const stokSesudahCell = row.querySelector(".stok-sesudah-cell");
     const actionCell = row.querySelector(".action-cell");
 
     // Restore original values
     dateCell.textContent = originalDate;
     timeCell.textContent = originalTime;
     kodeCell.textContent = originalKode;
-    jumlahCell.textContent = originalJumlah;
+    stokSebelumCell.textContent = originalStokSebelum;
+    stokSesudahCell.textContent = originalStokSesudah;
 
     // Restore action buttons
     actionCell.innerHTML = `
@@ -691,7 +479,8 @@ class MaintenanceSystem {
       const dateInput = row.querySelector(".date-cell input").value;
       const timeInput = row.querySelector(".time-cell input").value;
       const kodeInput = row.querySelector(".kode-cell input").value;
-      const jumlahInput = parseInt(row.querySelector(".jumlah-cell input").value) || 0;
+      const stokSebelumInput = parseInt(row.querySelector(".stok-sebelum-cell input").value) || 0;
+      const stokSesudahInput = parseInt(row.querySelector(".stok-sesudah-cell input").value) || 0;
 
       if (!dateInput || !kodeInput) {
         this.showAlert("Tanggal dan Kode harus diisi", "warning");
@@ -700,18 +489,12 @@ class MaintenanceSystem {
 
       // Update Firestore
       const docRef = doc(this.firestore, "stokAksesorisTransaksi", docId);
-
-      // Get current data to preserve stok direction
-      const currentDoc = await getDoc(docRef);
-      const currentData = currentDoc.data();
-      const wasIncrease = (currentData.stokSesudah || 0) > (currentData.stokSebelum || 0);
-
       const updateData = {
         timestamp: Timestamp.fromDate(new Date(dateInput)),
         timestr: timeInput,
         kode: kodeInput,
-        stokSebelum: wasIncrease ? 0 : jumlahInput,
-        stokSesudah: wasIncrease ? jumlahInput : 0,
+        stokSebelum: stokSebelumInput,
+        stokSesudah: stokSesudahInput,
         lastUpdated: serverTimestamp(),
       };
 
@@ -721,13 +504,15 @@ class MaintenanceSystem {
       const dateCell = row.querySelector(".date-cell");
       const timeCell = row.querySelector(".time-cell");
       const kodeCell = row.querySelector(".kode-cell");
-      const jumlahCell = row.querySelector(".jumlah-cell");
+      const stokSebelumCell = row.querySelector(".stok-sebelum-cell");
+      const stokSesudahCell = row.querySelector(".stok-sesudah-cell");
       const actionCell = row.querySelector(".action-cell");
 
       dateCell.textContent = new Date(dateInput).toLocaleDateString("id-ID");
       timeCell.textContent = timeInput;
       kodeCell.textContent = kodeInput;
-      jumlahCell.textContent = jumlahInput;
+      stokSebelumCell.textContent = stokSebelumInput;
+      stokSesudahCell.textContent = stokSesudahInput;
 
       // Restore action buttons
       actionCell.innerHTML = `
@@ -739,16 +524,9 @@ class MaintenanceSystem {
       </button>
     `;
 
-      const docData = await getDoc(docRef);
-      if (docData.exists()) {
-        this.cache.updateCollectionDoc("stokAksesorisTransaksi", this.currentDate, docId, {
-          id: docId,
-          ...docData.data(),
-        });
-      }
-
       this.showAlert("Data berhasil diupdate", "success");
     } catch (error) {
+      console.error("Error saving data:", error);
       this.showAlert("Gagal menyimpan data: " + error.message, "error");
     }
   }
@@ -762,8 +540,16 @@ class MaintenanceSystem {
     if (!confirmed) return;
 
     try {
+      // Delete from Firestore
       await deleteDoc(doc(this.firestore, "stokAksesorisTransaksi", docId));
 
+      // Remove from table
+      const row = document.querySelector(`tr[data-id="${docId}"]`);
+      if (row) {
+        row.remove();
+      }
+
+      // Check if table is empty
       const remainingRows = this.dataTableBody.querySelectorAll("tr");
       if (remainingRows.length === 0) {
         this.dataTableBody.innerHTML = `
@@ -777,6 +563,7 @@ class MaintenanceSystem {
 
       this.showAlert("Data berhasil dihapus", "success");
     } catch (error) {
+      console.error("Error deleting data:", error);
       this.showAlert("Gagal menghapus data: " + error.message, "error");
     }
   }
@@ -806,6 +593,7 @@ class MaintenanceSystem {
       this.penjualanTableBody.innerHTML = "";
       await this.loadPenjualanData(selectedDate);
     } catch (error) {
+      console.error("Error loading penjualan data:", error);
       this.showAlert("Gagal memuat data: " + error.message, "error");
     } finally {
       this.penjualanLoading.style.display = "none";
@@ -813,15 +601,6 @@ class MaintenanceSystem {
   }
 
   async loadPenjualanData(dateStr) {
-    this.detachListener("penjualan");
-
-    const cachedData = this.cache.getCollectionData("penjualanAksesoris", dateStr);
-    if (cachedData) {
-      const dataArray = this.flattenPenjualanData(Array.from(cachedData.values()));
-      this.renderPenjualanTable(dataArray);
-    }
-
-    this.currentPenjualanDate = dateStr;
     const selectedDate = new Date(dateStr);
     const startDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
     const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() + 1);
@@ -830,56 +609,13 @@ class MaintenanceSystem {
       collection(this.firestore, "penjualanAksesoris"),
       where("timestamp", ">=", Timestamp.fromDate(startDate)),
       where("timestamp", "<", Timestamp.fromDate(endDate)),
-      orderBy("timestamp", "desc"),
+      orderBy("timestamp", "desc")
     );
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          const docData = { id: change.doc.id, ...change.doc.data() };
-
-          if (change.type === "added") {
-            this.cache.setCollectionData("penjualanAksesoris", dateStr, change.doc.id, docData);
-            if (cachedData) {
-              this.addPenjualanRowsToTable(docData);
-            }
-          } else if (change.type === "modified") {
-            this.cache.updateCollectionDoc("penjualanAksesoris", dateStr, change.doc.id, docData);
-            this.updatePenjualanRowsInTable(docData);
-          } else if (change.type === "removed") {
-            this.cache.removeCollectionDoc("penjualanAksesoris", dateStr, change.doc.id);
-            this.removePenjualanRowsFromTable(change.doc.id);
-          }
-        });
-
-        if (!cachedData) {
-          const allData = [];
-          snapshot.forEach((doc) => {
-            const docData = { id: doc.id, ...doc.data() };
-            this.cache.setCollectionData("penjualanAksesoris", dateStr, doc.id, docData);
-            allData.push(docData);
-          });
-          const flatData = this.flattenPenjualanData(allData);
-          this.renderPenjualanTable(flatData);
-        }
-      },
-      (error) => {
-        console.error("Error in penjualan realtime listener:", error);
-        this.showAlert("Error memuat data penjualan realtime: " + error.message, "error");
-      },
-    );
-
-    this.activeListeners.set("penjualan", unsubscribe);
-  }
-
-  /**
-   * Flatten penjualan data (doc with items array to flat array)
-   */
-  flattenPenjualanData(docs) {
+    const querySnapshot = await getDocs(q);
     const data = [];
-    docs.forEach((doc) => {
-      const docData = doc;
+    querySnapshot.docs.forEach((doc) => {
+      const docData = doc.data();
       const items = Array.isArray(docData.items) ? docData.items : [];
       items.forEach((item, idx) => {
         data.push({
@@ -896,68 +632,7 @@ class MaintenanceSystem {
         });
       });
     });
-    return data;
-  }
-
-  /**
-   * Add penjualan rows to table (realtime)
-   */
-  addPenjualanRowsToTable(docData) {
-    const items = Array.isArray(docData.items) ? docData.items : [];
-    items.forEach((item, idx) => {
-      const rowId = `${docData.id}_${idx}`;
-      const existingRow = document.querySelector(`tr[data-id="${rowId}"]`);
-      if (existingRow) return;
-
-      const date = docData.timestamp ? new Date(docData.timestamp.seconds * 1000) : null;
-      const dateStr = date ? date.toLocaleDateString("id-ID") : "";
-      const timeStr = date ? date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "";
-      const hargaFormatted = new Intl.NumberFormat("id-ID").format(item.harga || 0);
-
-      const rowHtml = `
-        <tr data-id="${rowId}" data-doc-id="${docData.id}" data-item-index="${idx}" style="animation: fadeIn 0.3s;">
-          <td class="pj-date-cell">${dateStr}</td>
-          <td class="pj-time-cell">${timeStr}</td>
-          <td class="pj-sales-cell">${docData.sales || ""}</td>
-          <td class="pj-barcode-cell">${item.barcode || ""}</td>
-          <td class="pj-kode-lock-cell">${item.kodeLock || ""}</td>
-          <td class="pj-nama-cell">${item.nama || ""}</td>
-          <td class="pj-kadar-cell">${item.kadar || ""}</td>
-          <td class="pj-berat-cell">${item.berat || ""}</td>
-          <td class="pj-harga-cell">${hargaFormatted}</td>
-          <td class="pj-action-cell">
-            <button class="btn btn-sm btn-warning me-1" onclick="maintenanceSystem.editPenjualanRow('${rowId}')">
-              <i class="fas fa-edit"></i>
-            </button>
-            <button class="btn btn-sm btn-danger" onclick="maintenanceSystem.deletePenjualanRow('${docData.id}')">
-              <i class="fas fa-trash"></i>
-            </button>
-          </td>
-        </tr>
-      `;
-
-      this.penjualanTableBody.insertAdjacentHTML("afterbegin", rowHtml);
-    });
-  }
-
-  /**
-   * Update penjualan rows in table (realtime)
-   */
-  updatePenjualanRowsInTable(docData) {
-    // Remove old rows for this doc
-    document.querySelectorAll(`tr[data-doc-id="${docData.id}"]`).forEach((row) => row.remove());
-    // Add updated rows
-    this.addPenjualanRowsToTable(docData);
-  }
-
-  /**
-   * Remove penjualan rows from table (realtime)
-   */
-  removePenjualanRowsFromTable(docId) {
-    document.querySelectorAll(`tr[data-doc-id="${docId}"]`).forEach((row) => {
-      row.style.animation = "fadeOut 0.3s";
-      setTimeout(() => row.remove(), 300);
-    });
+    this.renderPenjualanTable(data);
   }
 
   renderPenjualanTable(data) {
@@ -1000,7 +675,7 @@ class MaintenanceSystem {
     const row = document.querySelector(`tr[data-id="${rowId}"]`);
     if (!row) return;
     const dateCell = row.querySelector(".pj-date-cell");
-    const kodeCell = row.querySelector(".pj-barcode-cell");
+    const kodeCell = row.querySelector(".pj-kode-cell");
     const namaCell = row.querySelector(".pj-nama-cell");
     const actionCell = row.querySelector(".pj-action-cell");
 
@@ -1023,7 +698,7 @@ class MaintenanceSystem {
     const row = document.querySelector(`tr[data-id="${rowId}"]`);
     if (!row) return;
     row.querySelector(".pj-date-cell").textContent = originalDate;
-    row.querySelector(".pj-barcode-cell").textContent = originalKode;
+    row.querySelector(".pj-kode-cell").textContent = originalKode;
     row.querySelector(".pj-nama-cell").textContent = originalNama;
     row.querySelector(".pj-action-cell").innerHTML = `
       <button class="btn btn-sm btn-warning me-1" onclick="maintenanceSystem.editPenjualanRow('${rowId}')"><i class="fas fa-edit"></i></button>
@@ -1036,7 +711,7 @@ class MaintenanceSystem {
     const docId = row.dataset.docId;
     const itemIndex = parseInt(row.dataset.itemIndex);
     const dateInput = row.querySelector(".pj-date-cell input").value;
-    const kodeInput = row.querySelector(".pj-barcode-cell input").value;
+    const kodeInput = row.querySelector(".pj-kode-cell input").value;
     const namaInput = row.querySelector(".pj-nama-cell input").value;
 
     if (!dateInput || !kodeInput) {
@@ -1047,7 +722,7 @@ class MaintenanceSystem {
     try {
       const docRef = doc(this.firestore, "penjualanAksesoris", docId);
       const docSnap = await getDocs(
-        query(collection(this.firestore, "penjualanAksesoris"), where("__name__", "==", docId)),
+        query(collection(this.firestore, "penjualanAksesoris"), where("__name__", "==", docId))
       );
       if (docSnap.empty) throw new Error("Document not found");
 
@@ -1065,13 +740,14 @@ class MaintenanceSystem {
       });
 
       row.querySelector(".pj-date-cell").textContent = new Date(dateInput).toLocaleDateString("id-ID");
-      row.querySelector(".pj-barcode-cell").textContent = kodeInput;
+      row.querySelector(".pj-kode-cell").textContent = kodeInput;
       row.querySelector(".pj-nama-cell").textContent = namaInput;
       row.querySelector(".pj-action-cell").innerHTML = `
         <button class="btn btn-sm btn-warning me-1" onclick="maintenanceSystem.editPenjualanRow('${rowId}')"><i class="fas fa-edit"></i></button>
         <button class="btn btn-sm btn-danger" onclick="maintenanceSystem.deletePenjualanRow('${docId}')"><i class="fas fa-trash"></i></button>`;
       this.showAlert("Data berhasil diupdate", "success");
     } catch (error) {
+      console.error("Error saving penjualan:", error);
       this.showAlert("Gagal menyimpan: " + error.message, "error");
     }
   }
@@ -1079,50 +755,20 @@ class MaintenanceSystem {
   async deletePenjualanRow(docId) {
     const confirmed = await this.showConfirmation(
       "Apakah Anda yakin ingin menghapus transaksi ini?",
-      "Konfirmasi Hapus",
+      "Konfirmasi Hapus"
     );
     if (!confirmed) return;
 
     try {
       await deleteDoc(doc(this.firestore, "penjualanAksesoris", docId));
-
-      setTimeout(() => {
-        if (this.penjualanTableBody.querySelectorAll("tr").length === 0) {
-          this.penjualanTableBody.innerHTML = `<tr><td colspan="10" class="text-center text-muted">Tidak ada data untuk tanggal yang dipilih</td></tr>`;
-        }
-      }, 500);
-
+      document.querySelectorAll(`tr[data-doc-id="${docId}"]`).forEach((row) => row.remove());
+      if (this.penjualanTableBody.querySelectorAll("tr").length === 0) {
+        this.penjualanTableBody.innerHTML = `<tr><td colspan="9" class="text-center text-muted">Tidak ada data untuk tanggal yang dipilih</td></tr>`;
+      }
       this.showAlert("Data berhasil dihapus", "success");
     } catch (error) {
+      console.error("Error deleting penjualan:", error);
       this.showAlert("Gagal menghapus: " + error.message, "error");
-    }
-  }
-
-  /**
-   * Build query for collection and month
-   */
-  buildDeleteQuery(collectionConfig, monthStr) {
-    const [year, month] = monthStr.split("-");
-    const { name, dateField, dateType } = collectionConfig;
-
-    if (dateType === "timestamp") {
-      const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-      const endDate = new Date(parseInt(year), parseInt(month), 1);
-      return query(
-        collection(this.firestore, name),
-        where(dateField, ">=", Timestamp.fromDate(startDate)),
-        where(dateField, "<", Timestamp.fromDate(endDate)),
-      );
-    } else {
-      // string date format YYYY-MM-DD
-      const startDateStr = `${year}-${month.padStart(2, "0")}-01`;
-      const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
-      const endDateStr = `${year}-${month.padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
-      return query(
-        collection(this.firestore, name),
-        where(dateField, ">=", startDateStr),
-        where(dateField, "<=", endDateStr),
-      );
     }
   }
 
@@ -1131,6 +777,7 @@ class MaintenanceSystem {
    */
   showLoading(title, subtitle) {
     if (this.isLoading) {
+      console.warn("Already loading, skipping duplicate loading modal");
       return;
     }
 
@@ -1138,30 +785,20 @@ class MaintenanceSystem {
     this.currentOperation = title;
 
     try {
-      const loadingText = document.getElementById("loadingText");
-      const loadingSubtext = document.getElementById("loadingSubtext");
+      document.getElementById("loadingText").textContent = title;
+      document.getElementById("loadingSubtext").textContent = subtitle;
 
-      if (loadingText) loadingText.textContent = title;
-      if (loadingSubtext) loadingSubtext.textContent = subtitle;
-
+      // Auto-hide after 30 seconds as failsafe
       setTimeout(() => {
         if (this.isLoading && this.currentOperation === title) {
+          console.warn("Force hiding loading modal after timeout");
           this.hideLoading();
         }
       }, 30000);
     } catch (error) {
+      console.error("Error showing loading modal:", error);
       this.isLoading = false;
     }
-  }
-
-  /**
-   * Cleanup all active listeners
-   */
-  cleanupAllListeners() {
-    for (const [key, unsubscribe] of this.activeListeners.entries()) {
-      unsubscribe();
-    }
-    this.activeListeners.clear();
   }
 
   /**
@@ -1169,28 +806,33 @@ class MaintenanceSystem {
    */
   hideLoading() {
     try {
-      const modalElement = document.getElementById("loadingModal");
-
       if (modalElement) {
+        // Remove any existing modal backdrop
         const backdrops = document.querySelectorAll(".modal-backdrop");
         backdrops.forEach((backdrop) => backdrop.remove());
 
+        // Force hide modal
         modalElement.style.display = "none";
         modalElement.classList.remove("show");
         modalElement.setAttribute("aria-hidden", "true");
         modalElement.removeAttribute("aria-modal");
 
+        // Reset body classes
         document.body.classList.remove("modal-open");
         document.body.style.overflow = "";
         document.body.style.paddingRight = "";
       }
 
+      // Reset state
       this.isLoading = false;
       this.currentOperation = null;
+
+      console.log("Loading modal hidden successfully");
     } catch (error) {
+      console.error("Error hiding loading modal:", error);
+      // Force reset state even if hiding fails
       this.isLoading = false;
       this.currentOperation = null;
-      const modalElement = document.getElementById("loadingModal");
       if (modalElement) {
         modalElement.style.display = "none";
       }
@@ -1200,89 +842,192 @@ class MaintenanceSystem {
   }
 
   /**
-   * Handle delete old data - Direct delete with fetch and confirm
+   * Handle export data for specific collection with month filtering
    */
-  async handleDeleteOldData() {
-    const selectedCollection = this.collectionSelect.value;
-    const selectedMonth = this.deleteMonthInput.value;
-
-    // Validate input
-    if (!selectedCollection) {
-      this.showAlert("Pilih koleksi terlebih dahulu", "warning");
-      return;
-    }
-
+  async handleExportData(collectionName) {
+    const selectedMonth = this.exportMonthInput.value;
     if (!selectedMonth) {
-      this.showAlert("Pilih bulan terlebih dahulu", "warning");
+      this.showAlert("Pilih bulan yang akan diexport", "warning");
       return;
     }
 
     try {
-      // Show loading while fetching documents
-      this.showLoading("Mengambil Data...", "Memuat dokumen untuk dihapus");
+      this.showLoading("Mengexport Data...", `Memproses data ${collectionName} untuk bulan ${selectedMonth}`);
 
-      let allDocs = [];
-      let collectionSummary = [];
+      await this.exportCollectionToExcel(collectionName, selectedMonth);
 
-      // Fetch documents based on selection
-      if (selectedCollection === "all") {
-        // Fetch all collections
-        for (const key of Object.keys(COLLECTION_CONFIGS)) {
-          const config = COLLECTION_CONFIGS[key];
-          const q = this.buildDeleteQuery(config, selectedMonth);
-          const snapshot = await getDocs(q);
+      // Mark month as exported
+      this.exportedMonths.add(selectedMonth);
+      this.updateDeleteButtonState();
+      this.showAlert(`Data ${collectionName} untuk bulan ${selectedMonth} berhasil diexport!`, "success");
+    } catch (error) {
+      console.error("Error exporting data:", error);
+      this.showAlert("Gagal mengexport data: " + error.message, "error");
+    } finally {
+      this.hideLoading();
+    }
+  }
 
-          if (snapshot.docs.length > 0) {
-            allDocs.push(...snapshot.docs);
-            collectionSummary.push({
-              label: config.label,
-              count: snapshot.docs.length,
-            });
-          }
+  /**
+   * Export collection to Excel with month filtering and caching
+   */
+  async exportCollectionToExcel(collectionName, monthStr) {
+    try {
+      const cacheKey = `export_${collectionName}_${monthStr}`;
+      let data = this.cache.get(cacheKey);
+
+      if (!data) {
+        // Prepare date range for month filtering
+        const [year, month] = monthStr.split("-");
+        const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+        const endDate = new Date(parseInt(year), parseInt(month), 1);
+
+        // Query based on collection type
+        let querySnapshot;
+        if (collectionName === "stokAksesoris") {
+          // For stokAksesoris, get all current stock (no date filtering)
+          querySnapshot = await getDocs(collection(this.firestore, collectionName));
+        } else {
+          // For other collections, filter by month
+          const q = query(
+            collection(this.firestore, collectionName),
+            where("timestamp", ">=", Timestamp.fromDate(startDate)),
+            where("timestamp", "<", Timestamp.fromDate(endDate)),
+            orderBy("timestamp", "desc")
+          );
+          querySnapshot = await getDocs(q);
         }
+
+        data = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        // Cache for 10 minutes
+        this.cache.set(cacheKey, data);
       } else {
-        // Fetch single collection
-        const config = COLLECTION_CONFIGS[selectedCollection];
-        const q = this.buildDeleteQuery(config, selectedMonth);
-        const snapshot = await getDocs(q);
-        allDocs = snapshot.docs;
-
-        if (allDocs.length > 0) {
-          collectionSummary.push({
-            label: config.label,
-            count: allDocs.length,
-          });
-        }
       }
 
-      this.hideLoading();
-
-      // Check if there's data to delete
-      if (allDocs.length === 0) {
-        this.showAlert("Tidak ada data untuk dihapus pada periode yang dipilih", "info");
+      if (data.length === 0) {
         return;
       }
 
-      // Show confirmation with detailed summary
-      const collectionLabel =
-        selectedCollection === "all" ? "SEMUA KOLEKSI" : COLLECTION_CONFIGS[selectedCollection].label;
-      const summaryText = collectionSummary.map((s) => `• ${s.label}: ${s.count} dokumen`).join("\n");
+      // Transform data for Excel
+      const excelData = await this.transformDataForExcel(data, collectionName);
 
-      const confirmed = await this.showConfirmation(
-        `HAPUS ${allDocs.length} DOKUMEN?\n\n${summaryText}\n\nBulan: ${selectedMonth}\n\n⚠️ PERINGATAN: Data tidak dapat dikembalikan!`,
-        "Konfirmasi Hapus Data",
-      );
-
-      if (!confirmed) return;
-
-      // Delete with progress indicator
-      this.showLoading("Menghapus Data...", `0/${allDocs.length} dokumen (0%)`);
-      await this.deleteBatchWithProgress(allDocs, allDocs.length, 0);
-
-      // Clear cache and show success
-      this.cache.clear();
-      this.showAlert(`${allDocs.length} dokumen berhasil dihapus!`, "success");
+      // Create and download Excel file
+      const filename = `${collectionName}_${monthStr}.xlsx`;
+      await this.createExcelFile(excelData, filename);
     } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Transform data for Excel export
+   */
+  async transformDataForExcel(data, collectionName) {
+    const transformedData = [];
+
+    for (const item of data) {
+      let row = {};
+
+      switch (collectionName) {
+        case "penjualanAksesoris":
+          // Safely extract items[0] for single-item sales
+          const firstItem = Array.isArray(item.items) && item.items.length > 0 ? item.items[0] : {};
+
+          row = {
+            Tanggal: item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleDateString("id-ID") : "",
+            Waktu: item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleTimeString("id-ID") : "",
+            Kode: firstItem.kodeText || item.kodeText || "",
+            "Nama Barang": firstItem.nama || item.nama || "",
+            Keterangan: firstItem.keterangan || item.keterangan || "",
+            Sales: item.sales || "",
+            "Total Harga": item.totalHarga || 0,
+            "Jumlah Items": Array.isArray(item.items) ? item.items.length : 0,
+          };
+          break;
+
+        case "stockAdditions":
+          row = {
+            Tanggal: item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleDateString("id-ID") : "",
+            Waktu: item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleTimeString("id-ID") : "",
+            Kode: item.kode || "",
+            "Nama Barang": item.namaBarang || "",
+            Kategori: item.kategori || "",
+            Jumlah: item.jumlah || 0,
+            "Harga Beli": item.hargaBeli || 0,
+            "Harga Jual": item.hargaJual || 0,
+            Supplier: item.supplier || "",
+            Keterangan: item.keterangan || "",
+          };
+          break;
+      }
+
+      transformedData.push(row);
+    }
+
+    return transformedData;
+  }
+
+  /**
+   * Create Excel file and trigger download
+   */
+  async createExcelFile(data, filename) {
+    // Create a new workbook
+    const wb = XLSX.utils.book_new();
+
+    // Create worksheet from data
+    const ws = XLSX.utils.json_to_sheet(data);
+
+    // Auto-size columns
+    const colWidths = [];
+    if (data.length > 0) {
+      Object.keys(data[0]).forEach((key) => {
+        const maxLength = Math.max(key.length, ...data.map((row) => String(row[key] || "").length));
+        colWidths.push({ wch: Math.min(maxLength + 2, 50) });
+      });
+      ws["!cols"] = colWidths;
+    }
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, "Data");
+
+    // Write file
+    XLSX.writeFile(wb, filename);
+  }
+
+  /**
+   * Handle delete old data
+   */
+  async handleDeleteOldData() {
+    const selectedMonth = this.deleteMonthInput.value;
+    if (!selectedMonth) {
+      this.showAlert("Pilih bulan yang akan dihapus", "warning");
+      return;
+    }
+
+    if (!this.exportedMonths.has(selectedMonth)) {
+      this.showAlert("Data harus diexport terlebih dahulu sebelum dihapus", "warning");
+      return;
+    }
+
+    const confirmed = await this.showConfirmation(
+      `Apakah Anda yakin ingin menghapus semua data bulan ${selectedMonth}? Pastikan data sudah diexport.`,
+      "Konfirmasi Hapus Data"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      this.showLoading("Menghapus Data...", `Menghapus data bulan ${selectedMonth}`);
+
+      await this.deleteDataByMonth(selectedMonth);
+
+      this.showAlert(`Data bulan ${selectedMonth} berhasil dihapus!`, "success");
+    } catch (error) {
+      console.error("Error deleting data:", error);
       this.showAlert("Gagal menghapus data: " + error.message, "error");
     } finally {
       this.hideLoading();
@@ -1290,31 +1035,62 @@ class MaintenanceSystem {
   }
 
   /**
-   * Delete documents in batches with progress indicator
+   * Delete data by month
    */
-  async deleteBatchWithProgress(docs, totalCount, startCount) {
-    const batchSize = 100;
-    const totalBatches = Math.ceil(docs.length / batchSize);
-    let currentCount = startCount;
+  async deleteDataByMonth(monthStr) {
+    try {
+      const [year, month] = monthStr.split("-");
+      const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+      const endDate = new Date(parseInt(year), parseInt(month), 1);
 
-    for (let j = 0; j < totalBatches; j++) {
-      const batch = writeBatch(this.firestore);
-      const startIndex = j * batchSize;
-      const endIndex = Math.min(startIndex + batchSize, docs.length);
+      const collections = ["penjualanAksesoris", "stockAdditions", "stokAksesorisTransaksi"];
+      let totalDeleted = 0;
 
-      for (let k = startIndex; k < endIndex; k++) {
-        batch.delete(docs[k].ref);
+      for (let i = 0; i < collections.length; i++) {
+        const collectionName = collections[i];
+
+        // Query data for the specified month
+        const q = query(
+          collection(this.firestore, collectionName),
+          where("timestamp", ">=", Timestamp.fromDate(startDate)),
+          where("timestamp", "<", Timestamp.fromDate(endDate))
+        );
+
+        const snapshot = await getDocs(q);
+        const docs = snapshot.docs;
+
+        if (docs.length > 0) {
+          // Delete in batches
+          const batchSize = 100;
+          const totalBatches = Math.ceil(docs.length / batchSize);
+
+          for (let j = 0; j < totalBatches; j++) {
+            const batch = writeBatch(this.firestore);
+            const startIndex = j * batchSize;
+            const endIndex = Math.min(startIndex + batchSize, docs.length);
+            const batchDocs = docs.slice(startIndex, endIndex);
+
+            batchDocs.forEach((docSnapshot) => {
+              batch.delete(docSnapshot.ref);
+            });
+
+            await batch.commit();
+
+            const progress = (i / collections.length + (j + 1) / totalBatches / collections.length) * 100;
+            // Small delay between batches
+            if (j < totalBatches - 1) {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+          }
+
+          totalDeleted += docs.length;
+        }
       }
 
-      await batch.commit();
-
-      currentCount += endIndex - startIndex;
-      const percentage = Math.round((currentCount / totalCount) * 100);
-
-      const loadingSubtext = document.getElementById("loadingSubtext");
-      if (loadingSubtext) {
-        loadingSubtext.textContent = `${currentCount}/${totalCount} dokumen (${percentage}%)`;
-      }
+      // Clear cache
+      this.cache.clear();
+    } catch (error) {
+      throw error;
     }
   }
 
@@ -1329,6 +1105,7 @@ class MaintenanceSystem {
       <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
 
+    // Find alerts container or create one
     let alertContainer = document.getElementById("alertContainer");
     if (!alertContainer) {
       alertContainer = document.createElement("div");
@@ -1340,6 +1117,7 @@ class MaintenanceSystem {
 
     alertContainer.appendChild(alertDiv);
 
+    // Auto-remove after 5 seconds
     setTimeout(() => {
       if (alertDiv.parentNode) {
         alertDiv.remove();
@@ -1390,12 +1168,7 @@ class MaintenanceSystem {
   }
 }
 
+// Initialize the maintenance system when page loads
 document.addEventListener("DOMContentLoaded", () => {
   window.maintenanceSystem = new MaintenanceSystem();
-
-  window.addEventListener("beforeunload", () => {
-    if (window.maintenanceSystem) {
-      window.maintenanceSystem.cleanupAllListeners();
-    }
-  });
 });

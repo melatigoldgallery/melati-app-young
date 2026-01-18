@@ -458,61 +458,59 @@ const laporanPenjualanHandler = {
         language: {
           url: "//cdn.datatables.net/plug-ins/1.10.25/i18n/Indonesian.json",
         },
+        // PERBAIKAN: footerCallback dengan logika DP yang benar
         footerCallback: function (row, data, start, end, display) {
           let totalPcs = 0;
           let totalBerat = 0;
           let totalHarga = 0;
           let hasValidBerat = false;
 
-          // Sum totals from visible table rows (these reflect aggregated item prices)
-          data.forEach((row) => {
-            const jumlah = parseInt(row[4]) || 0;
-            const hargaStr = (row[7] || "").toString().replace(/[^\d]/g, "") || "0";
-            const harga = parseInt(hargaStr) || 0;
+          // PERBAIKAN: Akses data asli untuk perhitungan total yang akurat
+          laporanPenjualanHandler.filteredSalesData.forEach((transaction) => {
+            if (!transaction.items) return;
 
-            totalPcs += jumlah;
-            totalHarga += harga;
+            transaction.items.forEach((item) => {
+              const jumlah = parseInt(item.jumlah) || 1;
+              let harga = parseInt(item.totalHarga) || 0;
 
-            if (row[5] !== "-") {
-              const beratStr = row[5].replace(" gr", "").replace(",", ".") || "0";
-              const berat = parseFloat(beratStr) || 0;
-              if (berat > 0) {
+              // Selalu hitung PCS dan berat
+              totalPcs += jumlah;
+
+              const berat = parseFloat(item.berat) || 0;
+              if (berat > 0 && transaction.jenisPenjualan !== "kotak") {
                 totalBerat += berat;
                 hasValidBerat = true;
               }
-            }
+
+              // PERBAIKAN: Logika perhitungan harga berdasarkan metode pembayaran
+              if (transaction.metodeBayar === "dp") {
+                const nominalDP = parseFloat(transaction.nominalDP) || 0;
+                const totalHargaTransaksi = parseFloat(transaction.totalHarga) || 0;
+
+                if (nominalDP >= totalHargaTransaksi) {
+                  // Jika DP >= total harga, tidak dihitung (harga = 0)
+                  harga = 0;
+                } else {
+                  // Jika DP < total harga, hitung proporsi sisa pembayaran
+                  const sisaPembayaran = totalHargaTransaksi - nominalDP;
+                  const proporsi = harga / totalHargaTransaksi;
+                  harga = Math.round(proporsi * sisaPembayaran);
+                }
+              } else if (transaction.metodeBayar === "free") {
+                harga = 0;
+              }
+              // Untuk metode tunai, harga tetap normal
+
+              totalHarga += harga;
+            });
           });
-
-          // Compute total DP applied across the currently filtered transactions.
-          // We subtract DP once per transaction to get the net collected amount.
-          let dpTotal = 0;
-          try {
-            const seenTx = new Set();
-            if (Array.isArray(laporanPenjualanHandler.filteredSalesData)) {
-              laporanPenjualanHandler.filteredSalesData.forEach((tx) => {
-                if (!tx || !tx.id) return;
-                if (seenTx.has(tx.id)) return;
-                seenTx.add(tx.id);
-
-                // nominalDP may be string or number; fallback 0
-                const dp = parseInt(tx.nominalDP) || 0;
-                dpTotal += dp;
-              });
-            }
-          } catch (e) {
-            console.warn("Could not compute DP total:", e);
-            dpTotal = 0;
-          }
-
-          // Final collected amount = totalHarga (sum of item totals shown) - dpTotal
-          let finalHarga = totalHarga - dpTotal;
-          if (finalHarga < 0) finalHarga = 0;
 
           const api = this.api();
           $(api.column(4).footer()).html(totalPcs);
           $(api.column(5).footer()).html(hasValidBerat ? `${totalBerat.toFixed(2)} gr` : "-");
-          $(api.column(7).footer()).html(`Rp ${finalHarga.toLocaleString("id-ID")}`);
+          $(api.column(7).footer()).html(`Rp ${totalHarga.toLocaleString("id-ID")}`);
         },
+
         dom: "Bfrtip",
         buttons: [
           {
@@ -609,7 +607,7 @@ const laporanPenjualanHandler = {
 
               // Mengatur lebar kolom agar lebih proporsional
               if (doc.content[1].table) {
-                doc.content[1].table.widths = ["9%", "8%", "7%", "20%", "5%", "6%", "7%", "12%", "13%", "13%"];
+                doc.content[1].table.widths = ["9%", "8%", "7%", "20%", "5%", "6%", "7%", "12%", "14%", "12%"];
               }
             },
           },
@@ -680,7 +678,7 @@ const laporanPenjualanHandler = {
   // Update table header
   updateTableHeader() {
     const salesType = document.getElementById("salesType").value;
-    let configKey = salesType === "all" ? "manual" : salesType === "manual" ? "manual" : salesType;
+    let configKey = salesType === "all" ? "manual" : salesType === "layanan" ? "manual" : salesType;
 
     const config = tableConfigs[configKey];
     if (!config) return;
@@ -697,16 +695,11 @@ const laporanPenjualanHandler = {
     const configKey = "manual";
     const config = tableConfigs[configKey];
     if (!config) return [];
-    const tableRows = [];
-    const summaryMap = new Map();
 
-    const toNumber = (v) => {
-      if (v === null || v === undefined) return 0;
-      if (typeof v === "number") return v;
-      const s = String(v).replace(/[^0-9-]/g, "");
-      const n = parseInt(s, 10);
-      return isNaN(n) ? 0 : n;
-    };
+    const tableData = [];
+
+    // PERBAIKAN: Buat summary map global untuk menggabungkan item dengan kode sama
+    const globalSummaryMap = new Map();
 
     this.filteredSalesData.forEach((transaction) => {
       // Enhanced date formatting with better timestamp handling
@@ -731,25 +724,30 @@ const laporanPenjualanHandler = {
 
       if (!transaction.items) return;
 
+      // PERBAIKAN: Cek apakah ini penjualan manual atau bukan
       const isManualSale =
         transaction.jenisPenjualan === "manual" ||
         transaction.isGantiLock ||
         transaction.jenisPenjualan === "gantiLock";
 
-      transaction.items.forEach((item) => {
-        const key = item.kodeText || item.barcode || "-";
-        const name = item.nama || "-";
-        const kadar = item.kadar || "-";
-        const berat = parseFloat(item.berat) || 0;
-        const jumlah = parseInt(item.jumlah) || 1;
+      if (isManualSale) {
+        // Untuk penjualan manual: tampilkan detail setiap item dalam setiap transaksi
+        transaction.items.forEach((item) => {
+          const key = item.kodeText || item.barcode || "-";
+          const name = item.nama || "-";
+          const kadar = item.kadar || "-";
+          const berat = parseFloat(item.berat) || 0;
+          const jumlah = parseInt(item.jumlah) || 1;
 
-        let harga = toNumber(item.totalHarga || item.harga || 0);
-        if (transaction.metodeBayar === "free") harga = 0;
+          let harga = parseInt(item.totalHarga) || 0;
+          if (transaction.metodeBayar === "free") {
+            harga = 0;
+          }
 
-        if (isManualSale) {
-          // For manual sales, push each transaction-item as its own row (no aggregation)
-          const beratDisplay = transaction.jenisPenjualan === "kotak" ? "-" : `${berat.toFixed(2)} gr`;
-          tableRows.push([
+          const beratDisplay = berat > 0 ? `${berat.toFixed(2)} gr` : "-";
+
+          // Tambahkan setiap item sebagai baris terpisah
+          tableData.push([
             date,
             jenisPenjualan,
             key,
@@ -761,15 +759,33 @@ const laporanPenjualanHandler = {
             status,
             item.keterangan || keterangan,
           ]);
-        } else {
-          // Non-manual: aggregate by item key
-          if (summaryMap.has(key)) {
-            const existing = summaryMap.get(key);
+        });
+      } else {
+        // PERBAIKAN: Untuk penjualan aksesoris/kotak: gunakan global summary untuk menggabungkan semua item dengan kode sama
+        transaction.items.forEach((item) => {
+          const key = item.kodeText || item.barcode || "-";
+          const name = item.nama || "-";
+          const kadar = item.kadar || "-";
+          const berat = parseFloat(item.berat) || 0;
+          const jumlah = parseInt(item.jumlah) || 1;
+
+          let harga = parseInt(item.totalHarga) || 0;
+          if (transaction.metodeBayar === "free") {
+            harga = 0;
+          }
+
+          // Gunakan kode sebagai key untuk menggabungkan item yang sama
+          if (globalSummaryMap.has(key)) {
+            const existing = globalSummaryMap.get(key);
             existing.jumlah += jumlah;
             existing.berat += berat;
             existing.harga += harga;
+            // Update tanggal ke yang terbaru jika ada
+            if (date !== "-") {
+              existing.tanggal = date;
+            }
           } else {
-            summaryMap.set(key, {
+            globalSummaryMap.set(key, {
               tanggal: date,
               jenis: jenisPenjualan,
               kode: key,
@@ -783,14 +799,14 @@ const laporanPenjualanHandler = {
               jenisPenjualan: transaction.jenisPenjualan,
             });
           }
-        }
-      });
+        });
+      }
     });
 
-    // Append aggregated non-manual items after manual rows
-    const aggregatedRows = Array.from(summaryMap.values()).map((item) => {
+    // PERBAIKAN: Tambahkan summary data dari global map ke tableData
+    Array.from(globalSummaryMap.values()).forEach((item) => {
       const beratDisplay = item.jenisPenjualan === "kotak" ? "-" : `${item.berat.toFixed(2)} gr`;
-      return [
+      tableData.push([
         item.tanggal,
         item.jenis,
         item.kode,
@@ -801,35 +817,18 @@ const laporanPenjualanHandler = {
         `Rp ${item.harga.toLocaleString("id-ID")}`,
         item.status,
         item.keterangan,
-      ];
+      ]);
     });
 
-    return tableRows.concat(aggregatedRows);
+    return tableData;
   },
 
   getStatusBadge(transaction) {
     const status = transaction.statusPembayaran || "Lunas";
 
     if (status === "DP") {
-      // Helper to parse numbers robustly (handles strings with separators)
-      const toNumber = (v) => {
-        if (v === null || v === undefined) return 0;
-        if (typeof v === "number") return v;
-        const s = String(v).replace(/[^0-9-]/g, "");
-        const n = parseInt(s, 10);
-        return isNaN(n) ? 0 : n;
-      };
-
-      // Compute DP paid: use nominalDP if exists, otherwise sum from pembayaran array
-      let dpPaid = 0;
-      if (transaction.nominalDP) {
-        dpPaid = toNumber(transaction.nominalDP);
-      } else if (Array.isArray(transaction.pembayaran)) {
-        dpPaid = transaction.pembayaran.reduce((sum, p) => sum + toNumber(p.nominal || p.amount || 0), 0);
-      }
-
-      // Only show DP amount in status as requested
-      return `<span class="badge bg-warning">DP: Rp ${formatRupiah(dpPaid)}</span>`;
+      return `<span class="badge bg-warning">DP: Rp ${formatRupiah(transaction.nominalDP)}</span>
+              <br><small>Sisa: Rp ${formatRupiah(transaction.sisaPembayaran)}</small>`;
     } else if (status === "Lunas") {
       return `<span class="badge bg-success">Lunas</span>`;
     } else if (transaction.metodeBayar === "free") {
@@ -867,7 +866,7 @@ const laporanPenjualanHandler = {
         // Type filter
         let typeMatches = true;
         if (salesType !== "all") {
-          if (salesType === "manual") {
+          if (salesType === "layanan") {
             typeMatches = item.jenisPenjualan === "manual";
           } else {
             typeMatches = item.jenisPenjualan === salesType;

@@ -10,12 +10,8 @@ import {
   getDoc,
   updateDoc,
   deleteDoc,
-  Timestamp,
-  orderBy,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 import { firestore } from "./configFirebase.js";
-
-import StockService from "./services/stockService.js";
 
 // Utils function untuk alert
 const showAlert = (message, title = "Informasi", type = "info") => {
@@ -28,15 +24,6 @@ const showAlert = (message, title = "Informasi", type = "info") => {
   });
 };
 
-// Helper function untuk parse tanggal dd/mm/yyyy ke Date object
-const parseDate = (dateString) => {
-  if (!dateString) return null;
-  const parts = dateString.split("/");
-  if (parts.length !== 3) return null;
-  // parts[0] = day, parts[1] = month, parts[2] = year
-  return new Date(parts[2], parts[1] - 1, parts[0]);
-};
-
 const returnHandler = {
   stockData: [],
   stockListener: null,
@@ -46,114 +33,63 @@ const returnHandler = {
   isDeleting: false,
   deletePassword: "smlt116",
 
+  async filterRiwayatReturn() {
+    const selectedDate = $("#filterDate").val();
+    if (!selectedDate) {
+      showAlert("Mohon pilih tanggal", "Warning", "warning");
+      return;
+    }
+    this.loadRiwayatReturn(selectedDate);
+  },
+
   async init() {
     try {
-      this.initDatePickers();
       await this.setupEventListeners();
       this.setupRealTimeListeners();
       this.setDefaultDate();
       this.setDefaultFilterDates();
-      // Tidak auto-load, user harus klik tombol Tampilkan
+      await this.loadRiwayatReturn();
     } catch (error) {
       console.error("Error initializing return handler:", error);
       showAlert("Terjadi kesalahan saat memuat halaman", "Error", "error");
     }
   },
 
-  // Initialize date pickers
-  initDatePickers() {
-    $(".datepicker").datepicker({
-      format: "dd/mm/yyyy",
-      autoclose: true,
-      language: "id",
-      todayHighlight: true,
-      endDate: "0d", // Tidak bisa pilih tanggal masa depan
-    });
-  },
-
   // Set default filter date
   setDefaultFilterDates() {
     const today = new Date();
-    const day = String(today.getDate()).padStart(2, "0");
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-    const year = today.getFullYear();
-    const formattedToday = `${day}/${month}/${year}`;
-    $("#filterStartDate").val(formattedToday);
-    $("#filterEndDate").val(formattedToday);
+    $("#filterDate").val(today.toISOString().split("T")[0]);
   },
 
-  // Load riwayat return dari stokAksesorisTransaksi (Single Source of Truth)
-  async loadRiwayatReturn(startDate = null, endDate = null) {
+  // Load riwayat return
+  async loadRiwayatReturn(selectedDate = null) {
     try {
-      // Jika tidak ada parameter, tidak load data
-      if (!startDate || !endDate) {
-        this.riwayatData = [];
-        this.renderRiwayatReturn();
-        return;
+      const returnRef = collection(firestore, "returnBarang");
+      let returnQuery = returnRef;
+
+      if (selectedDate) {
+        // Convert to Date object to handle time zones properly
+        const date = new Date(selectedDate);
+        const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
+
+        returnQuery = query(
+          returnRef,
+          where("tanggal", ">=", startOfDay.toISOString()),
+          where("tanggal", "<=", endOfDay.toISOString())
+        );
       }
-
-      // Convert to Date object to handle time zones properly
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-
-      // Validate dates
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-        console.warn("Invalid date range:", { startDate, endDate });
-        this.riwayatData = [];
-        this.renderRiwayatReturn();
-        return;
-      }
-
-      const startOfDay = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
-      const endOfDay = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999);
-
-      console.log(`🔍 Query return data from ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
-
-      // Query dari stokAksesorisTransaksi dengan jenis = "return"
-      const transactionRef = collection(firestore, "stokAksesorisTransaksi");
-      const returnQuery = query(
-        transactionRef,
-        where("jenis", "==", "return"),
-        where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
-        where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
-        orderBy("timestamp", "desc"),
-      );
 
       const snapshot = await getDocs(returnQuery);
-      console.log(`📦 Found ${snapshot.size} return transactions`);
+      this.riwayatData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-      // Transform data untuk format yang compatible dengan renderRiwayatReturn
-      this.riwayatData = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        // Get tanggal from timestamp field (more reliable)
-        let tanggalStr = new Date().toISOString();
-        if (data.timestamp && data.timestamp.toDate) {
-          tanggalStr = data.timestamp.toDate().toISOString();
-        } else if (data.tanggal) {
-          tanggalStr = data.tanggal;
-        }
-
-        return {
-          id: doc.id,
-          tanggal: tanggalStr,
-          namaSales: data.sales || "-",
-          jenisReturn: data.jenisReturn || data.kategori || "-",
-          detailReturn: [
-            {
-              kode: data.kode,
-              namaBarang: data.namaBarang || data.nama || "-",
-              jumlah: data.jumlah,
-              keterangan: data.keterangan || "",
-            },
-          ],
-        };
-      });
-
-      console.log(`✅ Loaded ${this.riwayatData.length} return records`);
       this.renderRiwayatReturn();
     } catch (error) {
       console.error("Error loading riwayat return:", error);
-      showAlert("Gagal memuat data riwayat return. Error: " + error.message, "Error", "error");
+      showAlert("Gagal memuat data riwayat return", "Error", "error");
     }
   },
 
@@ -172,18 +108,6 @@ const returnHandler = {
     }
 
     this.riwayatData.forEach((data) => {
-      // Format tanggal untuk display
-      let displayDate = data.tanggal;
-      try {
-        const date = new Date(data.tanggal);
-        const day = String(date.getDate()).padStart(2, "0");
-        const month = String(date.getMonth() + 1).padStart(2, "0");
-        const year = date.getFullYear();
-        displayDate = `${day}/${month}/${year}`;
-      } catch (e) {
-        console.error("Error formatting date:", e);
-      }
-
       // Handle multiple items in detailReturn
       data.detailReturn.forEach((item, index) => {
         // Hanya tampilkan tombol hapus pada row pertama untuk setiap return
@@ -202,7 +126,7 @@ const returnHandler = {
 
         $tbody.append(`
         <tr>
-          <td>${displayDate}</td>
+          <td>${data.tanggal}</td>
           <td>${data.namaSales}</td>
           <td>${data.jenisReturn}</td>
           <td>${item.kode}</td>
@@ -224,27 +148,12 @@ const returnHandler = {
       return;
     }
 
-    const startDate = $("#filterStartDate").val();
-    const endDate = $("#filterEndDate").val();
-
-    if (!startDate || !endDate) {
-      showAlert("Mohon pilih tanggal mulai dan tanggal akhir terlebih dahulu", "Warning", "warning");
-      return;
-    }
-
-    const formattedStartDate = new Date(startDate).toLocaleDateString("id-ID", {
+    const selectedDate = $("#filterDate").val();
+    const formattedDate = new Date(selectedDate).toLocaleDateString("id-ID", {
       day: "numeric",
       month: "long",
       year: "numeric",
     });
-
-    const formattedEndDate = new Date(endDate).toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-
-    const dateRange = startDate === endDate ? formattedStartDate : `${formattedStartDate} - ${formattedEndDate}`;
 
     let printContent = `
       <!DOCTYPE html>
@@ -262,7 +171,7 @@ const returnHandler = {
         <body>
           <div class="header">
             <h2>Laporan Return Barang</h2>
-            <p>Periode: ${dateRange}</p>
+            <p>Tanggal: ${formattedDate}</p>
           </div>
           <table>
             <thead>
@@ -280,22 +189,10 @@ const returnHandler = {
     `;
 
     this.riwayatData.forEach((data) => {
-      // Format tanggal untuk display
-      let displayDate = data.tanggal;
-      try {
-        const date = new Date(data.tanggal);
-        const day = String(date.getDate()).padStart(2, "0");
-        const month = String(date.getMonth() + 1).padStart(2, "0");
-        const year = date.getFullYear();
-        displayDate = `${day}/${month}/${year}`;
-      } catch (e) {
-        console.error("Error formatting date:", e);
-      }
-
       data.detailReturn.forEach((item) => {
         printContent += `
           <tr>
-            <td>${displayDate}</td>
+            <td>${data.tanggal}</td>
             <td>${data.namaSales}</td>
             <td>${data.jenisReturn}</td>
             <td>${item.kode}</td>
@@ -326,33 +223,12 @@ const returnHandler = {
 
   // Filter riwayat return
   filterRiwayatReturn() {
-    const startDateStr = $("#filterStartDate").val();
-    const endDateStr = $("#filterEndDate").val();
-
-    if (!startDateStr || !endDateStr) {
-      showAlert("Mohon pilih tanggal mulai dan tanggal akhir", "Warning", "warning");
+    const selectedDate = $("#filterDate").val();
+    if (!selectedDate) {
+      showAlert("Mohon pilih tanggal", "Warning", "warning");
       return;
     }
-
-    // Parse tanggal dari format dd/mm/yyyy
-    const startDate = parseDate(startDateStr);
-    const endDate = parseDate(endDateStr);
-
-    if (!startDate || !endDate) {
-      showAlert("Format tanggal tidak valid", "Warning", "warning");
-      return;
-    }
-
-    if (startDate > endDate) {
-      showAlert("Tanggal mulai tidak boleh lebih besar dari tanggal akhir", "Warning", "warning");
-      return;
-    }
-
-    // Konversi ke format ISO untuk query
-    const startISO = startDate.toISOString().split("T")[0];
-    const endISO = endDate.toISOString().split("T")[0];
-
-    this.loadRiwayatReturn(startISO, endISO);
+    this.loadRiwayatReturn(selectedDate);
   },
 
   // Setup event listeners
@@ -368,6 +244,16 @@ const returnHandler = {
     // Filter and print buttons
     $("#btnTampilkan").on("click", () => this.filterRiwayatReturn());
     $("#btnPrintLaporan").on("click", () => this.printLaporanReturn());
+
+    // Add filter function
+    async function filterRiwayatReturn() {
+      const selectedDate = $("#filterDate").val();
+      if (!selectedDate) {
+        showAlert("Mohon pilih tanggal", "Warning", "warning");
+        return;
+      }
+      await this.loadRiwayatReturn(selectedDate);
+    }
 
     // Pilih barang button
     $("#btnPilihBarang").on("click", async () => {
@@ -445,58 +331,53 @@ const returnHandler = {
     });
   },
 
-  // Load master data and calculate stock from transactions (single source of truth)
+  // Load stock data based on type
   async loadStockData(type) {
     try {
-      console.log(`🔍 Loading stock data for type: ${type}`);
-
-      // 1. Get master data (kode, nama, kategori) from stokAksesoris
+      // Get all stock data first
       const stockRef = collection(firestore, "stokAksesoris");
       const snapshot = await getDocs(stockRef);
-      const masterData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
 
-      console.log(`📦 Loaded ${masterData.length} master items`);
+      // Log raw data for debugging
+      console.log(
+        "Raw Firestore data:",
+        snapshot.docs.map((doc) => doc.data())
+      );
 
-      // 2. Calculate real stock from transactions (single source of truth)
-      const stockMap = await StockService.calculateAllStocksBatch();
-      console.log(`📊 Calculated stock for ${stockMap.size} items`);
+      this.stockData = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return { id: doc.id, ...data };
+      });
 
-      // 3. Merge master data with calculated stock
-      const mergedData = masterData.map((item) => ({
-        ...item,
-        stok: stockMap.get(item.kode) || 0, // Real stock from transactions
-      }));
+      // Filter based on type
+      this.stockData = this.stockData.filter((item) => {
+        // Check both kategori and jenis fields
+        const itemType = (item.kategori || item.jenis || "").toLowerCase();
+        const isMatchingType =
+          type === "kotak" ? itemType.includes("kotak") : itemType.includes("aksesoris") || itemType === "";
 
-      // 4. Filter by type and stock > 0
-      this.stockData = mergedData.filter((item) => {
-        const itemKategori = (item.kategori || item.jenis || "").toLowerCase();
+        // Check stock
+        const hasStock = (parseInt(item.stok) || parseInt(item.stokAkhir) || 0) > 0;
 
-        // Match type (support kotak, aksesoris, silver)
-        const matchesType =
-          type === "kotak"
-            ? itemKategori.includes("kotak")
-            : type === "aksesoris"
-              ? itemKategori.includes("aksesoris")
-              : type === "silver"
-                ? itemKategori.includes("silver")
-                : false;
+        // Log item details for debugging
+        console.log(`Item ${item.kode}:`, {
+          type: itemType,
+          matches: isMatchingType,
+          stock: hasStock,
+          stok: item.stok,
+          stokAkhir: item.stokAkhir,
+        });
 
-        const hasStock = item.stok > 0;
-
-        if (matchesType) {
-          console.log(`✓ ${item.kode}: kategori=${itemKategori}, stock=${item.stok}`);
-        }
-
-        return matchesType && hasStock;
+        return isMatchingType && hasStock;
       });
 
       this.populateStockTable();
-      console.log(`✅ Loaded ${this.stockData.length} items for type '${type}' with stock > 0`);
+
+      // Log filtered results
+      console.log(`Loaded ${this.stockData.length} items for type: ${type}`);
+      console.log("Filtered data:", this.stockData);
     } catch (error) {
-      console.error("❌ Error loading stock data:", error);
+      console.error("Error loading stock data:", error);
       showAlert("Gagal memuat data stok", "Error", "error");
     }
   },
@@ -509,22 +390,26 @@ const returnHandler = {
     if (!this.stockData || this.stockData.length === 0) {
       $tbody.append(`
         <tr>
-          <td colspan="2" class="text-center">Tidak ada data dengan stok tersedia</td>
+          <td colspan="3" class="text-center">Tidak ada data</td>
         </tr>
       `);
       return;
     }
 
     this.stockData.forEach((item) => {
-      $tbody.append(`
-        <tr data-id="${item.id}" data-kode="${item.kode}">
-          <td>${item.kode}</td>
-          <td>${item.nama || "-"}</td>
-        </tr>
-      `);
+      const stok = parseInt(item.stok) || parseInt(item.stokAkhir) || 0;
+      if (stok > 0) {
+        $tbody.append(`
+          <tr data-id="${item.id}" data-kode="${item.kode}">
+            <td>${item.kode}</td>
+            <td>${item.nama || "-"}</td>
+          </tr>
+        `);
+      }
     });
 
-    console.log(`📋 Populated table with ${this.stockData.length} items`);
+    // Log untuk debugging
+    console.log(`Populated table with ${this.stockData.length} items`);
   },
 
   // Add return row
@@ -564,14 +449,19 @@ const returnHandler = {
   // Set default date
   setDefaultDate() {
     const today = new Date();
-    // Format tanggal ke dd/mm/yyyy
+    // Format tanggal ke YYYY-MM-DD
     const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, "0");
     const day = String(today.getDate()).padStart(2, "0");
-    const formattedDate = `${day}/${month}/${year}`;
+    const formattedDate = `${year}-${month}-${day}`;
 
     // Set nilai default untuk input tanggal
     $("#tanggalReturn").val(formattedDate);
+    $("#filterDate").val(formattedDate); // Set juga untuk filter tanggal
+
+    // Set max date ke hari ini untuk mencegah pemilihan tanggal masa depan
+    $("#tanggalReturn").attr("max", formattedDate);
+    $("#filterDate").attr("max", formattedDate);
   },
 
   // Validate return
@@ -635,36 +525,67 @@ const returnHandler = {
     }
   },
 
-  // Save to stokAksesorisTransaksi collection (Single Source of Truth)
-  async saveToStokTransaksi(returnData) {
+  // NEW: Update stock in stokAksesoris collection
+  async updateStockAfterReturn(kode, jumlahReturn) {
     try {
-      const savedTransactions = [];
+      const stockRef = collection(firestore, "stokAksesoris");
+      const stockQuery = query(stockRef, where("kode", "==", kode));
+      const snapshot = await getDocs(stockQuery);
 
-      for (const item of returnData.detailReturn) {
-        // Calculate current stock from transactions
-        const stokSebelum = await StockService.calculateStockFromTransactions(item.kode);
-        const stokSesudah = Math.max(0, stokSebelum - item.jumlah);
+      if (!snapshot.empty) {
+        const stockDoc = snapshot.docs[0];
+        const currentData = stockDoc.data();
+        const currentStok = parseInt(currentData.stok) || parseInt(currentData.stokAkhir) || 0;
+        const newStok = Math.max(0, currentStok - jumlahReturn); // return = barang keluar → stok berkurang
 
-        // ✅ Gunakan StockService dengan field lengkap untuk single source of truth
-        const transactionRef = await StockService.updateStock({
-          kode: item.kode,
-          jenis: "return",
-          jumlah: item.jumlah,
-          tanggal: returnData.tanggal, // Tanggal return yang dipilih user
-          keterangan: item.keterangan || "",
-          sales: returnData.namaSales,
-          nama: item.namaBarang,
-          namaBarang: item.namaBarang,
-          jenisReturn: returnData.jenisReturn, // kotak/aksesoris/silver
-          currentStock: stokSebelum,
-          newStock: stokSesudah,
+        await updateDoc(doc(firestore, "stokAksesoris", stockDoc.id), {
+          stok: newStok,
+          stokAkhir: newStok,
         });
 
-        savedTransactions.push(transactionRef.id);
-        console.log(`✅ Return transaction saved for ${item.kode} (ID: ${transactionRef.id})`);
+        return true;
       }
+      return false;
+    } catch (error) {
+      console.error("Error updating stock:", error);
+      return false;
+    }
+  },
 
-      return savedTransactions;
+  // NEW: Save to stokAksesorisTransaksi collection
+  async saveToStokTransaksi(returnData) {
+    try {
+      for (const item of returnData.detailReturn) {
+        const currentStock = await this.getCurrentStockData(item.kode);
+
+        if (currentStock) {
+          const stokSebelum = parseInt(currentStock.stok) || parseInt(currentStock.stokAkhir) || 0;
+          const stokSesudah = Math.max(0, stokSebelum - item.jumlah); // pengurangan karena return
+
+          const transaksiData = {
+            isScantiLock: false,
+            jenis: "return", // transaksi return → pengurangan stok
+            jumlah: item.jumlah, // disimpan positif, dihitung sebagai pengurangan di laporan
+            kategori: currentStock.kategori || returnData.jenisReturn,
+            keterangan: `Return barang oleh ${returnData.namaSales}${item.keterangan ? ` - ${item.keterangan}` : ""}`,
+            kode: item.kode,
+            nama: item.namaBarang,
+            stokAkhir: stokSesudah,
+            stokSebelum: stokSebelum,
+            stokSesudah: stokSesudah,
+            timestamp: serverTimestamp(),
+          };
+
+          await addDoc(collection(firestore, "stokAksesorisTransaksi"), transaksiData);
+
+          // Update stok master (berkurang)
+          await this.updateStockAfterReturn(item.kode, item.jumlah);
+
+          console.log(`✅ Transaction saved for ${item.kode}`);
+        } else {
+          console.warn(`⚠️ Stock data not found for ${item.kode}`);
+        }
+      }
     } catch (error) {
       console.error("Error saving to stokAksesorisTransaksi:", error);
       throw error;
@@ -680,19 +601,10 @@ const returnHandler = {
       $("#btnSimpanReturn").prop("disabled", true);
 
       // Prepare return data
-      const selectedDateStr = $("#tanggalReturn").val();
-      const selectedDate = parseDate(selectedDateStr);
-
-      if (!selectedDate) {
-        showAlert("Format tanggal tidak valid", "Error", "error");
-        return;
-      }
-
-      // Format tanggal ke ISO string untuk Firestore
-      const isoDate = selectedDate.toISOString();
+      const selectedDate = $("#tanggalReturn").val();
 
       const returnData = {
-        tanggal: isoDate,
+        tanggal: selectedDate,
         namaSales: $("#sales").val().trim(),
         jenisReturn: $("#jenisReturn").val(),
         detailReturn: [],
@@ -712,25 +624,17 @@ const returnHandler = {
 
       console.log("Saving return data:", returnData);
 
-      // ✅ Single Source of Truth: Simpan HANYA ke stokAksesorisTransaksi
-      const savedIds = await this.saveToStokTransaksi(returnData);
-      console.log(`✅ Return saved with transaction IDs:`, savedIds);
+      // Save to returnBarang collection
+      await addDoc(collection(firestore, "returnBarang"), returnData);
+
+      // Save to stokAksesorisTransaksi collection and update stock
+      await this.saveToStokTransaksi(returnData);
 
       showAlert("Data return berhasil disimpan dan stok telah diperbarui", "Sukses", "success");
       this.resetForm();
 
-      // Refresh data dengan filter tanggal yang aktif
-      const startDateStr = $("#filterStartDate").val();
-      const endDateStr = $("#filterEndDate").val();
-      if (startDateStr && endDateStr) {
-        const startDate = parseDate(startDateStr);
-        const endDate = parseDate(endDateStr);
-        if (startDate && endDate) {
-          const startISO = startDate.toISOString().split("T")[0];
-          const endISO = endDate.toISOString().split("T")[0];
-          await this.loadRiwayatReturn(startISO, endISO);
-        }
-      }
+      // Refresh data if needed
+      await this.loadRiwayatReturn();
     } catch (error) {
       console.error("Error saving return:", error);
       showAlert("Gagal menyimpan data return", "Error", "error");
@@ -789,7 +693,7 @@ const returnHandler = {
     $("#modalKonfirmasiHapus").modal("show");
   },
 
-  // Delete return data (Single Source of Truth - hapus dari stokAksesorisTransaksi)
+  // NEW: Delete return data
   async deleteReturnData() {
     if (this.isDeleting || !this.currentDeleteData) return;
 
@@ -812,28 +716,17 @@ const returnHandler = {
       this.isDeleting = true;
       $("#btnKonfirmasiHapus").prop("disabled", true).html('<i class="fas fa-spinner fa-spin me-2"></i>Menghapus...');
 
-      // ✅ Single Source of Truth: Hapus langsung dari stokAksesorisTransaksi
-      // Data ID sudah merujuk ke dokumen di stokAksesorisTransaksi
-      await deleteDoc(doc(firestore, "stokAksesorisTransaksi", this.currentDeleteData.id));
-      console.log(`✅ Return transaction deleted: ${this.currentDeleteData.id}`);
+      // Delete from returnBarang collection
+      await deleteDoc(doc(firestore, "returnBarang", this.currentDeleteData.id));
 
-      showAlert("Data return berhasil dihapus dan stok otomatis dikembalikan", "Sukses", "success");
+      // Optionally: Reverse stock changes
+      await this.reverseStockChanges(this.currentDeleteData);
+
+      showAlert("Data return berhasil dihapus", "Sukses", "success");
 
       // Hide modal and refresh data
       $("#modalKonfirmasiHapus").modal("hide");
-
-      // Refresh dengan filter tanggal yang aktif
-      const startDateStr = $("#filterStartDate").val();
-      const endDateStr = $("#filterEndDate").val();
-      if (startDateStr && endDateStr) {
-        const startDate = parseDate(startDateStr);
-        const endDate = parseDate(endDateStr);
-        if (startDate && endDate) {
-          const startISO = startDate.toISOString().split("T")[0];
-          const endISO = endDate.toISOString().split("T")[0];
-          await this.loadRiwayatReturn(startISO, endISO);
-        }
-      }
+      await this.loadRiwayatReturn($("#filterDate").val());
     } catch (error) {
       console.error("Error deleting return data:", error);
       showAlert("Gagal menghapus data return", "Error", "error");
@@ -843,10 +736,45 @@ const returnHandler = {
     }
   },
 
-  // ✅ Tidak perlu reverseStockChanges lagi!
-  // Karena menggunakan Single Source of Truth (stokAksesorisTransaksi),
-  // menghapus transaksi return otomatis mengembalikan stok
-  // karena StockService.calculateStockFromTransactions() menghitung dari semua transaksi
+  // NEW: Reverse stock changes when deleting return
+  async reverseStockChanges(returnData) {
+    try {
+      for (const item of returnData.detailReturn) {
+        const currentStock = await this.getCurrentStockData(item.kode);
+
+        if (currentStock) {
+          const currentStok = parseInt(currentStock.stok) || parseInt(currentStock.stokAkhir) || 0;
+          const newStok = currentStok + item.jumlah; // pembatalan return → stok bertambah
+
+          await updateDoc(doc(firestore, "stokAksesoris", currentStock.id), {
+            stok: newStok,
+            stokAkhir: newStok,
+          });
+
+          // Catat transaksi pembatalan return agar historis konsisten
+          const reverseTransaksiData = {
+            isScantiLock: false,
+            jenis: "reverse_return", // pembatalan return
+            jumlah: item.jumlah, // positif → akan mengurangi nilai return bersih di laporan
+            kategori: currentStock.kategori || returnData.jenisReturn,
+            keterangan: `Pembatalan return - ${returnData.namaSales}`,
+            kode: item.kode,
+            nama: item.namaBarang,
+            stokAkhir: newStok,
+            stokSebelum: currentStok,
+            stokSesudah: newStok,
+            timestamp: serverTimestamp(),
+          };
+
+          await addDoc(collection(firestore, "stokAksesorisTransaksi"), reverseTransaksiData);
+
+          console.log(`✅ Stock reversed for ${item.kode}`);
+        }
+      }
+    } catch (error) {
+      console.error("Error reversing stock changes:", error);
+    }
+  },
 
   // Cleanup
   cleanup() {

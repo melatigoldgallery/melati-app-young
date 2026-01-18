@@ -54,7 +54,11 @@ const cacheManager = {
     if (salesData && Array.isArray(salesData)) {
       const index = salesData.findIndex((item) => item.id === transactionId);
       if (index !== -1) {
-        salesData[index] = { ...salesData[index], ...updatedData };
+        // Deep copy untuk nested objects (items array)
+        const currentItem = JSON.parse(JSON.stringify(salesData[index]));
+        const newData = JSON.parse(JSON.stringify(updatedData));
+        delete newData.lastUpdated; // Remove serverTimestamp
+        salesData[index] = { ...currentItem, ...newData };
         this.set("salesData", salesData);
         return true;
       }
@@ -162,6 +166,49 @@ const utils = {
       return `${day}/${month}/${year}`;
     } catch (error) {
       console.error("Error formatting date:", date, error);
+      return "-";
+    }
+  },
+
+  formatTime: (date) => {
+    if (!date) return "-";
+
+    try {
+      let dateObj = null;
+
+      // Handle Firestore Timestamp
+      if (date && typeof date.toDate === "function") {
+        dateObj = date.toDate();
+      }
+      // Handle Date object
+      else if (date instanceof Date) {
+        dateObj = date;
+      }
+      // Handle timestamp number
+      else if (typeof date === "number") {
+        dateObj = new Date(date);
+      }
+      // Handle string
+      else if (typeof date === "string") {
+        dateObj = new Date(date);
+      }
+      // Handle object with seconds (Firestore timestamp format)
+      else if (date && typeof date === "object" && date.seconds) {
+        dateObj = new Date(date.seconds * 1000);
+      }
+
+      // Validate the date
+      if (!dateObj || isNaN(dateObj.getTime())) {
+        return "-";
+      }
+
+      const hours = String(dateObj.getHours()).padStart(2, "0");
+      const minutes = String(dateObj.getMinutes()).padStart(2, "0");
+      const seconds = String(dateObj.getSeconds()).padStart(2, "0");
+
+      return `${hours}:${minutes}:${seconds}`;
+    } catch (error) {
+      console.error("Error formatting time:", date, error);
       return "-";
     }
   },
@@ -276,22 +323,6 @@ class OptimizedDataPenjualanApp {
     // ✅ PERBAIKAN: Bind inactivity methods
     this.resetInactivityTimer = this.resetInactivityTimer.bind(this);
     this.handleUserInactivity = this.handleUserInactivity.bind(this);
-
-    // Shared CSS for printing invoice (aligned with aksesoris-app)
-    this.INVOICE_CSS = `
-      @page { size: 10cm 20cm; margin: 0; }
-      body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; box-sizing: border-box; }
-      .invoice { width: 100%; }
-      .header-info { text-align: right; margin-bottom: 0.5cm; margin-right: 3cm; margin-top: 0.8cm; }
-      .customer-info { text-align: right; margin-bottom: 0.9cm; margin-right: 3cm; font-size: 11px; line-height: 1.2; }
-      .total-row { margin-top: 0.7cm; text-align: right; font-weight: bold; margin-right: 3cm; }
-      .sales { text-align: right; margin-top: 0.6cm; margin-right: 2cm; }
-      .keterangan { font-style: italic; font-size: 10px; margin-top: 1.2cm; margin-bottom: 0.4cm; padding-top: 2mm; text-align: left; margin-left: 0.5cm; margin-right: 3cm; }
-      .keterangan-spacer { height: 1.6cm; }
-      .item-details { display: flex; flex-wrap: wrap; }
-      .item-data { display: grid; grid-template-columns: 2cm 2.7cm 4.6cm 1.8cm 1.8cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 0.5cm; margin-top: 1cm; margin-right: 3cm; }
-      .item-data span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    `;
   }
 
   // ✅ PERBAIKAN: Tambahkan method untuk handle inactivity
@@ -745,6 +776,7 @@ class OptimizedDataPenjualanApp {
       data: [],
       columns: [
         { title: "Tanggal", width: "90px", className: "text-center" },
+        { title: "Jam", width: "75px", className: "text-center" },
         { title: "Sales", width: "80px", className: "text-center" },
         { title: "Jenis", width: "85px", className: "text-center" },
         { title: "Kode", width: "100px", className: "text-center" },
@@ -765,7 +797,7 @@ class OptimizedDataPenjualanApp {
       autoWidth: false,
       columnDefs: [
         { targets: "_all", className: "text-nowrap" },
-        { targets: [10], className: "text-wrap" },
+        { targets: [11], className: "text-wrap" },
       ],
       language: {
         decimal: "",
@@ -954,26 +986,32 @@ class OptimizedDataPenjualanApp {
     uniqueFilteredData.forEach((transaction) => {
       // ✅ PERBAIKAN: Handle timestamp dengan lebih robust
       let displayDate = "-";
+      let displayTime = "-";
 
       if (transaction.timestamp) {
         if (typeof transaction.timestamp.toDate === "function") {
           try {
             displayDate = utils.formatDate(transaction.timestamp.toDate());
+            displayTime = utils.formatTime(transaction.timestamp.toDate());
           } catch (error) {
             console.warn("Error formatting timestamp:", error);
             displayDate = utils.formatDate(transaction.tanggal) || "-";
           }
         } else if (transaction.timestamp instanceof Date) {
           displayDate = utils.formatDate(transaction.timestamp);
+          displayTime = utils.formatTime(transaction.timestamp);
         } else if (
           transaction.timestamp &&
           typeof transaction.timestamp === "object" &&
           transaction.timestamp.seconds
         ) {
-          displayDate = utils.formatDate(new Date(transaction.timestamp.seconds * 1000));
+          const tempDate = new Date(transaction.timestamp.seconds * 1000);
+          displayDate = utils.formatDate(tempDate);
+          displayTime = utils.formatTime(tempDate);
         } else {
           const parsedDate = new Date(transaction.timestamp);
           displayDate = isNaN(parsedDate.getTime()) ? "-" : utils.formatDate(parsedDate);
+          displayTime = isNaN(parsedDate.getTime()) ? "-" : utils.formatTime(parsedDate);
         }
       } else if (transaction.tanggal) {
         displayDate = utils.formatDate(transaction.tanggal);
@@ -981,6 +1019,7 @@ class OptimizedDataPenjualanApp {
 
       const baseData = {
         date: displayDate,
+        time: displayTime,
         sales: transaction.sales || "Admin",
         jenis: this.formatJenisPenjualan(transaction),
         status: this.getStatusBadge(transaction),
@@ -991,6 +1030,7 @@ class OptimizedDataPenjualanApp {
         transaction.items.forEach((item) => {
           tableData.push([
             baseData.date,
+            baseData.time,
             baseData.sales,
             baseData.jenis,
             item.kodeText || item.barcode || "-",
@@ -1007,6 +1047,7 @@ class OptimizedDataPenjualanApp {
       } else {
         tableData.push([
           baseData.date,
+          baseData.time,
           baseData.sales,
           baseData.jenis,
           "-",
@@ -1160,10 +1201,38 @@ class OptimizedDataPenjualanApp {
 
   // Generate edit form HTML
   generateEditForm(transaction, jenisPenjualan) {
+    // Format tanggal untuk input date dengan error handling
+    let tanggalValue = new Date().toISOString().split("T")[0]; // Default hari ini
+    try {
+      if (transaction.timestamp) {
+        let dateObj = null;
+        if (typeof transaction.timestamp.toDate === "function") {
+          dateObj = transaction.timestamp.toDate();
+        } else if (transaction.timestamp.seconds) {
+          dateObj = new Date(transaction.timestamp.seconds * 1000);
+        } else if (transaction.timestamp instanceof Date) {
+          dateObj = transaction.timestamp;
+        } else {
+          dateObj = new Date(transaction.timestamp);
+        }
+        if (dateObj && !isNaN(dateObj.getTime())) {
+          tanggalValue = dateObj.toISOString().split("T")[0];
+        }
+      }
+    } catch (e) {
+      console.warn("Error parsing date for edit:", e);
+    }
+
     let formHtml = `
-      <div class="mb-3">
-        <label for="editSales" class="form-label">Sales:</label>
-        <input type="text" class="form-control" id="editSales" value="${transaction.sales || ""}">
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <label for="editTanggal" class="form-label">Tanggal:</label>
+          <input type="date" class="form-control" id="editTanggal" value="${tanggalValue}">
+        </div>
+        <div class="col-md-6">
+          <label for="editSales" class="form-label">Sales:</label>
+          <input type="text" class="form-control" id="editSales" value="${transaction.sales || ""}">
+        </div>
       </div>
     `;
 
@@ -1171,28 +1240,31 @@ class OptimizedDataPenjualanApp {
       formHtml += `<div class="mb-3"><label class="form-label">Detail Barang:</label></div>`;
 
       transaction.items.forEach((item, index) => {
-        formHtml += `
-          <div class="border p-3 mb-3 rounded">
-            <h6>Item ${index + 1}</h6>
-            <div class="row">
-              <div class="col-md-6">
-                <label for="editNama_${index}" class="form-label">Nama Barang:</label>
-                <input type="text" class="form-control" id="editNama_${index}" value="${item.nama || ""}">
+        if (jenisPenjualan === "manual") {
+          // Manual: Barcode, Kode Lock, Nama, Kadar, Berat, Harga, Keterangan
+          formHtml += `
+            <div class="border p-3 mb-3 rounded">
+              <h6>Item ${index + 1}</h6>
+              <div class="row">
+                <div class="col-md-6">
+                  <label for="editBarcode_${index}" class="form-label">Barcode:</label>
+                  <input type="text" class="form-control" id="editBarcode_${index}" value="${item.kodeText || ""}">
+                </div>
+                <div class="col-md-6">
+                  <label for="editKodeLock_${index}" class="form-label">Kode Lock:</label>
+                  <input type="text" class="form-control" id="editKodeLock_${index}" value="${item.kodeLock || ""}">
+                </div>
               </div>
-              ${
-                jenisPenjualan !== "kotak"
-                  ? `
+              <div class="row mt-2">
+                <div class="col-md-6">
+                  <label for="editNama_${index}" class="form-label">Nama Barang:</label>
+                  <input type="text" class="form-control" id="editNama_${index}" value="${item.nama || ""}">
+                </div>
                 <div class="col-md-6">
                   <label for="editKadar_${index}" class="form-label">Kadar:</label>
                   <input type="text" class="form-control" id="editKadar_${index}" value="${item.kadar || ""}">
                 </div>
-              `
-                  : ""
-              }
-            </div>
-            ${
-              jenisPenjualan !== "kotak"
-                ? `
+              </div>
               <div class="row mt-2">
                 <div class="col-md-6">
                   <label for="editBerat_${index}" class="form-label">Berat (gr):</label>
@@ -1201,38 +1273,64 @@ class OptimizedDataPenjualanApp {
                 <div class="col-md-6">
                   <label for="editHarga_${index}" class="form-label">Harga:</label>
                   <input type="text" class="form-control" id="editHarga_${index}" value="${utils.formatRupiah(
-                    item.totalHarga || 0
-                  )}">
+            item.totalHarga || 0
+          )}">
                 </div>
               </div>
-            `
-                : `
-              <div class="row mt-2">
-                <div class="col-md-12">
-                  <label for="editHarga_${index}" class="form-label">Harga:</label>
-                  <input type="text" class="form-control" id="editHarga_${index}" value="${utils.formatRupiah(
-                    item.totalHarga || 0
-                  )}">
-                </div>
-              </div>
-            `
-            }
-            ${
-              jenisPenjualan === "manual"
-                ? `
               <div class="row mt-2">
                 <div class="col-md-12">
                   <label for="editKeterangan_${index}" class="form-label">Keterangan:</label>
                   <textarea class="form-control" id="editKeterangan_${index}" rows="2">${
-                    item.keterangan || ""
-                  }</textarea>
+            item.keterangan || ""
+          }</textarea>
                 </div>
               </div>
-            `
-                : ""
-            }
-          </div>
-        `;
+            </div>
+          `;
+        } else {
+          // Aksesoris & Kotak: Kode, Nama, Kadar, Berat, Harga
+          formHtml += `
+            <div class="border p-3 mb-3 rounded">
+              <h6>Item ${index + 1}</h6>
+              <div class="row">
+                <div class="col-md-6">
+                  <label for="editKode_${index}" class="form-label">Kode:</label>
+                  <input type="text" class="form-control" id="editKode_${index}" value="${
+            item.kodeText || item.kode || ""
+          }">
+                </div>
+                <div class="col-md-6">
+                  <label for="editNama_${index}" class="form-label">Nama Barang:</label>
+                  <input type="text" class="form-control" id="editNama_${index}" value="${item.nama || ""}">
+                </div>
+              </div>
+              ${
+                jenisPenjualan !== "kotak"
+                  ? `
+              <div class="row mt-2">
+                <div class="col-md-6">
+                  <label for="editKadar_${index}" class="form-label">Kadar:</label>
+                  <input type="text" class="form-control" id="editKadar_${index}" value="${item.kadar || ""}">
+                </div>
+                <div class="col-md-6">
+                  <label for="editBerat_${index}" class="form-label">Berat (gr):</label>
+                  <input type="text" class="form-control" id="editBerat_${index}" value="${item.berat || ""}">
+                </div>
+              </div>
+              `
+                  : ""
+              }
+              <div class="row mt-2">
+                <div class="col-md-12">
+                  <label for="editHarga_${index}" class="form-label">Harga:</label>
+                  <input type="text" class="form-control" id="editHarga_${index}" value="${utils.formatRupiah(
+            item.totalHarga || 0
+          )}">
+                </div>
+              </div>
+            </div>
+          `;
+        }
       });
     }
 
@@ -1259,8 +1357,15 @@ class OptimizedDataPenjualanApp {
     try {
       utils.showLoading(true);
 
+      // Get tanggal dari input dan simpan tanggal original untuk perbandingan
+      const tanggalInput = document.getElementById("editTanggal")?.value;
+      const originalDate = this.getTransactionDate(this.currentTransaction);
+      const newDate = tanggalInput ? new Date(tanggalInput) : originalDate;
+      const newTimestamp = tanggalInput ? Timestamp.fromDate(newDate) : this.currentTransaction.timestamp;
+
       const updateData = {
         sales: document.getElementById("editSales").value.trim(),
+        timestamp: newTimestamp,
         lastUpdated: serverTimestamp(),
       };
 
@@ -1270,13 +1375,36 @@ class OptimizedDataPenjualanApp {
 
           updatedItem.nama = document.getElementById(`editNama_${index}`)?.value || item.nama;
 
-          if (this.currentTransaction.jenisPenjualan !== "kotak") {
+          if (this.currentTransaction.jenisPenjualan === "manual") {
+            // Manual: barcode, kodeLock, kadar, berat, keterangan
+            // Hanya update field yang memang ada inputnya, pertahankan struktur original
+            const newBarcode = document.getElementById(`editBarcode_${index}`)?.value;
+            const newKodeLock = document.getElementById(`editKodeLock_${index}`)?.value;
+
+            // Update kode/barcode jika ada perubahan
+            if (newBarcode !== undefined && newBarcode !== "") {
+              updatedItem.kode = newBarcode;
+            }
+            // Update kodeLock jika ada perubahan
+            if (newKodeLock !== undefined && newKodeLock !== "") {
+              updatedItem.kodeLock = newKodeLock;
+            }
+            // kodeText tetap mengikuti nilai original, tidak diubah
+            // (kodeText biasanya barcode untuk display)
+
             updatedItem.kadar = document.getElementById(`editKadar_${index}`)?.value || item.kadar;
             updatedItem.berat = document.getElementById(`editBerat_${index}`)?.value || item.berat;
-          }
-
-          if (this.currentTransaction.jenisPenjualan === "manual") {
             updatedItem.keterangan = document.getElementById(`editKeterangan_${index}`)?.value || item.keterangan;
+          } else {
+            // Aksesoris & Kotak: kode, kadar, berat
+            const newKode = document.getElementById(`editKode_${index}`)?.value || item.kodeText || item.kode;
+            updatedItem.kodeText = newKode;
+            updatedItem.kode = newKode;
+
+            if (this.currentTransaction.jenisPenjualan !== "kotak") {
+              updatedItem.kadar = document.getElementById(`editKadar_${index}`)?.value || item.kadar;
+              updatedItem.berat = document.getElementById(`editBerat_${index}`)?.value || item.berat;
+            }
           }
 
           const hargaValue = document.getElementById(`editHarga_${index}`)?.value.replace(/\./g, "") || "0";
@@ -1291,8 +1419,9 @@ class OptimizedDataPenjualanApp {
       // Update in Firestore
       await updateDoc(doc(firestore, "penjualanAksesoris", this.currentTransaction.id), updateData);
 
-      // Update local data and cache
-      this.updateLocalData(this.currentTransaction.id, updateData);
+      // Update local data and cache (dengan info perubahan tanggal)
+      const dateChanged = originalDate && newDate && !utils.isSameDate(originalDate, newDate);
+      this.updateLocalData(this.currentTransaction.id, updateData, dateChanged);
 
       $("#editModal").modal("hide");
       utils.showAlert("Transaksi berhasil diperbarui", "Sukses", "success");
@@ -1305,27 +1434,40 @@ class OptimizedDataPenjualanApp {
   }
 
   // Update local data
-  updateLocalData(transactionId, updateData) {
-    // Update salesData
-    const salesIndex = this.salesData.findIndex((item) => item.id === transactionId);
-    if (salesIndex !== -1) {
-      this.salesData[salesIndex] = { ...this.salesData[salesIndex], ...updateData };
-      delete this.salesData[salesIndex].lastUpdated;
+  updateLocalData(transactionId, updateData, dateChanged = false) {
+    // Deep copy updateData untuk nested objects
+    const deepUpdateData = JSON.parse(JSON.stringify(updateData));
+    delete deepUpdateData.lastUpdated;
+
+    // Convert timestamp ke format yang bisa di-filter
+    if (deepUpdateData.timestamp && deepUpdateData.timestamp.seconds) {
+      // Sudah dalam format {seconds, nanoseconds} - OK
+    } else if (updateData.timestamp && typeof updateData.timestamp.toDate === "function") {
+      // Convert Firestore Timestamp ke object
+      const date = updateData.timestamp.toDate();
+      deepUpdateData.timestamp = { seconds: Math.floor(date.getTime() / 1000), nanoseconds: 0 };
     }
 
-    // Update filteredData
-    const filteredIndex = this.filteredData.findIndex((item) => item.id === transactionId);
-    if (filteredIndex !== -1) {
-      this.filteredData[filteredIndex] = { ...this.filteredData[filteredIndex], ...updateData };
-      delete this.filteredData[filteredIndex].lastUpdated;
+    // Update salesData dengan deep copy
+    const salesIndex = this.salesData.findIndex((item) => item.id === transactionId);
+    if (salesIndex !== -1) {
+      const currentData = JSON.parse(JSON.stringify(this.salesData[salesIndex]));
+      this.salesData[salesIndex] = { ...currentData, ...deepUpdateData };
     }
 
     // Update cache
-    cacheManager.updateTransaction(transactionId, updateData);
+    cacheManager.updateTransaction(transactionId, deepUpdateData);
 
-    // Re-render table
-    this.updateDataTable();
-    this.updateSummary();
+    // ✅ OPSI B: Simpan cache ke localStorage agar persist
+    cacheManager.saveToStorage();
+
+    // Force re-filter untuk refresh tampilan dengan data terbaru
+    this.filterData();
+
+    // Jika tanggal berubah, tampilkan notifikasi
+    if (dateChanged) {
+      console.log("📅 Tanggal transaksi berubah, cache updated tanpa reload Firestore");
+    }
   }
 
   // Show delete modal
@@ -1608,117 +1750,24 @@ class OptimizedDataPenjualanApp {
       return utils.showAlert("Tidak ada data transaksi untuk dicetak!");
     }
 
-    const tx = this.currentTransaction;
+    const transaction = this.currentTransaction;
 
-    if (
-      type === "invoice" &&
-      (tx.jenisPenjualan === "manual" || tx.isGantiLock) &&
-      Array.isArray(tx.items) &&
-      tx.items.length > 1
-    ) {
-      // Cetak invoice per item untuk penjualan manual dengan banyak item
-      this.printInvoicePerItem(tx);
-      return;
+    // Khusus invoice dengan >1 item: cetak per item satu-satu via iframe (anti duplikat)
+    if (type === "invoice" && transaction && Array.isArray(transaction.items) && transaction.items.length > 1) {
+      try {
+        $("#printModal").modal("hide");
+      } catch (_) {}
+      return this.printInvoicePerItem(transaction);
     }
 
+    // Fallback: gunakan window.open untuk struk atau invoice biasa (single)
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
       return utils.showAlert("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak.", "Error", "error");
     }
-
-    const html = type === "receipt" ? this.generateReceiptHTML(tx) : this.generateInvoiceHTML(tx);
+    const html = type === "receipt" ? this.generateReceiptHTML(transaction) : this.generateInvoiceHTML(transaction);
     printWindow.document.write(html);
     printWindow.document.close();
-  }
-
-  // Print separate invoices per item for manual sales
-  printInvoicePerItem(tx) {
-    const buildItemHTML = (item) => {
-      const tanggal = utils.formatDate(tx.timestamp || tx.tanggal) || "";
-      const itemHarga = parseInt(item.totalHarga || 0) || 0;
-      const keterangan = item.keterangan ? String(item.keterangan).trim() : "";
-
-      return `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Invoice Customer</title>
-          <style>${this.INVOICE_CSS}</style>
-        </head>
-        <body>
-          <div class="invoice">
-            <div class="header-info"><p>${tanggal}</p></div>
-            <div class="customer-info">
-              <div>${tx.customerName || "-"}</div>
-              <div>${tx.customerPhone || ""}</div>
-            </div>
-            <div class="item-details">
-              <div class="item-data">
-                <span>${item.kodeText || item.kode || "-"}</span>
-                <span>${item.jumlah || "1"}pcs</span>
-                <span>${item.nama || item.namaBarang || "-"}</span>
-                <span>${item.kadar || "-"}</span>
-                <span>${item.berat || item.gr || "-"}gr</span>
-                <span>${utils.formatRupiah(itemHarga)}</span>
-              </div>
-            </div>
-            ${keterangan ? `<div class="keterangan"><strong>Keterangan:</strong><br>${keterangan}</div>` : ""}
-            <div class="total-row">Rp ${utils.formatRupiah(itemHarga)}</div>
-            <div class="sales">${tx.sales || "-"}</div>
-          </div>
-        </body>
-        </html>
-      `;
-    };
-
-    const printViaIframe = (html) =>
-      new Promise((resolve) => {
-        const iframe = document.createElement("iframe");
-        iframe.style.position = "fixed";
-        iframe.style.right = "0";
-        iframe.style.bottom = "0";
-        iframe.style.width = "0";
-        iframe.style.height = "0";
-        iframe.style.border = "0";
-        document.body.appendChild(iframe);
-
-        const w = iframe.contentWindow;
-        const d = w.document;
-        d.open();
-        d.write(html);
-        d.close();
-
-        const cleanup = () => {
-          setTimeout(() => {
-            document.body.removeChild(iframe);
-            resolve();
-          }, 150);
-        };
-
-        const onAfterPrint = () => {
-          try {
-            w.removeEventListener("afterprint", onAfterPrint);
-          } catch (e) {}
-          cleanup();
-        };
-
-        try {
-          w.addEventListener("afterprint", onAfterPrint);
-        } catch (e) {}
-
-        w.focus();
-        setTimeout(() => {
-          w.print();
-          setTimeout(cleanup, 1000);
-        }, 50);
-      });
-
-    (async () => {
-      for (const item of tx.items || []) {
-        const html = buildItemHTML(item);
-        await printViaIframe(html);
-      }
-    })();
   }
 
   // Generate receipt HTML
@@ -1728,48 +1777,41 @@ class OptimizedDataPenjualanApp {
     if (salesType === "manual") salesType = "manual";
 
     let receiptHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Struk Kasir</title>
-        <style>
-          body { font-family: consolas; font-size: 12px; margin: 0; padding: 0; width: 80mm; }
-          .receipt { margin: 0 auto; padding: 5mm; }
-          .receipt h3, .receipt h4 { text-align: center; margin: 2mm 0; }
-          .receipt hr { border-top: 1px dashed #000; }
-          .receipt table { width: 100%; border-collapse: collapse; }
-          .receipt th, .receipt td { text-align: left; padding: 1mm 2mm; }
-          .tanggal {margin-left: 10px}
-          .text-center { text-align: center; }
-          .text-right { text-align: right; }
-          .keterangan { font-style: italic; font-size: 14px; margin-top: 2mm; border-top: 1px dotted #000; padding-top: 2mm; }
-          .payment-info { margin-top: 2mm; border-top: 1px dotted #000; padding-top: 2mm; }
-        </style>
-      </head>
-      <body>
-        <div class="receipt">
-          <h3>MELATI 3</h3>
-          <h4>JL. DIPONEGORO NO. 116</h4>
-          <h4>NOTA PENJUALAN ${salesType.toUpperCase()}</h4>
-          <hr>
-          <p class="tanggal">Tanggal: ${tanggal}<br>Sales: ${transaction.sales || "-"}</p>
-          ${
-            transaction.customerName || transaction.customerPhone
-              ? `<p class="tanggal">Customer: ${transaction.customerName || "-"}${
-                  transaction.customerPhone ? ` | Tlp: ${transaction.customerPhone}` : ""
-                }</p>`
-              : ""
-          }
-          <hr>
-          <table>
-            <tr>
-              <th>Kode</th>
-              <th>Nama</th>
-              <th>Kadar</th>
-              <th>Gr</th>
-              <th>Harga</th>
-            </tr>
-    `;
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Struk Kasir</title>
+      <style>
+        body { font-family: consolas; font-size: 12px; margin: 0; padding: 0; width: 80mm;}
+        .receipt { margin: 0 auto; padding: 5mm; }
+        .receipt h3, .receipt h4 { text-align: center; margin: 2mm 0; }
+        .receipt hr { border-top: 1px dashed #000; }
+        .receipt table { width: 100%; border-collapse: collapse; }
+        .receipt th, .receipt td { text-align: left; padding: 1mm 2mm; }
+        .tanggal {margin-left: 10px}
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .keterangan { font-style: italic; font-size: 14px; margin-top: 2mm; border-top: 1px dotted #000; padding-top: 2mm; }
+        .payment-info { margin-top: 2mm; border-top: 1px dotted #000; padding-top: 2mm; }
+      </style>
+    </head>
+    <body>
+      <div class="receipt d-flex justify-content-center">
+        <h3>MELATI 3</h3>
+        <h4>JL. DIPONEGORO NO. 116</h4>
+        <h4>NOTA PENJUALAN ${salesType.toUpperCase()}</h4>
+        <hr>
+        <p class="tanggal">Tanggal: ${tanggal}<br>Sales: ${transaction.sales || "-"}</p>
+        <hr>
+        <table>
+          <tr>
+            <th>Kode</th>
+            <th>Nama</th>
+            <th>Kadar</th>
+            <th>Gr</th>
+            <th>Harga</th>
+          </tr>
+  `;
 
     let hasKeterangan = false;
     let keteranganText = "";
@@ -1777,14 +1819,14 @@ class OptimizedDataPenjualanApp {
     transaction.items?.forEach((item) => {
       const itemHarga = parseInt(item.totalHarga || 0);
       receiptHTML += `
-        <tr>
-          <td>${item.kodeText || "-"}</td>
-          <td>${item.nama || "-"}</td>
-          <td>${item.kadar || "-"}</td>
-          <td>${item.berat || "-"}</td>
-          <td class="text-right">${utils.formatRupiah(itemHarga)}</td>
-        </tr>
-      `;
+      <tr>
+        <td>${item.kodeText || "-"}</td>
+        <td>${item.nama || "-"}</td>
+        <td>${item.kadar || "-"}</td>
+        <td>${item.berat || "-"}</td>
+        <td class="text-right">${utils.formatRupiah(itemHarga)}</td>
+      </tr>
+    `;
 
       if (item.keterangan && item.keterangan.trim() !== "") {
         hasKeterangan = true;
@@ -1794,59 +1836,87 @@ class OptimizedDataPenjualanApp {
 
     const totalHarga = parseInt(transaction.totalHarga || 0);
     receiptHTML += `
-            <tr>
-              <td colspan="4" class="text-right"><strong>Total:</strong></td>
-              <td class="text-right"><strong>${utils.formatRupiah(totalHarga)}</strong></td>
-            </tr>
-          </table>
-    `;
+          <tr>
+            <td colspan="4" class="text-right"><strong>Total:</strong></td>
+            <td class="text-right"><strong>${utils.formatRupiah(totalHarga)}</strong></td>
+          </tr>
+        </table>
+  `;
 
-    // Add DP information if applicable
+    // PERBAIKAN: Add DP information dengan logika yang benar
     if (transaction.metodeBayar === "dp" || transaction.statusPembayaran === "DP") {
       const dpAmount = parseInt(transaction.nominalDP || 0);
-      const remainingAmount = parseInt(transaction.sisaPembayaran || 0);
 
       receiptHTML += `
-        <div class="payment-info">
-          <table>
-            <tr>
-              <td>Total Harga:</td>
-              <td class="text-right">${utils.formatRupiah(totalHarga)}</td>
-            </tr>
-            <tr>
-              <td>DP:</td>
-              <td class="text-right">${utils.formatRupiah(dpAmount)}</td>
-            </tr>
-            <tr>
-              <td><strong>SISA:</strong></td>
-              <td class="text-right"><strong>${utils.formatRupiah(remainingAmount)}</strong></td>
-            </tr>
-          </table>
-        </div>
+      <div class="payment-info">
+        <table>
+          <tr>
+            <td>Total Harga:</td>
+            <td class="text-right">${utils.formatRupiah(totalHarga)}</td>
+          </tr>
+          <tr>
+            <td>DP:</td>
+            <td class="text-right">${utils.formatRupiah(dpAmount)}</td>
+          </tr>
+    `;
+
+      // PERBAIKAN: Logika untuk menampilkan SISA atau KEMBALIAN
+      if (dpAmount >= totalHarga) {
+        // Jika DP >= total, tampilkan kembalian (jika ada)
+        if (dpAmount > totalHarga) {
+          const kembalian = dpAmount - totalHarga;
+          receiptHTML += `
+          <tr>
+            <td><strong>KEMBALIAN:</strong></td>
+            <td class="text-right"><strong>${utils.formatRupiah(kembalian)}</strong></td>
+          </tr>
+        `;
+        } else {
+          // Jika DP = total, tampilkan LUNAS
+          receiptHTML += `
+          <tr>
+            <td colspan="2" class="text-center"><strong>LUNAS</strong></td>
+          </tr>
+        `;
+        }
+      } else {
+        // Jika DP < total, tampilkan sisa pembayaran
+        const remainingAmount = parseInt(transaction.sisaPembayaran || 0);
+        receiptHTML += `
+        <tr>
+          <td><strong>SISA:</strong></td>
+          <td class="text-right"><strong>${utils.formatRupiah(remainingAmount)}</strong></td>
+        </tr>
       `;
+      }
+
+      receiptHTML += `
+        </table>
+      </div>
+    `;
     }
 
     if (hasKeterangan && transaction.jenisPenjualan === "manual") {
       receiptHTML += `
-        <div class="keterangan">
-          <strong>Keterangan:</strong> ${keteranganText.trim()}
-        </div>
-      `;
+      <div class="keterangan">
+        <strong>Keterangan:</strong> ${keteranganText.trim()}
+      </div>
+    `;
     }
 
     receiptHTML += `
-          <hr>
-          <p class="text-center">Terima Kasih<br>Atas Kunjungan Anda</p>
-        </div>
-        <script>
-          window.onload = function() {
-            window.print();
-            setTimeout(function() { window.close(); }, 500);
-          };
-        </script>
-      </body>
-      </html>
-    `;
+        <hr>
+        <p class="text-center">Terima Kasih<br>Atas Kunjungan Anda</p>
+      </div>
+      <script>
+        window.onload = function() {
+          window.print();
+          setTimeout(function() { window.close(); }, 500);
+        };
+      </script>
+    </body>
+    </html>
+  `;
 
     return receiptHTML;
   }
@@ -1860,11 +1930,27 @@ class OptimizedDataPenjualanApp {
     <html>
     <head>
       <title>Invoice Customer</title>
-      <style>${this.INVOICE_CSS}</style>
+      <style>
+        @page { size: 10cm 20cm; margin: 0; }
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; box-sizing: border-box; }
+        .invoice { width: 100%; position: relative; min-height: 19cm; }
+        .header-info { text-align: left; margin-bottom: 0.5cm; margin-left: 14.3cm; margin-top: 0.8cm; }
+        .customer-info { text-align: left; margin-bottom: 1.1cm; margin-left: 14.3cm; font-size: 11px; line-height: 1.2; }
+        .total-row { position: absolute; top: 6.3cm; right: 3cm; text-align: right; font-weight: bold; }
+        .sales { position: absolute; top: 7.2cm; right: 1.6cm; text-align: right; }
+        .keterangan { position: absolute; top: 5cm; left: 0.5cm; right: 3cm; font-style: italic; font-size: 10px; padding-top: 2mm; text-align: left; }
+        .keterangan-spacer { height: 0; }
+        .item-details { display: flex; flex-wrap: wrap; }
+        .item-data { display: grid; grid-template-columns: 2cm 2.8cm 4.7cm 1.8cm 1.8cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 0.5cm; margin-top: 0.8cm; margin-right: 3cm; }
+        .item-data span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .item-data span:nth-child(3) { white-space: normal; overflow: visible; text-overflow: clip; word-wrap: break-word; }
+      </style>
     </head>
     <body>
       <div class="invoice">
-        <div class="header-info"><p>${tanggal}</p></div>
+        <div class="header-info">
+          <p>${tanggal}</p>
+        </div>
         <div class="customer-info">
           <div>${transaction.customerName || "-"}</div>
           <div>${transaction.customerPhone || ""}</div>
@@ -1884,7 +1970,7 @@ class OptimizedDataPenjualanApp {
       <div class="item-details">
         <div class="item-data">
           <span>${item.kodeText || "-"}</span>
-          <span>${item.jumlah || "1"}pcs</span>
+          <span>${item.jumlah || " "}pcs</span>
           <span>${item.nama || "-"}</span>
           <span>${item.kadar || "-"}</span>
           <span>${item.berat || "-"}gr</span>
@@ -1930,6 +2016,156 @@ class OptimizedDataPenjualanApp {
   `;
 
     return invoiceHTML;
+  }
+
+  // Cetak invoice per item (khusus penjualan manual > 1 item)
+  printInvoicePerItem(transaction) {
+    if (!transaction?.items || transaction.items.length === 0) {
+      return utils.showAlert("Tidak ada item untuk dicetak.", "Info", "info");
+    }
+
+    const totalItems = transaction.items.length;
+    let index = 0;
+
+    const printNext = () => {
+      if (index >= totalItems) {
+        return; // selesai
+      }
+
+      const item = transaction.items[index];
+      const html = this.generateSingleItemInvoiceHTML(transaction, item, index + 1, totalItems);
+      this.printViaIframe(html, () => {
+        index += 1;
+        // beri jeda singkat antar cetak untuk stabilitas printer
+        setTimeout(printNext, 200);
+      });
+    };
+
+    printNext();
+  }
+
+  // Template invoice untuk satu item (tanpa auto window.print di onload)
+  generateSingleItemInvoiceHTML(transaction, item, itemIndex, itemTotal) {
+    const tanggal = utils.formatDate(transaction.timestamp || transaction.tanggal);
+    const itemHarga = parseInt(item?.totalHarga || 0);
+    const keteranganText =
+      transaction.jenisPenjualan === "manual" && item?.keterangan && item.keterangan.trim() !== ""
+        ? `<div class="keterangan"><strong>Keterangan:</strong><br>${item.keterangan.trim()}</div>`
+        : `<div class="keterangan-spacer"></div>`;
+
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Invoice Customer - Item ${itemIndex}/${itemTotal}</title>
+      <style>
+        @page { size: 10cm 20cm; margin: 0; }
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 5mm; width: 20cm; box-sizing: border-box; }
+        .invoice { width: 100%; position: relative; min-height: 19cm; }
+        .header-info { text-align: left; margin-bottom: 0.5cm; margin-left: 14.3cm; margin-top: 0.8cm; }
+        .customer-info { text-align: left; margin-bottom: 1.1cm; margin-left: 14.3cm; font-size: 11px; line-height: 1.2; }
+        .total-row { position: absolute; top: 6.3cm; right: 3cm; text-align: right; font-weight: bold; }
+        .sales { position: absolute; top: 7.2cm; right: 1.6cm; text-align: right; }
+        .keterangan { position: absolute; top: 5cm; left: 0.5cm; right: 3cm; font-style: italic; font-size: 10px; padding-top: 2mm; text-align: left; }
+        .keterangan-spacer { height: 0; }
+        .item-details { display: flex; flex-wrap: wrap; }
+        .item-data { display: grid; grid-template-columns: 2cm 2.8cm 4.7cm 1.8cm 1.8cm 2cm; width: 100%; column-gap: 0.2cm; margin-left: 0.5cm; margin-top: 0.8cm; margin-right: 3cm; }
+        .item-data span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .item-data span:nth-child(3) { white-space: normal; overflow: visible; text-overflow: clip; word-wrap: break-word; }
+      </style>
+    </head>
+    <body>
+      <div class="invoice">
+        <div class="header-info">
+          <p>${tanggal}</p>
+        </div>
+        <div class="customer-info">
+          <div>${transaction.customerName || "-"}</div>
+          <div>${transaction.customerPhone || ""}</div>
+        </div>
+        <div class="item-details">
+          <div class="item-data">
+            <span>${item?.kodeText || "-"}</span>
+            <span>${item?.jumlah || " "}pcs</span>
+            <span>${item?.nama || "-"}</span>
+            <span>${item?.kadar || "-"}</span>
+            <span>${item?.berat || "-"}gr</span>
+            <span>${utils.formatRupiah(itemHarga)}</span>
+          </div>
+        </div>
+        ${keteranganText}
+        <div class="total-row">Rp ${utils.formatRupiah(itemHarga)}</div>
+        <div class="sales">${transaction.sales || "-"}</div>
+      </div>
+    </body>
+    </html>`;
+  }
+
+  // Controller cetak via iframe tersembunyi (hindari duplikasi)
+  printViaIframe(html, onDone) {
+    try {
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentDocument || iframe.contentWindow.document;
+      doc.open();
+      doc.write(html);
+      doc.close();
+
+      const cleanup = () => {
+        try {
+          if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        } catch (_) {}
+      };
+
+      const handleAfterPrint = () => {
+        try {
+          iframe.contentWindow.removeEventListener("afterprint", handleAfterPrint);
+        } catch (_) {}
+        cleanup();
+        if (typeof onDone === "function") onDone();
+      };
+
+      // Listener afterprint untuk memastikan 1x cetak
+      try {
+        iframe.contentWindow.addEventListener("afterprint", handleAfterPrint);
+      } catch (_) {}
+
+      const tryPrint = () => {
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        } catch (e) {
+          // jika dokumen belum siap, coba lagi
+          return setTimeout(tryPrint, 150);
+        }
+        // Fallback jika afterprint tidak terpanggil
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            try {
+              iframe.contentWindow.removeEventListener("afterprint", handleAfterPrint);
+            } catch (_) {}
+            cleanup();
+            if (typeof onDone === "function") onDone();
+          }
+        }, 2500);
+      };
+
+      if (doc.readyState === "complete") {
+        setTimeout(tryPrint, 50);
+      } else {
+        iframe.onload = () => setTimeout(tryPrint, 50);
+      }
+    } catch (err) {
+      console.error("Print via iframe failed:", err);
+      if (typeof onDone === "function") onDone();
+    }
   }
 
   // Refresh data manually
