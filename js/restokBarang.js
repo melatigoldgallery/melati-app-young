@@ -365,7 +365,7 @@ async function fetchByMonthAndStatus(monthStr, status) {
       collRef,
       where("tanggal", ">=", startDate),
       where("tanggal", "<=", endDate),
-      where("status", "==", status)
+      where("status", "==", status),
     );
     const snap = await getDocs(q);
     const items = [];
@@ -425,7 +425,7 @@ function renderRowsPerlu(items, tbody) {
         </div>
       </td>
     </tr>
-  `
+  `,
     )
     .join("");
 
@@ -459,7 +459,7 @@ function renderRowsSudah(items, tbody) {
         </button>
       </td>
     </tr>
-  `
+  `,
     )
     .join("");
 
@@ -631,7 +631,7 @@ async function deleteRow(tr) {
   }
 }
 
-// WhatsApp send untuk data perlu restok saja dengan PDF
+// WhatsApp send untuk data perlu restok dengan pilihan Web/Desktop
 if (btnSendWA) {
   btnSendWA.addEventListener("click", async () => {
     const rows = Array.from(dataTablePerlu.querySelectorAll("tr"));
@@ -648,10 +648,10 @@ if (btnSendWA) {
       btnSendWA.disabled = true;
       btnSendWA.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Membuat PDF...';
 
-      await generateAndSendPDF(rows);
+      await showWhatsAppOptions(rows);
     } catch (err) {
-      console.error("Gagal membuat PDF:", err);
-      alert("Gagal membuat PDF");
+      console.error("Gagal memproses:", err);
+      alert("Gagal memproses data");
     } finally {
       btnSendWA.disabled = false;
       btnSendWA.innerHTML = '<i class="fa-brands fa-whatsapp me-2"></i>Kirim Data Perlu Restok';
@@ -659,9 +659,160 @@ if (btnSendWA) {
   });
 }
 
-async function generateAndSendPDF(rows) {
+/**
+ * Show WhatsApp platform options dialog
+ */
+async function showWhatsAppOptions(rows) {
+  // Generate PDF first
+  const { pdfBlob, pdfFile, dateStr } = await generatePDF(rows);
+
+  // Detect if running on mobile device
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  // Check if Web Share API is supported with files (prioritize for mobile only)
+  if (isMobile && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+    try {
+      const message = buildWhatsAppMessage(dateStr, rows.length);
+      await navigator.share({
+        files: [pdfFile],
+        title: "Daftar Barang Perlu Restok",
+        text: message,
+      });
+      return;
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.error("Error sharing:", err);
+      }
+      // Continue to show dialog if share fails
+    }
+  }
+
+  // Show platform selection dialog for desktop
+  if (!window.Swal) {
+    console.error("SweetAlert2 not loaded!");
+    alert("Error: SweetAlert2 library tidak tersedia");
+    return;
+  }
+
+  const result = await Swal.fire({
+    title: "Pilih Platform WhatsApp",
+    text: "Pilih cara mengirim data restok ke WhatsApp",
+    icon: "question",
+    iconColor: "#25D366",
+    showDenyButton: true,
+    showCancelButton: true,
+    confirmButtonText: '<i class="fa-solid fa-globe me-2"></i>WhatsApp Web',
+    denyButtonText: '<i class="fa-solid fa-desktop me-2"></i>WhatsApp Desktop',
+    cancelButtonText: "Batal",
+    confirmButtonColor: "#25D366",
+    denyButtonColor: "#128C7E",
+    customClass: {
+      confirmButton: "btn-lg",
+      denyButton: "btn-lg",
+      cancelButton: "btn-lg",
+    },
+  });
+
+  if (result.isConfirmed) {
+    // WhatsApp Web
+    sendViaWhatsAppWeb(pdfBlob, dateStr, rows.length);
+  } else if (result.isDenied) {
+    // WhatsApp Desktop
+    sendViaWhatsAppDesktop(pdfBlob, dateStr, rows.length);
+  }
+}
+
+/**
+ * Send via WhatsApp Web (Browser)
+ */
+function sendViaWhatsAppWeb(pdfBlob, dateStr, itemCount) {
+  // Download PDF
+  downloadPDF(pdfBlob, `Restok_${dateStr}.pdf`);
+
+  // Build message
+  const message = buildWhatsAppMessage(dateStr, itemCount);
+  // Use web.whatsapp.com to force browser WhatsApp Web (not desktop app)
+  const url = `https://web.whatsapp.com/send?phone=${SUPPLIER_PHONE}&text=${encodeURIComponent(message)}`;
+
+  // Open WhatsApp Web in reusable tab
+  window.open(url, "MelatiWhatsAppWeb");
+
+  // Show toast notification
+  const Toast = Swal.mixin({
+    toast: true,
+    position: "top-end",
+    showConfirmButton: false,
+    timer: 4000,
+    timerProgressBar: true,
+  });
+
+  Toast.fire({
+    icon: "success",
+    title: "PDF Berhasil Diunduh",
+    html: "<small>WhatsApp Web dibuka.<br>Attach file PDF yang sudah didownload.</small>",
+  });
+}
+
+/**
+ * Send via WhatsApp Desktop App
+ */
+function sendViaWhatsAppDesktop(pdfBlob, dateStr, itemCount) {
+  // Download PDF
+  downloadPDF(pdfBlob, `Restok_${dateStr}.pdf`);
+
+  // Build message
+  const message = buildWhatsAppMessage(dateStr, itemCount);
+  const desktopUrl = `whatsapp://send?phone=${SUPPLIER_PHONE}&text=${encodeURIComponent(message)}`;
+
+  // Try to open WhatsApp Desktop
+  window.location.href = desktopUrl;
+
+  // Show toast notification
+  const Toast = Swal.mixin({
+    toast: true,
+    position: "top-end",
+    showConfirmButton: false,
+    timer: 4000,
+    timerProgressBar: true,
+  });
+
+  Toast.fire({
+    icon: "success",
+    title: "PDF Berhasil Diunduh",
+    html: "<small>WhatsApp Desktop dibuka.<br>Attach file PDF yang sudah didownload.</small>",
+  });
+}
+
+/**
+ * Download PDF blob as file
+ */
+function downloadPDF(blob, filename) {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+}
+
+/**
+ * Build WhatsApp message text
+ */
+function buildWhatsAppMessage(dateStr, itemCount) {
+  return `Terlampir daftar barang perlu restok tanggal ${dateStr}.\nTotal: ${itemCount} items. Terima kasih.`;
+}
+
+/**
+ * Generate PDF and return blob/file
+ */
+async function generatePDF(rows) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
+
+  // Calculate date once for entire document
+  const today = new Date();
+  const dateStr = `${pad(today.getDate())}-${pad(today.getMonth() + 1)}-${today.getFullYear()}`;
 
   // Load logo as base64
   const logoImg = new Image();
@@ -680,28 +831,30 @@ async function generateAndSendPDF(rows) {
   const pageWidth = doc.internal.pageSize.getWidth();
 
   // Add logo if loaded
+  let logoBottomY = 2; // padding top logo lebih kecil
   if (logoImg.complete && logoImg.naturalHeight !== 0) {
     try {
-      doc.addImage(logoImg, "PNG", pageWidth / 2 - 15, 10, 30, 30);
+      doc.addImage(logoImg, "PNG", pageWidth / 2 - 15, 2, 30, 30); // y=2
+      logoBottomY = 2 + 30;
     } catch (e) {
       console.warn("Gagal menambahkan logo");
+      logoBottomY = 4;
     }
   }
 
   // Title
+  const titleY = logoBottomY + 3; // lebih dekat ke logo
   doc.setFontSize(18);
   doc.setFont(undefined, "bold");
-  doc.text("MELATI GOLD SHOP", pageWidth / 2, 45, { align: "center" });
+  doc.text("MELATI GOLD SHOP", pageWidth / 2, titleY, { align: "center" });
 
   doc.setFontSize(14);
-  doc.text("Daftar Barang Perlu Restok", pageWidth / 2, 55, { align: "center" });
+  doc.text("Daftar Barang Perlu Restok", pageWidth / 2, titleY + 7, { align: "center" }); // line height lebih kecil
 
   // Date
   doc.setFontSize(10);
   doc.setFont(undefined, "normal");
-  const today = new Date();
-  const dateStr = `${pad(today.getDate())}-${pad(today.getMonth() + 1)}-${today.getFullYear()}`;
-  doc.text(`Tanggal: ${dateStr}`, 14, 65);
+  doc.text(`Tanggal: ${dateStr}`, 10, titleY + 15);
 
   // Prepare table data
   const tableData = [];
@@ -714,28 +867,29 @@ async function generateAndSendPDF(rows) {
 
   // Table
   doc.autoTable({
-    startY: 72,
-    head: [["No", "Tanggal", "Jenis", "Nama Barang", "Kadar", "Berat", "Panjang"]],
+    startY: 54,
+    margin: { left: 10, right: 10 },
+    head: [["No", "Tanggal", "Jenis", "Nama Barang", "Kadar", "Berat", "Panjang/\nLebar/Size"]],
     body: tableData,
     theme: "grid",
     headStyles: {
-      fillColor: [212, 175, 55], // Gold color
+      fillColor: [212, 175, 55],
       textColor: [255, 255, 255],
       fontStyle: "bold",
       halign: "center",
     },
     columnStyles: {
-      0: { cellWidth: 12, halign: "center" },
-      1: { cellWidth: 25, halign: "center" },
-      2: { cellWidth: 22, halign: "center" },
-      3: { cellWidth: 50 },
-      4: { cellWidth: 20, halign: "center" },
-      5: { cellWidth: 20, halign: "center" },
-      6: { cellWidth: 20, halign: "center" },
+      0: { cellWidth: 10, halign: "center" },
+      1: { cellWidth: 24, halign: "center" },
+      2: { cellWidth: 20, halign: "center" },
+      3: { cellWidth: 68 }, // Nama Barang diperbesar
+      4: { cellWidth: 18, halign: "center" },
+      5: { cellWidth: 25, halign: "center" },
+      6: { cellWidth: 25, halign: "center", cellWidthAuto: false, cellPadding: 1, overflow: "linebreak" }, // Panjang/Lebar/Size diperkecil dan word wrap
     },
     styles: {
       fontSize: 9,
-      cellPadding: 3,
+      cellPadding: 2,
     },
     alternateRowStyles: {
       fillColor: [245, 245, 245],
@@ -746,57 +900,13 @@ async function generateAndSendPDF(rows) {
   const finalY = doc.lastAutoTable.finalY || 72;
   doc.setFontSize(11);
   doc.setFont(undefined, "bold");
-  doc.text(`Total: ${rows.length} items`, 14, finalY + 10);
+  doc.text(`Total: ${rows.length} items`, 10, finalY + 10);
 
-  // Generate blob for WhatsApp
+  // Generate blob and file
   const pdfBlob = doc.output("blob");
   const pdfFile = new File([pdfBlob], `Restok_${dateStr}.pdf`, { type: "application/pdf" });
 
-  // Check if Web Share API with files is supported
-  if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-    try {
-      await navigator.share({
-        files: [pdfFile],
-        title: "Daftar Barang Perlu Restok",
-        text: `Data Perlu Restok - ${dateStr}`,
-      });
-    } catch (err) {
-      if (err.name !== "AbortError") {
-        console.error("Share error:", err);
-        fallbackPDFDownload(doc, dateStr);
-      }
-    }
-  } else {
-    // Fallback: Download PDF + open WhatsApp
-    fallbackPDFDownload(doc, dateStr);
-  }
-}
-
-function fallbackPDFDownload(doc, dateStr) {
-  // Download PDF
-  doc.save(`Restok_${dateStr}.pdf`);
-
-  // Open WhatsApp with text message
-  const message = encodeURIComponent(
-    `Halo, terlampir daftar barang perlu restok tanggal ${dateStr}.\n\nSilakan cek file PDF yang saya kirim.`
-  );
-  const url = `https://wa.me/${SUPPLIER_PHONE}?text=${message}`;
-
-  // Show instruction
-  if (window.Swal) {
-    Swal.fire({
-      icon: "info",
-      title: "PDF Berhasil Diunduh",
-      html: "Silakan attach file PDF yang sudah didownload ke WhatsApp yang akan terbuka.",
-      confirmButtonText: "Buka WhatsApp",
-      timer: 5000,
-    }).then(() => {
-      window.open(url, "_blank");
-    });
-  } else {
-    alert("PDF berhasil diunduh. Silakan attach ke WhatsApp.");
-    window.open(url, "_blank");
-  }
+  return { pdfBlob, pdfFile, dateStr };
 }
 
 // Chart Functions
@@ -901,8 +1011,11 @@ if (btnTambahBarang) {
 }
 
 // WhatsApp Setting Event Listeners
+// Sembunyikan tombol setting WA jika bukan supervisor
 if (btnSettingWA) {
-  btnSettingWA.addEventListener("click", openWhatsAppSettingModal);
+  const user = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
+  if (user.username !== "supervisor") btnSettingWA.style.display = "none";
+  else btnSettingWA.addEventListener("click", openWhatsAppSettingModal);
 }
 
 if (savePhoneBtn) {
