@@ -169,8 +169,6 @@
   position: relative;
 }
 
-
-
 .nav-tabs .nav-link i {
   margin-right: 8px;
   font-size: 1rem;
@@ -628,7 +626,63 @@
 }
 
 #modalRiwayat .modal-dialog {
-  max-width: 750px;
+  max-width: 600px;
+}
+
+/* Styling untuk tabel riwayat */
+#modalRiwayat .table thead th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 0;
+  vertical-align: middle;
+  border-bottom: 2px solid #dee2e6;
+  text-align: center;
+}
+
+#modalRiwayat .table tbody td {
+  padding: 10px 8px;
+  vertical-align: middle;
+  font-size: 13px;
+}
+
+/* Lebar kolom yang proporsional */
+#modalRiwayat .table thead th:nth-child(1),
+#modalRiwayat .table tbody td:nth-child(1) {
+  width: 20px;
+  text-align: center;
+}
+
+#modalRiwayat .table thead th:nth-child(2),
+#modalRiwayat .table tbody td:nth-child(2) {
+  width: 80px;
+  text-align: left;
+}
+
+#modalRiwayat .table thead th:nth-child(3),
+#modalRiwayat .table tbody td:nth-child(3) {
+  width: 70px;
+  text-align: center;
+}
+
+#modalRiwayat .table thead th:nth-child(4),
+#modalRiwayat .table tbody td:nth-child(4) {
+  width: 60px;
+  text-align: center;
+}
+
+#modalRiwayat .table thead th:nth-child(5),
+#modalRiwayat .table tbody td:nth-child(5) {
+  width: 130px;
+  text-align: left;
+  padding-left: 12px;
+}
+
+/* Styling untuk badge status */
+#modalRiwayat .badge {
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 /* HALA bulk modals may need slightly more width but still constrained */

@@ -7,47 +7,7 @@ import {
   setDoc,
   updateDoc,
   onSnapshot,
-  Timestamp,
-  arrayUnion,
 } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
-
-// ==================== LOGGING UTILITY FUNCTIONS ====================
-
-/**
- * Save stock log to daily_stock_logs collection
- */
-async function saveStockLog(logData) {
-  try {
-    if (!logData.jenis || !logData.lokasi || !logData.action || !logData.userName || !logData.keterangan) {
-      console.warn("Missing required fields for stock log:", logData);
-      return;
-    }
-
-    const now = new Date();
-    const witaOffset = 8 * 60;
-    const witaTime = new Date(now.getTime() + witaOffset * 60 * 1000);
-    const dateStr = witaTime.toISOString().split("T")[0];
-
-    const logEntry = {
-      timestamp: Timestamp.now(),
-      jenis: logData.jenis,
-      lokasi: logData.lokasi,
-      action: logData.action,
-      before: logData.before || 0,
-      after: logData.after || 0,
-      quantity: logData.quantity || 0,
-      userName: logData.userName,
-      keterangan: logData.keterangan,
-    };
-
-    const docRef = doc(firestore, "daily_stock_logs", dateStr);
-    await setDoc(docRef, { date: dateStr, logs: arrayUnion(logEntry) }, { merge: true });
-  } catch (error) {
-    console.error("Error saving stock log:", error);
-  }
-}
-
-// ==================== END LOGGING UTILITY FUNCTIONS ====================
 
 // === Konstanta dan Mapping ===
 const mainCategories = ["KALUNG", "LIONTIN", "ANTING", "CINCIN", "HALA", "GELANG", "GIWANG"];
@@ -386,24 +346,67 @@ export async function populateTables(options = {}) {
 
         const tr = document.createElement("tr");
 
-        // Semua kategori dan lokasi sekarang menggunakan tombol Update
-        let btnClass = "";
-        if (mainCat === "HALA") {
-          btnClass = "update-hala-btn";
+        const halaUpdateSubcats = ["Display", "Rusak", "Batu Lepas", "Manual", "Admin", "DP", "Contoh Custom"];
+        let actionColumn = "";
+        if (mainCat === "HALA" && halaUpdateSubcats.includes(subCat)) {
+          actionColumn = `
+            <td class="text-center">
+              <button class="btn btn-success btn-sm update-hala-btn"
+                      data-main="${mainCat}"
+                      data-category="${categoryKey}"
+                      data-subcategory="${subCat}">
+                <i class="fas fa-edit"></i> Update
+              </button>
+            </td>
+          `;
         } else {
-          btnClass = "update-stock-btn";
-        }
+          const halaLikeUpdateMains = ["KALUNG", "LIONTIN", "ANTING", "CINCIN", "GELANG", "GIWANG"];
+          const showUpdateButton =
+            (subCat === "Display" ||
+              subCat === "Manual" ||
+              subCat === "Admin" ||
+              (halaLikeUpdateMains.includes(mainCat) &&
+                (subCat === "Rusak" || subCat === "Batu Lepas" || subCat === "Contoh Custom" || subCat === "DP"))) &&
+            mainCat !== "HALA";
 
-        const actionColumn = `
-          <td class="text-center">
-            <button class="btn btn-success btn-sm ${btnClass}"
-                    data-main="${mainCat}"
-                    data-category="${categoryKey}"
-                    data-subcategory="${subCat}">
-              <i class="fas fa-edit"></i> Update
-            </button>
-          </td>
-        `;
+          actionColumn = showUpdateButton
+            ? `
+              <td class="text-center">
+                <button class="btn btn-success btn-sm update-stock-btn"
+                        data-main="${mainCat}"
+                        data-category="${categoryKey}"
+                        data-subcategory="${subCat}">
+                  <i class="fas fa-edit"></i> Update
+                </button>
+              </td>
+            `
+            : `
+              <td class="text-center">
+                <div class="dropdown position-relative">
+                  <button class="btn btn-secondary btn-sm dropdown-toggle" type="button"
+                          data-bs-toggle="dropdown"
+                          data-bs-display="static"
+                          data-bs-boundary="viewport">
+                    <i class="fas fa-cog"></i> Aksi
+                  </button>
+                  <ul class="dropdown-menu shadow" style="z-index: 2000;">
+                    <li>
+                      <a class="dropdown-item add-stock-btn" href="#"
+                         data-main="${mainCat}" data-category="${categoryKey}">
+                         <i class="fas fa-plus"></i> Tambah
+                      </a>
+                    </li>
+                    <li>
+                      <a class="dropdown-item reduce-stock-btn" href="#"
+                         data-main="${mainCat}" data-category="${categoryKey}">
+                         <i class="fas fa-minus"></i> Kurangi
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+              </td>
+            `;
+        }
 
         tr.innerHTML = `
           <td class="fw-bold">${idx + 1}</td>
@@ -620,54 +623,36 @@ async function updateStokDisplayManual(category, mainCat, newQuantity, petugas, 
   const item = stockData[category][mainCat];
   const oldQuantity = item.quantity;
   const newQty = parseInt(newQuantity);
-  const beforeQty = oldQuantity;
-  const afterQty = newQty;
 
   item.quantity = newQty;
   item.lastUpdated = new Date().toISOString();
 
-  let actionType, quantityDiff, logAction;
+  let actionType, quantityDiff;
   if (newQty > oldQuantity) {
-    actionType = "Tambah";
+    actionType = "Update (Tambah)";
     quantityDiff = newQty - oldQuantity;
-    logAction = "tambah";
   } else if (newQty < oldQuantity) {
-    actionType = "Kurangi";
+    actionType = "Update (Kurangi)";
     quantityDiff = oldQuantity - newQty;
-    logAction = "kurangi";
   } else {
-    actionType = "Update";
+    actionType = "Update (Tetap)";
     quantityDiff = 0;
-    logAction = "update";
   }
 
-  item.history.unshift({
+  const historyEntry = {
     date: item.lastUpdated,
     action: actionType,
     quantity: quantityDiff,
     oldQuantity: oldQuantity,
     newQuantity: newQty,
     petugas,
-    keterangan: keterangan || undefined,
-  });
+  };
+  if (keterangan && keterangan.trim() !== "") historyEntry.keterangan = keterangan.trim();
+
+  item.history.unshift(historyEntry);
   if (item.history.length > 10) item.history = item.history.slice(0, 10);
 
   await saveData(category, mainCat);
-
-  // Save to daily_stock_logs
-  if (quantityDiff > 0 && petugas && keterangan) {
-    await saveStockLog({
-      jenis: mainCat,
-      lokasi: category,
-      action: logAction,
-      before: beforeQty,
-      after: afterQty,
-      quantity: quantityDiff,
-      userName: petugas,
-      keterangan: keterangan,
-    });
-  }
-
   await populateTables({ skipFetch: true });
 }
 
@@ -801,8 +786,9 @@ function showHalaDetail(category, mainCat) {
   totalEl.textContent = total;
 
   // Update modal title dengan kategori
-  document.getElementById("modalDetailHalaLabel").textContent =
-    `Detail Stok ${mainCat} - ${reverseCategoryMapping[category]}`;
+  document.getElementById(
+    "modalDetailHalaLabel"
+  ).textContent = `Detail Stok ${mainCat} - ${reverseCategoryMapping[category]}`;
 
   modal.show();
 }
@@ -1005,7 +991,7 @@ function showHistoryModal(category, mainCat) {
     !stockData[category][mainCat].history ||
     stockData[category][mainCat].history.length === 0
   ) {
-    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Tidak ada riwayat</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Tidak ada riwayat</td></tr>`;
     return modal.show();
   }
 
@@ -1013,43 +999,53 @@ function showHistoryModal(category, mainCat) {
   history.forEach((record, i) => {
     const tr = document.createElement("tr");
 
-    // Quantity display - simple, hanya angka
-    let quantityDisplay = `${record.quantity || 0}`;
-
-    // Keterangan display
-    let jewelryInfo = "";
-    let keteranganText = record.keterangan || record.receiver || "-";
-
-    // Tambahan info untuk HALA (single atau bulk) - pindah ke keterangan
-    if (record.items && Array.isArray(record.items)) {
-      // Filter hanya items yang quantity-nya tidak 0 (benar-benar diupdate)
-      const updatedItems = record.items.filter((it) => it.quantity !== 0);
-      if (updatedItems.length > 0) {
-        const list = updatedItems.map((it) => `${it.jewelryName}: ${it.quantity}`).join(", ");
-        jewelryInfo = list;
-        // Tambahkan ke keterangan jika ada
-        if (keteranganText !== "-") {
-          keteranganText = `${jewelryInfo} | ${keteranganText}`;
-        } else {
-          keteranganText = jewelryInfo;
-        }
-      }
-    } else if (record.jewelryType && record.jewelryName) {
-      jewelryInfo = `${record.jewelryName}`;
-      // Tambahkan ke keterangan jika ada
-      if (keteranganText !== "-") {
-        keteranganText = `${jewelryInfo} | ${keteranganText}`;
+    // Determine action badge color and text
+    let actionBadge;
+    if (record.action === "Tambah" || record.action === "Tambah") {
+      actionBadge = `<span class="badge bg-success">${record.action}</span>`;
+    } else if (record.action === "Kurangi" || record.action === "Kurangi") {
+      actionBadge = `<span class="badge bg-danger">${record.action}</span>`;
+    } else if (record.action.includes("Update")) {
+      if (record.action.includes("Tambah")) {
+        actionBadge = '<span class="badge bg-success">Update (+)</span>';
+      } else if (record.action.includes("Kurangi")) {
+        actionBadge = '<span class="badge bg-danger">Update (-)</span>';
       } else {
-        keteranganText = jewelryInfo;
+        actionBadge = '<span class="badge bg-secondary">Update</span>';
       }
+    } else {
+      actionBadge = `<span class="badge bg-primary">${record.action}</span>`;
+    }
+
+    // Handle quantity display for update actions
+    let quantityDisplay;
+    if (record.oldQuantity !== undefined && record.newQuantity !== undefined) {
+      quantityDisplay = `<small>${record.oldQuantity} → ${record.newQuantity}</small><br><span class="badge bg-primary">${record.quantity}</span>`;
+    } else {
+      quantityDisplay = `<span class="badge bg-primary">${record.quantity}</span>`;
+    }
+
+    // Tambahan info untuk HALA (single atau bulk)
+    let jewelryInfo = "";
+    if (record.items && Array.isArray(record.items)) {
+      const list = record.items
+        .map(
+          (it) =>
+            `<span class=\"badge bg-light text-dark border me-1 mb-1\">${it.jewelryName} (${it.jewelryType}): <strong>${it.quantity}</strong></span>`
+        )
+        .join(" ");
+      jewelryInfo = `<br><div class=\"mt-1 d-flex flex-wrap\" style=\"gap:4px;\">${list}</div>`;
+    } else if (record.jewelryType && record.jewelryName) {
+      jewelryInfo = `<br><small class=\"text-muted\">${record.jewelryName} (${record.jewelryType})</small>`;
     }
 
     tr.innerHTML = `
       <td>${i + 1}</td>
       <td>${formatDate(record.date)}</td>
+      <td>${actionBadge}${jewelryInfo}</td>
       <td>${quantityDisplay}</td>
       <td>${record.adder || record.pengurang || record.petugas || "-"}</td>
-      <td>${keteranganText.toUpperCase()}</td>
+      <td>${record.keterangan || record.receiver || "-"}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -1208,6 +1204,7 @@ document.body.addEventListener("click", function (e) {
     const categoryKey = btn.dataset.category;
     const subCategory = btn.dataset.subcategory;
 
+    // Populate modal with current data
     const stockItem =
       stockData[categoryKey] && stockData[categoryKey][mainCat] ? stockData[categoryKey][mainCat] : { quantity: 0 };
 
@@ -1215,14 +1212,32 @@ document.body.addEventListener("click", function (e) {
     document.getElementById("updateStokCategory").value = categoryKey;
     document.getElementById("updateStokJenis").value = `${mainCat} - ${subCategory}`;
     document.getElementById("updateStokJumlah").value = stockItem.quantity;
-
+    // Toggle visibility/requirement of Nama Staf based on subCategory
+    const formUpdate = document.getElementById("formUpdateStok");
     const petugasInput = document.getElementById("updateStokPetugas");
-    if (petugasInput) petugasInput.value = "";
+    if (petugasInput) {
+      // Categories where Nama Staf is NOT used for Update
+      const noStaffSubcats = ["Display", "Rusak", "Batu Lepas", "Manual", "Admin", "DP", "Contoh Custom"];
+      const requirePetugas = !noStaffSubcats.includes(subCategory);
+      if (formUpdate) formUpdate.dataset.requirePetugas = requirePetugas ? "1" : "0";
+      // Find a reasonable wrapper to hide (form-group/mb-3/form-floating) and fallback to parent
+      const wrapper =
+        petugasInput.closest(".mb-3") ||
+        petugasInput.closest(".form-group") ||
+        petugasInput.closest(".form-floating") ||
+        petugasInput.parentElement;
+      if (wrapper) wrapper.classList.toggle("d-none", !requirePetugas);
+      petugasInput.required = requirePetugas;
+      if (!requirePetugas) petugasInput.value = ""; // clear when not needed
+    }
+    // Always reset petugas value when opening
+    if (document.getElementById("updateStokPetugas")) document.getElementById("updateStokPetugas").value = "";
+    const ketFieldUpdate = document.querySelector("#modalUpdateStok #keteranganKurangi");
+    if (ketFieldUpdate) ketFieldUpdate.value = "";
 
-    const keteranganSelect = document.getElementById("keteranganUpdateStok");
-    if (keteranganSelect) keteranganSelect.value = "";
-
-    $("#modalUpdateStok").modal("show");
+    // Use Bootstrap 5 API to show modal (replaces jQuery .modal('show'))
+    const modalEl = document.getElementById("modalUpdateStok");
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
   }
 });
 
@@ -1282,7 +1297,7 @@ if (formTambahStokHalaBulk) {
       $("#modalTambahStokHala").modal("hide");
       await addStockHalaBulk(currentCategory, currentMainCat, items, adder);
       showSuccessNotification(
-        `Berhasil menambah ${items.length} jenis (total ${items.reduce((a, b) => a + b.qty, 0)})`,
+        `Berhasil menambah ${items.length} jenis (total ${items.reduce((a, b) => a + b.qty, 0)})`
       );
     } catch (err) {
       console.error("Bulk HALA error", err);
@@ -1323,7 +1338,7 @@ if (formBulkReduce) {
       const success = await reduceStockHalaBulk(currentCategory, currentMainCat, items, pengurang, keterangan);
       if (success) {
         showSuccessNotification(
-          `Berhasil mengurangi ${items.length} jenis (total ${items.reduce((a, b) => a + b.qty, 0)})`,
+          `Berhasil mengurangi ${items.length} jenis (total ${items.reduce((a, b) => a + b.qty, 0)})`
         );
       }
     } catch (err) {
@@ -1366,37 +1381,25 @@ function showErrorNotification(message) {
 // === Handler Submit Modal Update Stok Display/Manual ===
 document.getElementById("formUpdateStok").onsubmit = async function (e) {
   e.preventDefault();
-  const submitBtn = document.getElementById("submitUpdateStokBtn");
-  const originalText = submitBtn ? submitBtn.innerHTML : "";
+  const mainCat = document.getElementById("updateStokMainCat").value;
+  const category = document.getElementById("updateStokCategory").value;
+  const jumlah = document.getElementById("updateStokJumlah").value;
+  const petugas = document.getElementById("updateStokPetugas").value;
+  const keterangan = this.querySelector("#keteranganKurangi")?.value?.trim() || "";
 
-  try {
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
-    }
-
-    const mainCat = document.getElementById("updateStokMainCat").value;
-    const category = document.getElementById("updateStokCategory").value;
-    const jumlah = document.getElementById("updateStokJumlah").value;
-    const petugas = document.getElementById("updateStokPetugas").value;
-    const keterangan = document.getElementById("keteranganUpdateStok").value;
-
-    if (!mainCat || !category || jumlah === "" || !petugas || !keterangan) {
-      throw new Error("Semua field harus diisi.");
-    }
-
-    await updateStokDisplayManual(category, mainCat, jumlah, petugas, keterangan);
-    showSuccessNotification(`Update ${mainCat} berhasil!`);
-    $("#modalUpdateStok").modal("hide");
-  } catch (err) {
-    console.error("Gagal update stok:", err);
-    alert(err.message || "Gagal update stok");
-  } finally {
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = originalText;
-    }
+  // Determine whether petugas is required for this submission
+  const requirePetugasFlag = this.dataset.requirePetugas === "1";
+  if (!mainCat || !category || jumlah === "" || (requirePetugasFlag && !petugas)) {
+    alert("Semua field yang wajib harus diisi.");
+    return;
   }
+
+  // Close modal first for better UX and to ensure it always closes in BS5
+  const modalEl = document.getElementById("modalUpdateStok");
+  const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+  modalInstance.hide();
+
+  await updateStokDisplayManual(category, mainCat, jumlah, petugas, keterangan);
 };
 
 // UPDATED: Listener realtime gunakan data snapshot langsung (tanpa re-fetch),
@@ -1473,16 +1476,17 @@ document.addEventListener("DOMContentLoaded", async function () {
 document.body.addEventListener("click", async function (e) {
   if (e.target.classList.contains("update-hala-btn") || e.target.closest(".update-hala-btn")) {
     const btn = e.target.classList.contains("update-hala-btn") ? e.target : e.target.closest(".update-hala-btn");
-    currentMainCat = btn.dataset.main;
+    currentMainCat = btn.dataset.main; // should be 'HALA'
     currentCategory = btn.dataset.category;
 
+    // Ambil data saat ini dan isi input pada modal Update HALA
     try {
       await fetchStockData();
       const item =
         stockData[currentCategory] && stockData[currentCategory][currentMainCat]
           ? stockData[currentCategory][currentMainCat]
           : { details: {} };
-
+      // Isi current-stock span dan input value pada modalUpdateStokHala
       halaJewelryTypes.forEach((t) => {
         const span = document.querySelector(`#modalUpdateStokHala .current-stock[data-type="${t}"]`);
         const input = document.querySelector(`#modalUpdateStokHala .hala-update-qty-input[data-type="${t}"]`);
@@ -1495,10 +1499,23 @@ document.body.addEventListener("click", async function (e) {
       document.getElementById("jenisUpdateHala").value = currentCategory;
       document.getElementById("modalUpdateStokHalaLabel").textContent = `Update Stok ${jenisDisplay}`;
 
-      const petugasInput = document.getElementById("petugasUpdateStokHalaBulk");
-      if (petugasInput) petugasInput.value = "";
-      const keteranganSelect = document.getElementById("keteranganUpdateHalaBulk");
-      if (keteranganSelect) keteranganSelect.value = "";
+      // Tampilkan/sembunyikan field Nama Staf khusus HALA:
+      // - Wajib & tampil untuk 'brankas' dan 'posting'
+      // - Disembunyikan untuk kategori lain (barang-display, barang-rusak, batu-lepas, manual, admin, DP, contoh-custom)
+      const requirePetugas = currentCategory === "brankas" || currentCategory === "posting";
+      const formEl = document.getElementById("formUpdateStokHalaBulk");
+      if (formEl) formEl.dataset.requirePetugas = requirePetugas ? "1" : "0";
+      const petugasInputHala = document.getElementById("petugasUpdateStokHalaBulk");
+      if (petugasInputHala) {
+        const wrapper =
+          petugasInputHala.closest(".mb-3") ||
+          petugasInputHala.closest(".form-group") ||
+          petugasInputHala.closest(".form-floating") ||
+          petugasInputHala.parentElement;
+        if (wrapper) wrapper.classList.toggle("d-none", !requirePetugas);
+        petugasInputHala.required = requirePetugas;
+        if (!requirePetugas) petugasInputHala.value = ""; // bersihkan saat tidak diperlukan
+      }
 
       $("#modalUpdateStokHala").modal("show");
     } catch (err) {
@@ -1520,13 +1537,9 @@ if (formUpdateHala) {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
       }
-
+      const requirePetugasFlag = this.dataset.requirePetugas === "1";
       const petugas = document.getElementById("petugasUpdateStokHalaBulk").value.trim();
-      const keterangan = document.getElementById("keteranganUpdateHalaBulk").value;
-
-      if (!petugas) throw new Error("Nama staf harus diisi");
-      if (!keterangan) throw new Error("Keterangan harus diisi");
-
+      if (requirePetugasFlag && !petugas) throw new Error("Nama staf harus diisi");
       const category = document.getElementById("jenisUpdateHala").value;
       const mainCat = document.getElementById("jenisUpdateHalaDisplay").value.split(" - ")[0] || "HALA";
 
@@ -1537,10 +1550,7 @@ if (formUpdateHala) {
       }
 
       const item = stockData[category][mainCat];
-      const beforeQty = item.quantity;
       const updates = [];
-      const changes = [];
-
       halaJewelryTypes.forEach((t) => {
         const input = document.querySelector(`.hala-update-qty-input[data-type="${t}"]`);
         if (!input) return;
@@ -1548,61 +1558,28 @@ if (formUpdateHala) {
         if (val === "") return;
         const newVal = parseInt(val || "0");
         if (isNaN(newVal) || newVal < 0) throw new Error("Nilai tidak valid");
-        const oldVal = parseInt(item.details[t] || 0);
         updates.push({ type: t, qty: newVal });
-        if (newVal !== oldVal) {
-          changes.push({ type: t, oldQty: oldVal, newQty: newVal, diff: newVal - oldVal });
-        }
       });
-
       if (!updates.length) throw new Error("Kosongkan kolom jika tidak ingin mengubah, atau isi minimal satu jenis.");
 
       updates.forEach((u) => (item.details[u.type] = u.qty));
       item.quantity = calculateHalaTotal(stockData[category], mainCat);
-      const afterQty = item.quantity;
-      const totalDiff = changes.reduce((a, c) => a + Math.abs(c.diff), 0);
-      const netChange = changes.reduce((a, c) => a + c.diff, 0);
-      const logAction = netChange > 0 ? "tambah" : netChange < 0 ? "kurangi" : "update";
-
-      let historyAction;
-      if (netChange > 0) {
-        historyAction = "Tambah";
-      } else if (netChange < 0) {
-        historyAction = "Kurangi";
-      } else {
-        historyAction = "Update";
-      }
-
       item.lastUpdated = new Date().toISOString();
-      item.history.unshift({
+      const historyEntry = {
         date: item.lastUpdated,
-        action: historyAction,
-        quantity: totalDiff,
-        petugas,
-        keterangan,
+        action: "Update Bulk",
+        quantity: updates.reduce((s, it) => s + it.qty, 0),
         items: updates.map((it) => ({
           jewelryType: it.type,
           jewelryName: halaJewelryMapping[it.type],
           quantity: it.qty,
         })),
-      });
+      };
+      if (requirePetugasFlag && petugas) historyEntry.petugas = petugas;
+      item.history.unshift(historyEntry);
       if (item.history.length > 10) item.history = item.history.slice(0, 10);
 
       await saveData(category, mainCat);
-
-      if (totalDiff > 0 && petugas && keterangan) {
-        await saveStockLog({
-          jenis: mainCat,
-          lokasi: category,
-          action: logAction,
-          before: beforeQty,
-          after: afterQty,
-          quantity: Math.abs(netChange),
-          userName: petugas,
-          keterangan: keterangan,
-        });
-      }
-
       await populateTables({ skipFetch: true });
       showSuccessNotification("Update HALA berhasil");
       $("#modalUpdateStokHala").modal("hide");

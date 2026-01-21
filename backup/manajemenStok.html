@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -102,8 +102,8 @@
             <nav aria-label="breadcrumb" class="mt-3">
               <ol class="breadcrumb">
                 <li class="breadcrumb-item">
-                  <a href="dashboard.html">
-                    <i class="fas fa-home"></i>
+                  <a href="dashboard.html" >
+                    <i class="fas fa-home "></i>
                     Home
                   </a>
                 </li>
@@ -202,11 +202,7 @@
             </div>
 
             <!-- Tab Navigation -->
-            <ul
-              class="nav nav-tabs mb-0 compact overflow-auto d-flex justify-content-center"
-              id="stockTab"
-              role="tablist"
-            >
+            <ul class="nav nav-tabs  mb-0 compact overflow-auto d-flex justify-content-center" id="stockTab" role="tablist">
               <!-- compact class uses existing CSS to reduce padding; overflow-auto enables horizontal scroll on small screens -->
 
               <li class="nav-item" role="presentation">
@@ -327,7 +323,7 @@
             <div class="tab-content" id="stockTabContent">
               <!-- TAB KALUNG -->
               <div class="tab-pane fade show active" id="kalung" role="tabpanel" aria-labelledby="kalung-tab">
-                <div class="card mb-4">
+                <div class="card mb-4 ">
                   <div class="card-header p-2 d-flex justify-content-start align-items-center">
                     <i class="fas fa-link me-2"></i>
                     <h3 class="mb-0">Data Kalung</h3>
@@ -966,7 +962,7 @@
             >
               <div class="modal-dialog modal-lg">
                 <div class="modal-content">
-                  <div class="modal-header">
+                  <div class="modal-header bg-warning">
                     <h5 class="modal-title" id="modalUpdateStokHalaLabel">Update Stok HALA</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                   </div>
@@ -987,14 +983,16 @@
                         <table class="table table-sm table-bordered align-middle">
                           <thead class="table-info">
                             <tr>
-                              <th style="width: 40%">Jenis Perhiasan</th>
-                              <th style="width: 30%" class="text-center">Stok Saat Ini</th>
-                              <th style="width: 30%">Update</th>
+                              <th style="width: 35%">Jenis Perhiasan</th>
+                              <th style="width: 15%" class="text-center">Kode</th>
+                              <th style="width: 25%" class="text-center">Stok Saat Ini</th>
+                              <th style="width: 25%">Update Jadi</th>
                             </tr>
                           </thead>
                           <tbody>
                             <tr data-type="KA">
                               <td>Kalung</td>
+                              <td class="text-center"><span class="badge bg-info text-dark">KA</span></td>
                               <td class="text-center"><span class="current-stock" data-type="KA">0</span></td>
                               <td>
                                 <input
@@ -1008,6 +1006,7 @@
                             </tr>
                             <tr data-type="LA">
                               <td>Liontin</td>
+                              <td class="text-center"><span class="badge bg-info text-dark">LA</span></td>
                               <td class="text-center"><span class="current-stock" data-type="LA">0</span></td>
                               <td>
                                 <input
@@ -1021,6 +1020,7 @@
                             </tr>
                             <tr data-type="AN">
                               <td>Anting</td>
+                              <td class="text-center"><span class="badge bg-info text-dark">AN</span></td>
                               <td class="text-center"><span class="current-stock" data-type="AN">0</span></td>
                               <td>
                                 <input
@@ -1034,6 +1034,7 @@
                             </tr>
                             <tr data-type="CA">
                               <td>Cincin</td>
+                              <td class="text-center"><span class="badge bg-info text-dark">CA</span></td>
                               <td class="text-center"><span class="current-stock" data-type="CA">0</span></td>
                               <td>
                                 <input
@@ -1047,6 +1048,7 @@
                             </tr>
                             <tr data-type="SA">
                               <td>Giwang</td>
+                              <td class="text-center"><span class="badge bg-info text-dark">SA</span></td>
                               <td class="text-center"><span class="current-stock" data-type="SA">0</span></td>
                               <td>
                                 <input
@@ -1060,6 +1062,7 @@
                             </tr>
                             <tr data-type="GA">
                               <td>Gelang</td>
+                              <td class="text-center"><span class="badge bg-info text-dark">GA</span></td>
                               <td class="text-center"><span class="current-stock" data-type="GA">0</span></td>
                               <td>
                                 <input
@@ -1076,35 +1079,16 @@
                       </div>
                       <div class="mb-3">
                         <label for="petugasUpdateStokHalaBulk" class="form-label">Nama Staf</label>
-                        <select class="form-select" id="petugasUpdateStokHalaBulk" required>
-                          <option value="">-- Pilih Nama Staff --</option>
-                        </select>
+                        <input type="text" class="form-control" id="petugasUpdateStokHalaBulk" required />
                       </div>
-                      <div class="mb-3">
-                        <label for="keteranganUpdateHalaBulk" class="form-label">
-                          Keterangan
-                          <span class="text-danger">*</span>
-                        </label>
-                        <select class="form-select" id="keteranganUpdateHalaBulk" required>
-                          <option value="">-- Pilih Keterangan --</option>
-                          <option value="restok">Restok</option>
-                          <option value="laku">Laku</option>
-                          <option value="dipajang">Dipajang</option>
-                          <option value="sudah posting">Sudah Posting</option>
-                          <option value="tutup toko">Tutup Toko</option>
-                          <option value="mutasi staff">Mutasi Staff</option>
-                          <option value="barang rusak">Barang Rusak</option>
-                          <option value="batu lepas">Batu Lepas</option>
-                          <option value="kode bermasalah">Kode Bermasalah</option>
-                          <option value="mutasi">Sudah Mutasi</option>
-                          <option value="diperbaiki">Diperbaiki</option>
-                          <option value="salah update">Salah Update</option>
-                          <option value="custom">Contoh Custom</option>
-                        </select>
+                      <div class="d-flex gap-2">
+                        <button type="reset" class="btn btn-outline-secondary w-25" id="resetBulkUpdateHalaBtn">
+                          Reset
+                        </button>
+                        <button type="submit" class="btn btn-warning flex-grow-1" id="submitBulkUpdateHalaBtn">
+                          Simpan Perubahan
+                        </button>
                       </div>
-                      <button type="submit" class="btn btn-primary w-100" id="submitBulkUpdateHalaBtn">
-                        Simpan Perubahan
-                      </button>
                       <small class="text-muted d-block mt-2">
                         Kosongkan kolom jika tidak ingin mengubah jenis tersebut.
                       </small>
@@ -1172,7 +1156,7 @@
           >
             <div class="modal-dialog modal-lg">
               <div class="modal-content">
-                <div class="modal-header p-3">
+                <div class="modal-header bg-warning">
                   <h5 class="modal-title" id="modalRiwayatLabel">
                     Riwayat Stok
                     <span id="riwayat-title"></span>
@@ -1186,8 +1170,9 @@
                         <tr>
                           <th>No</th>
                           <th>Tanggal</th>
+                          <th>Status</th>
                           <th>Jumlah</th>
-                          <th>Staff</th>
+                          <th>Nama Staff</th>
                           <th>Keterangan</th>
                         </tr>
                       </thead>
@@ -1211,7 +1196,7 @@
             <div class="modal-dialog">
               <div class="modal-content">
                 <form id="formUpdateStok">
-                  <div class="modal-header">
+                  <div class="modal-header bg-warning">
                     <h5 class="modal-title" id="modalUpdateStokLabel">Update Stok</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                   </div>
@@ -1228,35 +1213,15 @@
                     </div>
                     <div class="mb-3">
                       <label for="updateStokPetugas" class="form-label">Nama Staf</label>
-                      <select class="form-select" id="updateStokPetugas" required>
-                        <option value="">-- Pilih Nama Staff --</option>
-                      </select>
+                      <input type="text" class="form-control" id="updateStokPetugas" required />
                     </div>
                     <div class="mb-3">
-                      <label for="keteranganUpdateStok" class="form-label">
-                        Keterangan
-                        <span class="text-danger">*</span>
-                      </label>
-                      <select class="form-select" id="keteranganUpdateStok" required>
-                        <option value="">-- Pilih Keterangan --</option>
-                        <option value="restok">Restok</option>
-                        <option value="laku">Laku</option>
-                        <option value="dipajang">Dipajang</option>
-                        <option value="sudah posting">Sudah Posting</option>
-                        <option value="tutup toko">Tutup Toko</option>
-                        <option value="mutasi staff">Mutasi Staff</option>
-                        <option value="barang rusak">Barang Rusak</option>
-                        <option value="batu lepas">Batu Lepas</option>
-                        <option value="kode bermasalah">Kode Bermasalah</option>
-                        <option value="mutasi">Sudah Mutasi</option>
-                        <option value="diperbaiki">Diperbaiki</option>
-                        <option value="salah update">Salah Update</option>
-                        <option value="custom">Contoh Custom</option>
-                      </select>
+                      <label for="keteranganKurangi" class="form-label">Keterangan</label>
+                      <textarea class="form-control" id="keteranganKurangi" rows="2" placeholder="Opsional"></textarea>
                     </div>
                   </div>
                   <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary w-100" id="submitUpdateStokBtn">Update Stok</button>
+                    <button type="submit" class="btn btn-warning w-100">Update Stok</button>
                   </div>
                 </form>
               </div>
@@ -1266,7 +1231,6 @@
       </main>
     </div>
     <script src="js/sidebar-loader.js"></script>
-    <script src="js/staffHelper.js"></script>
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/manajemenStok.js"></script>
   </body>
