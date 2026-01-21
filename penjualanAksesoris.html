@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -303,7 +303,6 @@
                     <select class="form-select" id="jenisPenjualan">
                       <option value="aksesoris" selected>Aksesoris</option>
                       <option value="kotak">Kotak</option>
-                      <option value="silver">Silver</option>
                       <option value="manual">Penjualan Manual</option>
                     </select>
                   </div>
@@ -311,13 +310,23 @@
                     <label for="jenisManual" class="form-label">
                       Jenis Manual
                       <span class="text-danger">*</span>
+                      <i
+                        class="fas fa-info-circle text-primary ms-1"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        title="Pilih jenis manual sesuai kebutuhan mutasi kode barang"
+                        style="cursor: help; font-size: 0.9rem"
+                      ></i>
                     </label>
                     <select class="form-select" id="jenisManual" required>
                       <option value="">Pilih Jenis Manual</option>
                       <option value="perlu-mutasi">Perlu Mutasi</option>
                       <option value="tidak-perlu-mutasi">Tidak Perlu Mutasi</option>
                     </select>
-                    <div class="invalid-feedback">Jenis manual harus dipilih</div>
+                    <small class="form-text text-muted" id="jenisManualHelp" style="display: none">
+                      <i class="fas fa-lightbulb"></i>
+                      <span id="jenisManualHelpText"></span>
+                    </small>
                   </div>
                   <div class="col-md-2">
                     <label for="sales" class="form-label">
@@ -383,34 +392,6 @@
                       <tr>
                         <th colspan="6" class="text-end">Total:</th>
                         <th id="grand-total-aksesoris">0</th>
-                        <th></th>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-
-                <!-- Tabel untuk Silver -->
-                <div class="table-responsive" id="silverTableContainer" style="display: none">
-                  <table class="table table-hover" id="tableSilverDetail">
-                    <thead class="table-light">
-                      <tr>
-                        <th style="width: 10%">Barcode</th>
-                        <th style="width: 35%">Nama Barang</th>
-                        <th style="width: 10%">Jumlah</th>
-                        <th style="width: 10%">Kadar</th>
-                        <th style="width: 10%">Berat</th>
-                        <th style="width: 15%">Harga Per Gram</th>
-                        <th style="width: 15%">Total Harga</th>
-                        <th style="width: 5%">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <!-- Baris akan ditambahkan oleh JavaScript -->
-                    </tbody>
-                    <tfoot>
-                      <tr>
-                        <th colspan="6" class="text-end">Total:</th>
-                        <th id="grand-total-silver">0</th>
                         <th></th>
                       </tr>
                     </tfoot>
@@ -724,79 +705,6 @@
                 </thead>
                 <tbody>
                   <!-- Data kotak akan ditampilkan di sini -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div class="modal-footer bg-light">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-              <i class="fas fa-times me-2"></i>
-              Tutup
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal Pilih Silver -->
-    <div
-      class="modal fade"
-      id="modalPilihSilver"
-      tabindex="-1"
-      aria-labelledby="modalPilihSilverLabel"
-      aria-hidden="true"
-    >
-      <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-          <div class="modal-header bg-info text-white">
-            <h5 class="modal-title" id="modalPilihSilverLabel">
-              <i class="fas fa-coins me-2"></i>
-              Pilih Silver
-            </h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <div class="row mb-3">
-              <div class="col-md-6">
-                <div class="input-group">
-                  <span class="input-group-text bg-light">
-                    <i class="fas fa-search"></i>
-                  </span>
-                  <input
-                    type="text"
-                    class="form-control"
-                    id="searchSilver"
-                    placeholder="Cari kode atau nama silver..."
-                  />
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="d-flex align-items-center text-muted">
-                  <i class="fas fa-info-circle me-2"></i>
-                  <small>Klik pada baris untuk memilih silver</small>
-                </div>
-              </div>
-            </div>
-            <div class="table-responsive" style="max-height: 450px">
-              <table class="table table-hover table-striped" id="tableSilver">
-                <thead class="table-dark sticky-top">
-                  <tr>
-                    <th style="width: 20%">
-                      <i class="fas fa-barcode me-2"></i>
-                      Kode
-                    </th>
-                    <th style="width: 60%">
-                      <i class="fas fa-coins me-2"></i>
-                      Nama Silver
-                    </th>
-                    <th style="width: 20%" class="text-end">
-                      <i class="fas fa-box me-2"></i>
-                      Stok
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <!-- Data silver akan ditampilkan di sini -->
                 </tbody>
               </table>
             </div>

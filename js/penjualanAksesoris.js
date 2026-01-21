@@ -263,7 +263,8 @@ const penjualanHandler = {
     this.setupSmartListeners();
 
     this.updateUIForSalesType("aksesoris");
-    this.toggleJenisManualField("aksesoris");
+    this.toggleJenisManualField(); // Let it read from dropdown
+    this.initializeTooltips();
     $("#sales").focus();
   },
 
@@ -531,7 +532,7 @@ const penjualanHandler = {
       (error) => {
         console.error("Stock listener error:", error);
         this.stockListener = null;
-      }
+      },
     );
 
     // 2. Transaction listener - 🚀 OPSI C: Direct in-memory update (no cooldown!)
@@ -540,7 +541,7 @@ const penjualanHandler = {
 
     const transactionQuery = query(
       collection(firestore, "stokAksesorisTransaksi"),
-      where("timestamp", ">=", Timestamp.fromDate(today))
+      where("timestamp", ">=", Timestamp.fromDate(today)),
     );
 
     let isFirstSnapshot = true;
@@ -603,7 +604,7 @@ const penjualanHandler = {
       (error) => {
         console.error("Transaction listener error:", error);
         this.transactionListener = null;
-      }
+      },
     );
 
     // 3. Cross-tab sync listener (localStorage 'storage' event)
@@ -868,10 +869,17 @@ const penjualanHandler = {
       this.toggleJenisManualField(salesType);
     });
 
-    // Jenis manual validation
-    $("#jenisManual").on("change", function () {
-      if ($(this).val()) {
-        $(this).removeClass("is-invalid").addClass("is-valid");
+    // Jenis manual validation and help text update
+    $("#jenisManual").on("change", (e) => {
+      const value = $(e.target).val();
+      if (value) {
+        $(e.target).removeClass("is-invalid").addClass("is-valid");
+        // Update help text and tooltip
+        this.updateJenisManualHelp(value);
+        this.updateJenisManualTooltip(value);
+      } else {
+        $(e.target).removeClass("is-valid");
+        $("#jenisManualHelp").hide();
       }
     });
 
@@ -897,11 +905,11 @@ const penjualanHandler = {
     // Input events with debouncing
     $("#jumlahBayar").on(
       "input",
-      utils.debounce(() => this.calculateKembalian(), 300)
+      utils.debounce(() => this.calculateKembalian(), 300),
     );
     $("#nominalDP").on(
       "input",
-      utils.debounce(() => this.calculateSisaPembayaran(), 300)
+      utils.debounce(() => this.calculateSisaPembayaran(), 300),
     );
 
     $("#jumlahBayar, #nominalDP").on("blur", function () {
@@ -910,11 +918,11 @@ const penjualanHandler = {
     });
 
     // Search events
-    $("#searchAksesoris, #searchKotak, #searchSilver, #searchLock").on(
+    $("#searchAksesoris, #searchKotak, #searchLock").on(
       "input",
       utils.debounce((e) => {
         this.searchTable(e.target);
-      }, 300)
+      }, 300),
     );
 
     // Sales validation
@@ -945,17 +953,81 @@ const penjualanHandler = {
 
   // Toggle jenisManual field visibility
   toggleJenisManualField(salesType) {
+    // Always read current dropdown value if not provided
+    const currentType = salesType || $("#jenisPenjualan").val();
     const container = $("#jenisManualContainer");
     const select = $("#jenisManual");
 
-    if (salesType === "manual") {
+    if (currentType === "manual") {
       container.show();
       select.prop("required", true);
+      // Initialize tooltip when showing
+      setTimeout(() => this.initializeTooltips(), 50);
     } else {
       container.hide();
       select.prop("required", false);
-      select.val("").removeClass("is-invalid is-valid");
+      // Only reset if not already empty
+      if (select.val()) {
+        select.val("").removeClass("is-invalid is-valid");
+      }
+      $("#jenisManualHelp").hide();
+      // Reset tooltip to default
+      this.updateJenisManualTooltip("");
     }
+  },
+
+  // Update help text for Jenis Manual
+  updateJenisManualHelp(value) {
+    const helpContainer = $("#jenisManualHelp");
+    const helpText = $("#jenisManualHelpText");
+
+    if (value === "perlu-mutasi") {
+      helpText.html(
+        "<strong>Kode harus dimutasi</strong> - Digunakan untuk kode yang perlu mutasi seperti barang mutasi staff",
+      );
+      helpContainer.removeClass("text-muted text-success").addClass("text-danger").show();
+    } else if (value === "tidak-perlu-mutasi") {
+      helpText.html("<strong>Kode tidak perlu mutasi</strong> - Digunakan untuk reprint nota atau input barang custom");
+      helpContainer.removeClass("text-muted text-danger").addClass("text-success").show();
+    } else {
+      helpContainer.hide();
+    }
+  },
+
+  // Update tooltip for Jenis Manual icon
+  updateJenisManualTooltip(value) {
+    const tooltipIcon = $('i[data-bs-toggle="tooltip"]').filter(function () {
+      return $(this).closest("#jenisManualContainer").length > 0;
+    });
+
+    if (tooltipIcon.length === 0) return;
+
+    // Dispose existing tooltip
+    const tooltipInstance = bootstrap.Tooltip.getInstance(tooltipIcon[0]);
+    if (tooltipInstance) {
+      tooltipInstance.dispose();
+    }
+
+    // Update title based on selection
+    let newTitle = "";
+    if (value === "perlu-mutasi") {
+      newTitle = "✓ Kode harus dimutasi - Untuk mutasi antar staff";
+    } else if (value === "tidak-perlu-mutasi") {
+      newTitle = "✓ Kode tidak perlu mutasi - Untuk reprint nota/barang custom";
+    } else {
+      newTitle = "Pilih jenis manual sesuai kebutuhan mutasi kode barang";
+    }
+
+    // Set new title and reinitialize tooltip
+    tooltipIcon.attr("data-bs-original-title", newTitle).attr("title", newTitle);
+    new bootstrap.Tooltip(tooltipIcon[0]);
+  },
+
+  // Initialize Bootstrap tooltips
+  initializeTooltips() {
+    // Initialize all tooltips
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    [...tooltipTriggerList].map((tooltipTriggerEl) => new bootstrap.Tooltip(tooltipTriggerEl));
   },
 
   // Populate stock tables
@@ -964,7 +1036,6 @@ const penjualanHandler = {
     const categories = {
       aksesoris: "#tableAksesoris",
       kotak: "#tableKotak",
-      silver: "#tableSilver",
     };
 
     Object.entries(categories).forEach(([category, selector]) => {
@@ -1023,7 +1094,7 @@ const penjualanHandler = {
   },
 
   attachTableRowClickHandlers() {
-    $("#tableAksesoris tbody tr, #tableKotak tbody tr, #tableSilver tbody tr, #tableLock tbody tr").off("click");
+    $("#tableAksesoris tbody tr, #tableKotak tbody tr, #tableLock tbody tr").off("click");
 
     // 🎯 Aksesoris table with stock validation
     $("#tableAksesoris tbody tr").on("click", function () {
@@ -1083,35 +1154,6 @@ const penjualanHandler = {
       }
     });
 
-    // 🎯 Silver table with stock validation
-    $("#tableSilver tbody tr").on("click", function () {
-      if ($(this).data("kode")) {
-        const kode = $(this).data("kode");
-        const nama = $(this).data("nama");
-        const stok = parseInt($(this).data("stok")) || 0;
-
-        // Block if stock is 0 or less
-        if (stok <= 0) {
-          Swal.fire({
-            title: "Stok Habis!",
-            text: `Barang ${nama} (${kode}) tidak memiliki stok. Tidak dapat ditambahkan ke transaksi.`,
-            icon: "error",
-            confirmButtonText: "OK",
-            confirmButtonColor: "#dc3545",
-          });
-          return;
-        }
-
-        const data = {
-          kode: $(this).data("kode"),
-          nama: $(this).data("nama"),
-          harga: $(this).data("harga"),
-        };
-        penjualanHandler.addSilverToTable(data);
-        $("#modalPilihSilver").modal("hide");
-      }
-    });
-
     // Lock table (no stock validation needed for manual entry)
     $("#tableLock tbody tr").on("click", function () {
       if ($(this).data("kode") && activeLockRow) {
@@ -1153,8 +1195,6 @@ const penjualanHandler = {
         $("#modalPilihAksesoris").modal("show");
       } else if (salesType === "kotak") {
         $("#modalPilihKotak").modal("show");
-      } else if (salesType === "silver") {
-        $("#modalPilihSilver").modal("show");
       }
     } catch (error) {
       console.error("Error opening modal:", error);
@@ -1214,7 +1254,7 @@ const penjualanHandler = {
         </td>
         <td>
           <input type="text" class="form-control form-control-sm harga-input" value="${utils.formatRupiah(
-            hargaSatuan
+            hargaSatuan,
           )}" placeholder="Masukkan harga" required>
         </td>
         <td class="total-harga">${utils.formatRupiah(totalHarga)}</td>
@@ -1233,51 +1273,12 @@ const penjualanHandler = {
     this.updateGrandTotal("kotak");
   },
 
-  // Add silver to table
-  addSilverToTable(data) {
-    const { kode, nama, harga } = data;
-    const newRow = `
-      <tr>
-        <td>${kode}</td>
-        <td>${nama}</td>
-        <td>
-          <input type="number" class="form-control form-control-sm jumlah-input" value="1" min="1">
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm kadar-input" value="" placeholder="Masukkan kadar" required>
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm berat-input" value="" placeholder="0.00" required>
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm harga-per-gram-input" value="0" readonly>
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm total-harga-input" value="" placeholder="Masukkan harga" required>
-        </td>
-        <td>
-          <button class="btn btn-sm btn-danger btn-delete">
-            <i class="fas fa-trash"></i>
-          </button>
-        </td>
-      </tr>
-    `;
-
-    $("#tableSilverDetail tbody").append(newRow);
-    const $newRow = $("#tableSilverDetail tbody tr:last-child");
-    $newRow.find(".kadar-input").focus();
-    this.attachRowEventHandlers($newRow);
-    this.updateGrandTotal("silver");
-  },
-
   // Attach row event handlers
   attachRowEventHandlers($row) {
     $row.find("input, button").off();
 
     if ($row.closest("table").attr("id") === "tableAksesorisDetail") {
       this.attachAksesorisRowHandlers($row, "aksesoris");
-    } else if ($row.closest("table").attr("id") === "tableSilverDetail") {
-      this.attachAksesorisRowHandlers($row, "silver"); // Silver menggunakan handler yang sama dengan aksesoris
     } else if ($row.closest("table").attr("id") === "tableKotakDetail") {
       this.attachKotakRowHandlers($row);
     }
@@ -1286,13 +1287,7 @@ const penjualanHandler = {
     $row.find(".btn-delete").on("click", () => {
       const tableId = $row.closest("table").attr("id");
       const salesType =
-        tableId === "tableAksesorisDetail"
-          ? "aksesoris"
-          : tableId === "tableSilverDetail"
-          ? "silver"
-          : tableId === "tableKotakDetail"
-          ? "kotak"
-          : "manual";
+        tableId === "tableAksesorisDetail" ? "aksesoris" : tableId === "tableKotakDetail" ? "kotak" : "manual";
       $row.remove();
       this.updateGrandTotal(salesType);
     });
@@ -1407,7 +1402,7 @@ const penjualanHandler = {
   // Update UI for sales type
   updateUIForSalesType(type) {
     // Hide all containers
-    $("#aksesorisTableContainer, #silverTableContainer, #kotakTableContainer, #manualTableContainer").hide();
+    $("#aksesorisTableContainer, #kotakTableContainer, #manualTableContainer").hide();
     $("#btnTambah, #btnTambahBaris").hide();
 
     let detailTitle = "Detail Barang";
@@ -1417,11 +1412,6 @@ const penjualanHandler = {
         $("#aksesorisTableContainer").show();
         $("#btnTambah").show();
         detailTitle = "Detail Aksesoris";
-        break;
-      case "silver":
-        $("#silverTableContainer").show();
-        $("#btnTambah").show();
-        detailTitle = "Detail Silver";
         break;
       case "kotak":
         $("#kotakTableContainer").show();
@@ -1626,7 +1616,7 @@ const penjualanHandler = {
 
     // Clear input row
     $(
-      `#${type}InputKode, #${type}InputNamaBarang, #${type}InputKodeLock, #${type}InputKadar, #${type}InputBerat, #${type}InputHargaPerGram, #${type}InputTotalHarga, #${type}InputKeterangan`
+      `#${type}InputKode, #${type}InputNamaBarang, #${type}InputKodeLock, #${type}InputKadar, #${type}InputBerat, #${type}InputHargaPerGram, #${type}InputTotalHarga, #${type}InputKeterangan`,
     ).val("");
 
     $(`#${type}InputKode`).focus();
@@ -1642,10 +1632,6 @@ const penjualanHandler = {
         tableSelector = "#tableAksesorisDetail";
         grandTotalId = "#grand-total-aksesoris";
         break;
-      case "silver":
-        tableSelector = "#tableSilverDetail";
-        grandTotalId = "#grand-total-silver";
-        break;
       case "kotak":
         tableSelector = "#tableKotakDetail";
         grandTotalId = "#grand-total-kotak";
@@ -1658,7 +1644,7 @@ const penjualanHandler = {
 
     let total = 0;
 
-    if (salesType === "aksesoris" || salesType === "silver") {
+    if (salesType === "aksesoris") {
       $(tableSelector + " tbody tr:not(.input-row) .total-harga-input").each(function () {
         const value = $(this).val().replace(/\./g, "");
         total += parseFloat(value) || 0;
@@ -1698,8 +1684,8 @@ const penjualanHandler = {
       salesType === "aksesoris"
         ? "#grand-total-aksesoris"
         : salesType === "kotak"
-        ? "#grand-total-kotak"
-        : "#grand-total-manual";
+          ? "#grand-total-kotak"
+          : "#grand-total-manual";
 
     total = parseFloat($(grandTotalSelector).text().replace(/\./g, "")) || 0;
     $("#totalOngkos").val(utils.formatRupiah(total));
@@ -1820,11 +1806,9 @@ const penjualanHandler = {
       const tableSelector =
         salesType === "aksesoris"
           ? "#tableAksesorisDetail"
-          : salesType === "silver"
-          ? "#tableSilverDetail"
           : salesType === "kotak"
-          ? "#tableKotakDetail"
-          : "#tableManualDetail";
+            ? "#tableKotakDetail"
+            : "#tableManualDetail";
 
       // Check if table has rows
       if ($(tableSelector + " tbody tr:not(.input-row)").length === 0) {
@@ -1975,7 +1959,7 @@ const penjualanHandler = {
     const items = [];
     let validationErrors = [];
 
-    if (salesType === "aksesoris" || salesType === "silver") {
+    if (salesType === "aksesoris") {
       $(tableSelector + " tbody tr:not(.input-row)").each(function (index) {
         const kode = $(this).find("td:nth-child(1)").text();
         const nama = $(this).find("td:nth-child(2)").text();
@@ -2106,11 +2090,11 @@ const penjualanHandler = {
                 newStock: newStockLock,
                 jumlah,
                 isGantiLock: true,
-              })
+              }),
             );
           }
         } else {
-          // Untuk penjualan aksesoris, kotak, dan silver
+          // Untuk penjualan aksesoris dan kotak
           const kode = item.kodeText;
           if (!kode || kode === "-") continue;
           // Untuk penjualan aksesoris dan kotak
@@ -2125,7 +2109,7 @@ const penjualanHandler = {
               newStock,
               jumlah,
               isGantiLock: false,
-            })
+            }),
           );
         }
       }
@@ -2780,23 +2764,22 @@ const penjualanHandler = {
   // Reset form
   resetForm() {
     try {
-      // Reset sales type to default
-      $("#jenisPenjualan").val("aksesoris").trigger("change");
-
-      // Reset date to current date
-      this.setDefaultDate();
-
       // Reset sales name field
       $("#sales").val("").removeClass("is-valid is-invalid");
       $("#customerName").val("");
       $("#customerPhone").val("");
 
-      // Reset jenisManual
+      // Reset jenisManual (will be handled by toggleJenisManualField)
       $("#jenisManual").val("").removeClass("is-valid is-invalid");
-      $("#jenisManualContainer").hide();
 
       // Clear all tables
       $("#tableAksesorisDetail tbody, #tableKotakDetail tbody, #tableManualDetail tbody").empty();
+
+      // Reset sales type to default (trigger will handle jenisManual visibility)
+      $("#jenisPenjualan").val("aksesoris").trigger("change");
+
+      // Reset date to current date
+      this.setDefaultDate();
 
       // Reset payment fields
       $("#metodeBayar").val("tunai").trigger("change");
@@ -2948,19 +2931,22 @@ const performanceMonitor = {
 // Wrap critical functions with performance monitoring
 penjualanHandler.loadStockData = performanceMonitor.wrap(
   "Load Stock Data",
-  penjualanHandler.loadStockData.bind(penjualanHandler)
+  penjualanHandler.loadStockData.bind(penjualanHandler),
 );
 
 penjualanHandler.saveTransaction = performanceMonitor.wrap(
   "Save Transaction",
-  penjualanHandler.saveTransaction.bind(penjualanHandler)
+  penjualanHandler.saveTransaction.bind(penjualanHandler),
 );
 
 // Auto-maintenance tasks
-setInterval(() => {
-  // System health check (silent monitoring)
-  const readsStats = readsMonitor.getStats();
-}, 10 * 60 * 1000); // Every 10 minutes
+setInterval(
+  () => {
+    // System health check (silent monitoring)
+    const readsStats = readsMonitor.getStats();
+  },
+  10 * 60 * 1000,
+); // Every 10 minutes
 
 window.addEventListener("unhandledrejection", (event) => {
   console.error("🚫 Unhandled promise rejection:", event.reason);

@@ -161,6 +161,7 @@ export const aksesorisSaleHandler = {
   // Fungsi inisialisasi
   async init() {
     this.initDomElements();
+    this.checkAdminAccess();
     await this.loadKodeAksesorisData();
     this.initModals();
     this.attachEventListeners();
@@ -169,6 +170,20 @@ export const aksesorisSaleHandler = {
     this.handleCategoryChange(selectKategori.value, tbody);
     this.setTodayDate();
     this.renderStockAdditionHistory([]);
+  },
+
+  // Fungsi untuk check akses admin/supervisor
+  checkAdminAccess() {
+    try {
+      const currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
+      const isAdmin = currentUser.username === "supervisor" || currentUser.role === "supervisor";
+      if (isAdmin) {
+        const btnHapusData = document.getElementById("btnHapusData");
+        if (btnHapusData) btnHapusData.style.display = "";
+      }
+    } catch (error) {
+      console.error("Error checking admin access:", error);
+    }
   },
 
   // Fungsi untuk mengisi tanggal hari ini
@@ -294,6 +309,7 @@ export const aksesorisSaleHandler = {
         this.loadKodeBarang("aksesoris");
       });
     }
+
     // Event listeners untuk pencarian
     this.attachSearchListeners();
 
@@ -421,8 +437,7 @@ export const aksesorisSaleHandler = {
 
   // Fungsi untuk memfilter tabel berdasarkan input pencarian
   filterTable(kategori, searchText) {
-    const tableId =
-      kategori === "kotak" ? "tableKodeKotak" : kategori === "aksesoris" ? "tableKodeAksesoris" : null;
+    const tableId = kategori === "kotak" ? "tableKodeKotak" : kategori === "aksesoris" ? "tableKodeAksesoris" : "";
     const table = document.getElementById(tableId);
 
     if (!table) return;
@@ -526,12 +541,7 @@ export const aksesorisSaleHandler = {
   // Fungsi untuk menangani perubahan kategori
   handleCategoryChange(kategori, tbody) {
     tbody.innerHTML = "";
-    const options =
-      kategori === "1"
-        ? this.OPSI_KOTAK
-        : kategori === "2"
-          ? this.OPSI_AKSESORIS
-            : [];
+    const options = kategori === "1" ? this.OPSI_KOTAK : kategori === "2" ? this.OPSI_AKSESORIS : [];
     this.updateAllKodeBarangOptions(options);
     if (options.length) {
       this.tambahBaris(kategori, tbody);
@@ -665,6 +675,10 @@ export const aksesorisSaleHandler = {
   // Fungsi untuk memperbarui nama barang
   updateNamaBarang(kodeBarangSelect, namaBarangInput) {
     const selectedOption = kodeBarangSelect.options[kodeBarangSelect.selectedIndex];
+    if (!selectedOption) {
+      namaBarangInput.value = "";
+      return;
+    }
     const nama = selectedOption.getAttribute("data-nama");
     namaBarangInput.value = nama || "";
   },
@@ -820,7 +834,19 @@ export const aksesorisSaleHandler = {
     try {
       invalidateCache("stockData");
 
-      const tanggal = document.getElementById("tanggal").value;
+      const tanggalInput = document.getElementById("tanggal").value;
+
+      // ✅ FIX: Konversi format dd/mm/yyyy ke ISO string
+      let tanggalISO;
+      if (tanggalInput) {
+        const parts = tanggalInput.split("/");
+        if (parts.length === 3) {
+          // parts[0] = day, parts[1] = month, parts[2] = year
+          const date = new Date(parts[2], parts[1] - 1, parts[0]);
+          tanggalISO = date.toISOString();
+        }
+      }
+
       const currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
       const salesName = currentUser.username || "System";
 
@@ -833,7 +859,7 @@ export const aksesorisSaleHandler = {
           jumlah: parseInt(item.jumlah) || 0,
           keterangan: `Tambah stok: ${item.nama}`,
           sales: salesName,
-          tanggal: tanggal,
+          tanggal: tanggalISO, // ✅ Kirim ISO format
         });
       }
 
@@ -1430,8 +1456,7 @@ export const aksesorisSaleHandler = {
 
   async loadKodeBarang(kategori) {
     try {
-      const tableId =
-        kategori === "kotak" ? "tableKodeKotak" : kategori === "aksesoris" ? "tableKodeAksesoris" :"";
+      const tableId = kategori === "kotak" ? "tableKodeKotak" : kategori === "aksesoris" ? "tableKodeAksesoris" : "";
       const tableBody = document.querySelector(`#${tableId} tbody`);
 
       if (!tableBody) {
@@ -1471,8 +1496,7 @@ export const aksesorisSaleHandler = {
       this.renderKodeBarangTable(tableBody, kodeData, kategori);
     } catch (error) {
       console.error("Error loading kode barang:", error);
-      const tableId =
-        kategori === "kotak" ? "tableKodeKotak" : kategori === "aksesoris" ? "tableKodeAksesoris" : "";
+      const tableId = kategori === "kotak" ? "tableKodeKotak" : kategori === "aksesoris" ? "tableKodeAksesoris" : "";
       const tableBody = document.querySelector(`#${tableId} tbody`);
       if (tableBody) {
         tableBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Error: ${error.message}</td></tr>`;

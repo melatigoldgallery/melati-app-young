@@ -1,5 +1,6 @@
 import { sidebarToggle } from "./components/sidebar.js";
 import { initializeDateTime } from "./components/header.js";
+import { ensureDailySnapshotExists } from "./laporanStok.js";
 
 try {
   sidebarToggle();
@@ -145,5 +146,19 @@ $(document).ready(function () {
   checkLoginStatus();
   setupMenuAccess();
   setupPasswordVerification();
+
+    if (window.location.pathname.includes("dashboard.html") || window.location.pathname.endsWith("/")) {
+      ensureDailySnapshotExists()
+        .then((result) => {
+          if (result.created) {
+            console.log("✅ Daily snapshot created successfully");
+          } else if (result.success) {
+            console.log("✅ Daily snapshot already exists or being processed");
+          }
+        })
+        .catch((error) => {
+          console.error("⚠️ Snapshot creation failed (non-critical):", error);
+        });
+    }
 });
 window.handleLogout = handleLogout;

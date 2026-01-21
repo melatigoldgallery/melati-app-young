@@ -439,12 +439,13 @@ class OptimizedStockReport {
       endOfDay.setHours(23, 59, 59, 999);
 
       // Query dari stokAksesorisTransaksi dengan jenis = "return"
+      // ✅ FIX: Query berdasarkan field 'tanggal' (user input) bukan 'timestamp' (server time)
       const transactionRef = collection(firestore, "stokAksesorisTransaksi");
       const q = query(
         transactionRef,
         where("jenis", "==", "return"),
-        where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
-        where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
+        where("tanggal", ">=", startOfDay.toISOString()),
+        where("tanggal", "<=", endOfDay.toISOString()),
       );
 
       const snapshot = await getDocs(q);
@@ -762,6 +763,7 @@ class OptimizedStockReport {
     const endOfDay = new Date(selectedDate);
     endOfDay.setHours(23, 59, 59, 999);
 
+    // ✅ Query berdasarkan 'timestamp' (single source of truth untuk semua jenis transaksi)
     const transaksiQuery = query(
       collection(firestore, "stokAksesorisTransaksi"),
       where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
@@ -1302,14 +1304,14 @@ class OptimizedStockReport {
           text: '<i class="fas fa-file-excel me-2"></i>Excel',
           className: "btn btn-success btn-sm me-1",
           exportOptions: { columns: ":visible" },
-          title: `Laporan Stok Kotak & Aksesoris Melati Bawah (${selectedDate})`,
+          title: `Laporan Stok Kotak & Aksesoris Melati Atas (${selectedDate})`,
         },
         {
           extend: "pdf",
           text: '<i class="fas fa-file-pdf me-2"></i>PDF',
           className: "btn btn-danger btn-sm me-1",
           exportOptions: { columns: ":visible" },
-          title: `Laporan Stok Kotak & Aksesoris Melati Bawah\n(${selectedDate})`,
+          title: `Laporan Stok Kotak & Aksesoris Melati Atas\n(${selectedDate})`,
           customize: function (doc) {
             doc.defaultStyle.fontSize = 8;
             doc.styles.tableHeader.fontSize = 9;
@@ -1685,6 +1687,7 @@ class OptimizedStockReport {
   // Helper: Get ALL transactions for date in one query
   async getTransactionsForDateBatch(startDate, endDate) {
     try {
+      // ✅ Query berdasarkan 'timestamp' (single source of truth untuk semua jenis transaksi)
       const transQuery = query(
         collection(firestore, "stokAksesorisTransaksi"),
         where("timestamp", ">=", Timestamp.fromDate(startDate)),

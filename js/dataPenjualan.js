@@ -1423,25 +1423,34 @@ class OptimizedDataPenjualanApp {
 
           // ✅ OPSI B: Kode, kodeLock, jumlah TIDAK dapat diubah
           // Pertahankan nilai original untuk field yang mempengaruhi stok
-          updatedItem.kodeText = item.kodeText;
-          updatedItem.kode = item.kode || item.kodeText;
-          updatedItem.kodeLock = item.kodeLock;
-          updatedItem.jumlah = item.jumlah;
+          updatedItem.kodeText = item.kodeText || "";
+          updatedItem.kode = item.kode || item.kodeText || "";
+          updatedItem.kodeLock = item.kodeLock || "";
+          updatedItem.jumlah = item.jumlah || 1;
 
           // Allow edit: nama, kadar, berat, harga, keterangan
-          updatedItem.nama = document.getElementById(`editNama_${index}`)?.value || item.nama;
+          const namaInput = document.getElementById(`editNama_${index}`);
+          updatedItem.nama = namaInput?.value?.trim() || item.nama || "";
 
           if (this.currentTransaction.jenisPenjualan === "manual") {
-            updatedItem.kadar = document.getElementById(`editKadar_${index}`)?.value || item.kadar;
-            updatedItem.berat = document.getElementById(`editBerat_${index}`)?.value || item.berat;
-            updatedItem.keterangan = document.getElementById(`editKeterangan_${index}`)?.value || item.keterangan;
+            const kadarInput = document.getElementById(`editKadar_${index}`);
+            const beratInput = document.getElementById(`editBerat_${index}`);
+            const keteranganInput = document.getElementById(`editKeterangan_${index}`);
+
+            updatedItem.kadar = kadarInput?.value?.trim() || item.kadar || "";
+            updatedItem.berat = beratInput?.value?.trim() || item.berat || "";
+            updatedItem.keterangan = keteranganInput?.value?.trim() || item.keterangan || "";
           } else if (this.currentTransaction.jenisPenjualan !== "kotak") {
-            updatedItem.kadar = document.getElementById(`editKadar_${index}`)?.value || item.kadar;
-            updatedItem.berat = document.getElementById(`editBerat_${index}`)?.value || item.berat;
+            const kadarInput = document.getElementById(`editKadar_${index}`);
+            const beratInput = document.getElementById(`editBerat_${index}`);
+
+            updatedItem.kadar = kadarInput?.value?.trim() || item.kadar || "";
+            updatedItem.berat = beratInput?.value?.trim() || item.berat || "";
           }
 
-          const hargaValue = document.getElementById(`editHarga_${index}`)?.value.replace(/\./g, "") || "0";
-          updatedItem.totalHarga = parseInt(hargaValue);
+          const hargaInput = document.getElementById(`editHarga_${index}`);
+          const hargaValue = hargaInput?.value?.replace(/\./g, "") || "0";
+          updatedItem.totalHarga = parseInt(hargaValue) || 0;
 
           return updatedItem;
         });

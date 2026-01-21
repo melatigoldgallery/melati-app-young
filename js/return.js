@@ -83,31 +83,30 @@ const returnHandler = {
   },
 
   // Load riwayat return dari stokAksesorisTransaksi (Single Source of Truth)
-  async loadRiwayatReturn(startDate = null, endDate = null) {
+  async loadRiwayatReturn(startDateStr = null, endDateStr = null) {
     try {
       // Jika tidak ada parameter, tidak load data
-      if (!startDate || !endDate) {
+      if (!startDateStr || !endDateStr) {
         this.riwayatData = [];
         this.renderRiwayatReturn();
         return;
       }
 
-      // Convert to Date object to handle time zones properly
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+      // Parse tanggal dd/mm/yyyy ke Date object dengan waktu lokal
+      const startDate = parseDate(startDateStr);
+      const endDate = parseDate(endDateStr);
 
       // Validate dates
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-        console.warn("Invalid date range:", { startDate, endDate });
+      if (!startDate || !endDate) {
+        console.warn("Invalid date format:", { startDateStr, endDateStr });
         this.riwayatData = [];
         this.renderRiwayatReturn();
         return;
       }
 
-      const startOfDay = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
-      const endOfDay = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999);
-
-      console.log(`🔍 Query return data from ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
+      // Set waktu dengan presisi - start: 00:00:00, end: 23:59:59.999
+      const startOfDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0);
+      const endOfDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999);
 
       // Query dari stokAksesorisTransaksi dengan jenis = "return"
       const transactionRef = collection(firestore, "stokAksesorisTransaksi");
@@ -120,7 +119,6 @@ const returnHandler = {
       );
 
       const snapshot = await getDocs(returnQuery);
-      console.log(`📦 Found ${snapshot.size} return transactions`);
 
       // Transform data untuk format yang compatible dengan renderRiwayatReturn
       this.riwayatData = snapshot.docs.map((doc) => {
@@ -149,7 +147,6 @@ const returnHandler = {
         };
       });
 
-      console.log(`✅ Loaded ${this.riwayatData.length} return records`);
       this.renderRiwayatReturn();
     } catch (error) {
       console.error("Error loading riwayat return:", error);
@@ -334,12 +331,12 @@ const returnHandler = {
       return;
     }
 
-    // Parse tanggal dari format dd/mm/yyyy
+    // Validasi format tanggal dd/mm/yyyy
     const startDate = parseDate(startDateStr);
     const endDate = parseDate(endDateStr);
 
     if (!startDate || !endDate) {
-      showAlert("Format tanggal tidak valid", "Warning", "warning");
+      showAlert("Format tanggal tidak valid. Gunakan format dd/mm/yyyy", "Warning", "warning");
       return;
     }
 
@@ -348,11 +345,9 @@ const returnHandler = {
       return;
     }
 
-    // Konversi ke format ISO untuk query
-    const startISO = startDate.toISOString().split("T")[0];
-    const endISO = endDate.toISOString().split("T")[0];
-
-    this.loadRiwayatReturn(startISO, endISO);
+    // Langsung pass string dd/mm/yyyy ke loadRiwayatReturn
+    // Biarkan loadRiwayatReturn yang handle parsing dan timezone
+    this.loadRiwayatReturn(startDateStr, endDateStr);
   },
 
   // Setup event listeners
@@ -448,8 +443,6 @@ const returnHandler = {
   // Load master data and calculate stock from transactions (single source of truth)
   async loadStockData(type) {
     try {
-      console.log(`🔍 Loading stock data for type: ${type}`);
-
       // 1. Get master data (kode, nama, kategori) from stokAksesoris
       const stockRef = collection(firestore, "stokAksesoris");
       const snapshot = await getDocs(stockRef);
@@ -458,11 +451,8 @@ const returnHandler = {
         ...doc.data(),
       }));
 
-      console.log(`📦 Loaded ${masterData.length} master items`);
-
       // 2. Calculate real stock from transactions (single source of truth)
       const stockMap = await StockService.calculateAllStocksBatch();
-      console.log(`📊 Calculated stock for ${stockMap.size} items`);
 
       // 3. Merge master data with calculated stock
       const mergedData = masterData.map((item) => ({
@@ -486,15 +476,10 @@ const returnHandler = {
 
         const hasStock = item.stok > 0;
 
-        if (matchesType) {
-          console.log(`✓ ${item.kode}: kategori=${itemKategori}, stock=${item.stok}`);
-        }
-
         return matchesType && hasStock;
       });
 
       this.populateStockTable();
-      console.log(`✅ Loaded ${this.stockData.length} items for type '${type}' with stock > 0`);
     } catch (error) {
       console.error("❌ Error loading stock data:", error);
       showAlert("Gagal memuat data stok", "Error", "error");
@@ -523,8 +508,6 @@ const returnHandler = {
         </tr>
       `);
     });
-
-    console.log(`📋 Populated table with ${this.stockData.length} items`);
   },
 
   // Add return row
@@ -661,7 +644,6 @@ const returnHandler = {
         });
 
         savedTransactions.push(transactionRef.id);
-        console.log(`✅ Return transaction saved for ${item.kode} (ID: ${transactionRef.id})`);
       }
 
       return savedTransactions;
@@ -710,11 +692,8 @@ const returnHandler = {
         });
       });
 
-      console.log("Saving return data:", returnData);
-
       // ✅ Single Source of Truth: Simpan HANYA ke stokAksesorisTransaksi
       const savedIds = await this.saveToStokTransaksi(returnData);
-      console.log(`✅ Return saved with transaction IDs:`, savedIds);
 
       showAlert("Data return berhasil disimpan dan stok telah diperbarui", "Sukses", "success");
       this.resetForm();
@@ -723,13 +702,7 @@ const returnHandler = {
       const startDateStr = $("#filterStartDate").val();
       const endDateStr = $("#filterEndDate").val();
       if (startDateStr && endDateStr) {
-        const startDate = parseDate(startDateStr);
-        const endDate = parseDate(endDateStr);
-        if (startDate && endDate) {
-          const startISO = startDate.toISOString().split("T")[0];
-          const endISO = endDate.toISOString().split("T")[0];
-          await this.loadRiwayatReturn(startISO, endISO);
-        }
+        await this.loadRiwayatReturn(startDateStr, endDateStr);
       }
     } catch (error) {
       console.error("Error saving return:", error);
@@ -815,7 +788,6 @@ const returnHandler = {
       // ✅ Single Source of Truth: Hapus langsung dari stokAksesorisTransaksi
       // Data ID sudah merujuk ke dokumen di stokAksesorisTransaksi
       await deleteDoc(doc(firestore, "stokAksesorisTransaksi", this.currentDeleteData.id));
-      console.log(`✅ Return transaction deleted: ${this.currentDeleteData.id}`);
 
       showAlert("Data return berhasil dihapus dan stok otomatis dikembalikan", "Sukses", "success");
 
@@ -826,13 +798,7 @@ const returnHandler = {
       const startDateStr = $("#filterStartDate").val();
       const endDateStr = $("#filterEndDate").val();
       if (startDateStr && endDateStr) {
-        const startDate = parseDate(startDateStr);
-        const endDate = parseDate(endDateStr);
-        if (startDate && endDate) {
-          const startISO = startDate.toISOString().split("T")[0];
-          const endISO = endDate.toISOString().split("T")[0];
-          await this.loadRiwayatReturn(startISO, endISO);
-        }
+        await this.loadRiwayatReturn(startDateStr, endDateStr);
       }
     } catch (error) {
       console.error("Error deleting return data:", error);
@@ -860,7 +826,6 @@ const returnHandler = {
 $(document).ready(async () => {
   try {
     await returnHandler.init();
-    console.log("✅ Return handler initialized successfully");
   } catch (error) {
     console.error("❌ Error initializing return handler:", error);
   }

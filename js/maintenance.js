@@ -3,7 +3,7 @@
  * Handles data exports and cleanup with enhanced caching
  */
 
-import { firestore } from "../configFirebase.js";
+import { firestore } from "./configFirebase.js";
 import {
   collection,
   getDocs,
@@ -26,11 +26,11 @@ import {
  * Collection configurations for maintenance operations
  */
 const COLLECTION_CONFIGS = {
-  dailyStokSnapshot: {
-    name: "dailyStokSnapshot",
+  dailyStockSnapshot: {
+    name: "dailyStockSnapshot", // ✅ FIXED: Stock dengan 'c' bukan Stok dengan 'k'
     dateField: "date",
-    dateType: "string", // YYYY-MM-DD format
-    label: "Daily Stok Snapshot",
+    dateType: "string-ddmmyyyy", // ✅ FIXED: Format dd/mm/yyyy
+    label: "Daily Stock Snapshot",
   },
   daily_stock_logs: {
     name: "daily_stock_logs",
@@ -1113,15 +1113,24 @@ class MaintenanceSystem {
         where(dateField, ">=", Timestamp.fromDate(startDate)),
         where(dateField, "<", Timestamp.fromDate(endDate)),
       );
+    } else if (dateType === "string-ddmmyyyy") {
+      // ⚠️ Format dd/mm/yyyy cannot use range query efficiently
+      // Must use client-side filtering - return unfiltered query
+      return query(collection(this.firestore, name));
     } else {
       // string date format YYYY-MM-DD
+      // ✅ FIX: Gunakan < untuk endDate (bulan berikutnya) agar tidak perlu <=
       const startDateStr = `${year}-${month.padStart(2, "0")}-01`;
-      const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
-      const endDateStr = `${year}-${month.padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
+
+      // Calculate next month untuk endDate
+      const nextMonth = parseInt(month) === 12 ? 1 : parseInt(month) + 1;
+      const nextYear = parseInt(month) === 12 ? parseInt(year) + 1 : parseInt(year);
+      const endDateStr = `${nextYear}-${nextMonth.toString().padStart(2, "0")}-01`;
+
       return query(
         collection(this.firestore, name),
         where(dateField, ">=", startDateStr),
-        where(dateField, "<=", endDateStr),
+        where(dateField, "<", endDateStr),
       );
     }
   }
@@ -1229,23 +1238,21 @@ class MaintenanceSystem {
         // Fetch all collections
         for (const key of Object.keys(COLLECTION_CONFIGS)) {
           const config = COLLECTION_CONFIGS[key];
-          const q = this.buildDeleteQuery(config, selectedMonth);
-          const snapshot = await getDocs(q);
+          const docs = await this.fetchDocumentsForMonth(config, selectedMonth);
 
-          if (snapshot.docs.length > 0) {
-            allDocs.push(...snapshot.docs);
+          if (docs.length > 0) {
+            allDocs.push(...docs);
             collectionSummary.push({
               label: config.label,
-              count: snapshot.docs.length,
+              count: docs.length,
             });
           }
         }
       } else {
         // Fetch single collection
         const config = COLLECTION_CONFIGS[selectedCollection];
-        const q = this.buildDeleteQuery(config, selectedMonth);
-        const snapshot = await getDocs(q);
-        allDocs = snapshot.docs;
+        const docs = await this.fetchDocumentsForMonth(config, selectedMonth);
+        allDocs = docs;
 
         if (allDocs.length > 0) {
           collectionSummary.push({
@@ -1283,6 +1290,7 @@ class MaintenanceSystem {
       this.cache.clear();
       this.showAlert(`${allDocs.length} dokumen berhasil dihapus!`, "success");
     } catch (error) {
+      console.error("Error in handleDeleteOldData:", error);
       this.showAlert("Gagal menghapus data: " + error.message, "error");
     } finally {
       this.hideLoading();
