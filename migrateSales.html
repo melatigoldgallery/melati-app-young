@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Migrasi Data Sales - Melati Gold Young</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 800px;
+        margin: 50px auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #333;
+        margin-bottom: 20px;
+      }
+      .warning {
+        background: #fff3cd;
+        border: 1px solid #ffc107;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+      }
+      .success {
+        background: #d4edda;
+        border: 1px solid #28a745;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+        display: none;
+      }
+      .error {
+        background: #f8d7da;
+        border: 1px solid #dc3545;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+        display: none;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      button:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+      }
+      #progress {
+        margin-top: 20px;
+        display: none;
+      }
+      .progress-bar {
+        width: 100%;
+        height: 30px;
+        background: #e9ecef;
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      .progress-fill {
+        height: 100%;
+        background: #28a745;
+        transition: width 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+      }
+      #log {
+        margin-top: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 5px;
+        max-height: 300px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+        display: none;
+      }
+      .log-item {
+        margin: 5px 0;
+      }
+      .log-success {
+        color: #28a745;
+      }
+      .log-error {
+        color: #dc3545;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔄 Migrasi Data Sales ke Firestore</h1>
+
+      <div class="warning">
+        <strong>⚠️ Perhatian!</strong>
+        <p>
+          Script ini akan memigrasikan daftar nama sales dari hardcoded array ke Firestore collection
+          <code>salesStaff</code>
+          .
+        </p>
+        <p><strong>Hanya jalankan sekali untuk inisialisasi data!</strong></p>
+      </div>
+
+      <div class="success" id="successMsg">
+        <strong>✅ Berhasil!</strong>
+        <p id="successText"></p>
+      </div>
+
+      <div class="error" id="errorMsg">
+        <strong>❌ Error!</strong>
+        <p id="errorText"></p>
+      </div>
+
+      <button id="btnMigrate">Mulai Migrasi</button>
+
+      <div id="progress">
+        <p id="progressText">Progress: 0 / 0</p>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill" style="width: 0%">0%</div>
+        </div>
+      </div>
+
+      <div id="log">
+        <strong>Log:</strong>
+        <div id="logContent"></div>
+      </div>
+    </div>
+
+    <script type="module">
+      import {
+        collection,
+        addDoc,
+        getDocs,
+        Timestamp,
+      } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+      import { firestore } from "./js/configFirebase.js";
+
+      // Data sales yang akan dimigrasikan
+      const STAFF_NAMES = [
+        "ADE INDRA",
+        "ADITYA",
+        "AGUN",
+        "AGUSTINI",
+        "ALICIA",
+        "ALIM",
+        "ANDARI",
+        "ARISKA",
+        "ASTRY",
+        "AYU A.",
+        "AYU J",
+        "AYU P.",
+        "CANDRA",
+        "DEBBY",
+        "DENY",
+        "DESI",
+        "DEWI",
+        "DIAH",
+        "DWIK",
+        "ECI",
+        "EMI",
+        "FARINA",
+        "FENDI",
+        "FIRA",
+        "FITRI",
+        "GEK YUNI",
+        "GUNG ANIK",
+        "HANDY",
+        "HAPPY",
+        "IKA",
+        "KRISNA",
+        "LIA",
+        "LINDA",
+        "MANIK",
+        "MARTA",
+        "MAY",
+        "MAYA",
+        "MELIA",
+        "MIZZI",
+        "NADIA",
+        "NANTA",
+        "NOVITA",
+        "NUEL",
+        "PIPIT",
+        "PUSPA",
+        "RABEL",
+        "RACHA",
+        "RACHEL",
+        "RAMA",
+        "RATNA",
+        "REYKE",
+        "RIZKY",
+        "RUSTIA",
+        "SANTI",
+        "SARAS",
+        "SARI",
+        "SARI KM",
+        "SATYA",
+        "SRI",
+        "TALIA",
+        "TIARA",
+        "TRIADI",
+        "TU ADE",
+        "TYAS",
+        "VANA",
+        "VEREN",
+        "WIDI",
+        "WIDIA",
+        "WIGUNA",
+        "WIRA",
+        "WULAN",
+        "YOGA",
+        "YOHAN",
+        "YULI",
+      ];
+
+      const btnMigrate = document.getElementById("btnMigrate");
+      const progressDiv = document.getElementById("progress");
+      const progressText = document.getElementById("progressText");
+      const progressFill = document.getElementById("progressFill");
+      const logDiv = document.getElementById("log");
+      const logContent = document.getElementById("logContent");
+      const successMsg = document.getElementById("successMsg");
+      const errorMsg = document.getElementById("errorMsg");
+
+      function addLog(message, type = "info") {
+        const logItem = document.createElement("div");
+        logItem.className = `log-item log-${type}`;
+        logItem.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logContent.appendChild(logItem);
+        logDiv.scrollTop = logDiv.scrollHeight;
+      }
+
+      async function migrateData() {
+        try {
+          btnMigrate.disabled = true;
+          progressDiv.style.display = "block";
+          logDiv.style.display = "block";
+          successMsg.style.display = "none";
+          errorMsg.style.display = "none";
+
+          addLog("🚀 Memulai migrasi...");
+
+          // Check if data already exists
+          const existingData = await getDocs(collection(firestore, "salesStaff"));
+          if (!existingData.empty) {
+            const confirm = window.confirm(
+              `⚠️ Sudah ada ${existingData.size} data sales di Firestore.\n\nApakah Anda yakin ingin menambahkan lagi?`,
+            );
+            if (!confirm) {
+              addLog("❌ Migrasi dibatalkan oleh user", "error");
+              btnMigrate.disabled = false;
+              return;
+            }
+          }
+
+          addLog(`📊 Total data yang akan dimigrasikan: ${STAFF_NAMES.length}`);
+
+          let successCount = 0;
+          let errorCount = 0;
+
+          // Migrate each staff name
+          for (let i = 0; i < STAFF_NAMES.length; i++) {
+            const nama = STAFF_NAMES[i];
+
+            try {
+              await addDoc(collection(firestore, "salesStaff"), {
+                nama: nama,
+                status: "active",
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now(),
+              });
+
+              successCount++;
+              addLog(`✅ Berhasil: ${nama}`, "success");
+            } catch (error) {
+              errorCount++;
+              addLog(`❌ Gagal: ${nama} - ${error.message}`, "error");
+            }
+
+            // Update progress
+            const progress = ((i + 1) / STAFF_NAMES.length) * 100;
+            progressText.textContent = `Progress: ${i + 1} / ${STAFF_NAMES.length}`;
+            progressFill.style.width = `${progress}%`;
+            progressFill.textContent = `${Math.round(progress)}%`;
+          }
+
+          // Show result
+          if (errorCount === 0) {
+            successMsg.style.display = "block";
+            document.getElementById("successText").textContent =
+              `Semua ${successCount} data sales berhasil dimigrasikan ke Firestore!`;
+            addLog(`🎉 Migrasi selesai! ${successCount} berhasil, ${errorCount} gagal`, "success");
+          } else {
+            errorMsg.style.display = "block";
+            document.getElementById("errorText").textContent =
+              `Migrasi selesai dengan ${errorCount} error. ${successCount} berhasil dimigrasikan.`;
+            addLog(`⚠️ Migrasi selesai dengan error: ${successCount} berhasil, ${errorCount} gagal`, "error");
+          }
+        } catch (error) {
+          console.error("Migration error:", error);
+          errorMsg.style.display = "block";
+          document.getElementById("errorText").textContent = error.message;
+          addLog(`💥 Error fatal: ${error.message}`, "error");
+        } finally {
+          btnMigrate.disabled = false;
+        }
+      }
+
+      btnMigrate.addEventListener("click", migrateData);
+
+      // Auto-check on load
+      window.addEventListener("load", async () => {
+        try {
+          const existingData = await getDocs(collection(firestore, "salesStaff"));
+          if (!existingData.empty) {
+            addLog(`ℹ️ Ditemukan ${existingData.size} data sales yang sudah ada di Firestore`, "info");
+            logDiv.style.display = "block";
+          }
+        } catch (error) {
+          console.error("Error checking existing data:", error);
+        }
+      });
+    </script>
+  </body>
+</html>
