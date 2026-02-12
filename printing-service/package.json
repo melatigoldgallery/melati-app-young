@@ -1,0 +1,44 @@
+{
+  "name": "melati-print-service",
+  "version": "1.0.0",
+  "description": "Automated printing service for Melati App",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "dev:simple": "node server.js",
+    "install-service": "node install-service.js",
+    "uninstall-service": "node uninstall-service.js",
+    "test": "jest",
+    "test:browser": "node test-browser.js",
+    "preflight": "node test-browser.js"
+  },
+  "keywords": [
+    "printing",
+    "thermal",
+    "receipt",
+    "invoice",
+    "pos"
+  ],
+  "author": "Melati Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2",
+    "winston": "^3.11.0",
+    "handlebars": "^4.7.8"
+  },
+  "optionalDependencies": {
+    "pdf-to-printer": "^5.6.0",
+    "puppeteer": "^21.6.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0",
+    "node-windows": "^1.0.0-beta.8"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

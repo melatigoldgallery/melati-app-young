@@ -206,6 +206,7 @@ const penjualanHandler = {
   salesData: [],
   stockCache: new Map(),
   isSaving: false,
+  isPrinting: false, // ✅ Flag untuk prevent double-click print
 
   // Real-time listeners
   stockListener: null,
@@ -263,9 +264,40 @@ const penjualanHandler = {
     this.setupSmartListeners();
 
     this.updateUIForSalesType("aksesoris");
-    this.toggleJenisManualField(); // Let it read from dropdown
+    this.toggleJenisManualField("aksesoris");
     this.initializeTooltips();
+
+    // Initialize print service
+    if (window.printService) {
+      try {
+        await window.printService.init();
+        this.updatePrintServiceStatus();
+        // Update status every 30 seconds
+        setInterval(() => this.updatePrintServiceStatus(), 30000);
+      } catch (error) {
+        console.warn("Print service initialization failed:", error);
+      }
+    }
+
     $("#sales").focus();
+  },
+
+  // Update print service status indicator
+  updatePrintServiceStatus() {
+    if (!window.printService) return;
+
+    const statusEl = document.getElementById("printServiceStatus");
+    if (!statusEl) return;
+
+    const isOnline = window.printService.isOnline;
+
+    if (isOnline) {
+      statusEl.className = "print-service-status online";
+      statusEl.innerHTML = '<i class="fas fa-print"></i> Print Service: Online';
+    } else {
+      statusEl.className = "print-service-status offline";
+      statusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Print Service: Fallback Mode';
+    }
   },
 
   // Setup inactivity monitoring
@@ -918,7 +950,7 @@ const penjualanHandler = {
     });
 
     // Search events
-    $("#searchAksesoris, #searchKotak, #searchLock").on(
+    $("#searchAksesoris, #searchKotak, #searchSilver, #searchLock").on(
       "input",
       utils.debounce((e) => {
         this.searchTable(e.target);
@@ -1036,6 +1068,7 @@ const penjualanHandler = {
     const categories = {
       aksesoris: "#tableAksesoris",
       kotak: "#tableKotak",
+      silver: "#tableSilver",
     };
 
     Object.entries(categories).forEach(([category, selector]) => {
@@ -1053,8 +1086,12 @@ const penjualanHandler = {
           const stok = item.stokAkhir !== undefined ? item.stokAkhir : 0;
           const stockBadge = stok <= 0 ? '<span class="badge bg-danger ms-2">Habis</span>' : "";
 
+          // Include kadar & berat for silver category
+          const kadarAttr = category === "silver" && item.kadar ? `data-kadar="${item.kadar}"` : "";
+          const beratAttr = category === "silver" && item.berat ? `data-berat="${item.berat}"` : "";
+
           const row = `
-          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-harga="${hargaValue}" data-stok="${stok}">
+          <tr data-kode="${item.kode}" data-nama="${item.nama}" data-harga="${hargaValue}" data-stok="${stok}" ${kadarAttr} ${beratAttr}>
             <td>${item.kode || "-"}</td>
             <td>${item.nama || "-"}${stockBadge}</td>
             <td class="text-end">${stok}</td>
@@ -1094,7 +1131,7 @@ const penjualanHandler = {
   },
 
   attachTableRowClickHandlers() {
-    $("#tableAksesoris tbody tr, #tableKotak tbody tr, #tableLock tbody tr").off("click");
+    $("#tableAksesoris tbody tr, #tableKotak tbody tr, #tableSilver tbody tr, #tableLock tbody tr").off("click");
 
     // 🎯 Aksesoris table with stock validation
     $("#tableAksesoris tbody tr").on("click", function () {
@@ -1154,6 +1191,37 @@ const penjualanHandler = {
       }
     });
 
+    // 🎯 Silver table with stock validation
+    $("#tableSilver tbody tr").on("click", function () {
+      if ($(this).data("kode")) {
+        const kode = $(this).data("kode");
+        const nama = $(this).data("nama");
+        const stok = parseInt($(this).data("stok")) || 0;
+
+        // Block if stock is 0 or less
+        if (stok <= 0) {
+          Swal.fire({
+            title: "Stok Habis!",
+            text: `Barang ${nama} (${kode}) tidak memiliki stok. Tidak dapat ditambahkan ke transaksi.`,
+            icon: "error",
+            confirmButtonText: "OK",
+            confirmButtonColor: "#dc3545",
+          });
+          return;
+        }
+
+        const data = {
+          kode: $(this).data("kode"),
+          nama: $(this).data("nama"),
+          harga: $(this).data("harga"),
+          kadar: $(this).data("kadar") || 0,
+          berat: $(this).data("berat") || 0,
+        };
+        penjualanHandler.addSilverToTable(data);
+        $("#modalPilihSilver").modal("hide");
+      }
+    });
+
     // Lock table (no stock validation needed for manual entry)
     $("#tableLock tbody tr").on("click", function () {
       if ($(this).data("kode") && activeLockRow) {
@@ -1195,6 +1263,8 @@ const penjualanHandler = {
         $("#modalPilihAksesoris").modal("show");
       } else if (salesType === "kotak") {
         $("#modalPilihKotak").modal("show");
+      } else if (salesType === "silver") {
+        $("#modalPilihSilver").modal("show");
       }
     } catch (error) {
       console.error("Error opening modal:", error);
@@ -1273,12 +1343,66 @@ const penjualanHandler = {
     this.updateGrandTotal("kotak");
   },
 
+  // Add silver to table
+  addSilverToTable(data) {
+    const { kode, nama, harga, kadar, berat } = data;
+
+    // Auto-fill kadar & berat dari master data
+    const kadarValue = kadar || "";
+    const beratValue = berat || "";
+    const beratSatuan = berat || 0; // Simpan berat per unit untuk perhitungan
+
+    const newRow = `
+      <tr>
+        <td>${kode}</td>
+        <td>${nama}</td>
+        <td>
+          <input type="number" class="form-control form-control-sm jumlah-input" value="1" min="1">
+        </td>
+        <td>
+          <input type="text" class="form-control form-control-sm kadar-input" value="${kadarValue}" placeholder="Masukkan kadar" required ${kadarValue ? "readonly" : ""}>
+        </td>
+        <td>
+          <input type="text" class="form-control form-control-sm berat-input" value="${beratValue}" placeholder="0.00" required ${beratValue ? "readonly" : ""}">
+        </td>
+        <td>
+          <input type="text" class="form-control form-control-sm harga-per-gram-input" value="0" readonly>
+        </td>
+        <td>
+          <input type="text" class="form-control form-control-sm total-harga-input" value="" placeholder="Masukkan harga" required>
+        </td>
+        <td>
+          <button class="btn btn-sm btn-danger btn-delete">
+            <i class="fas fa-trash"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+
+    $("#tableSilverDetail tbody").append(newRow);
+    const $newRow = $("#tableSilverDetail tbody tr:last-child");
+    // Simpan berat satuan sebagai data attribute
+    if (beratSatuan) {
+      $newRow.data("berat-satuan", beratSatuan);
+    }
+    // Focus ke total harga jika kadar & berat sudah terisi
+    if (kadarValue && beratValue) {
+      $newRow.find(".total-harga-input").focus();
+    } else {
+      $newRow.find(".kadar-input").focus();
+    }
+    this.attachRowEventHandlers($newRow);
+    this.updateGrandTotal("silver");
+  },
+
   // Attach row event handlers
   attachRowEventHandlers($row) {
     $row.find("input, button").off();
 
     if ($row.closest("table").attr("id") === "tableAksesorisDetail") {
       this.attachAksesorisRowHandlers($row, "aksesoris");
+    } else if ($row.closest("table").attr("id") === "tableSilverDetail") {
+      this.attachAksesorisRowHandlers($row, "silver"); // Silver menggunakan handler yang sama dengan aksesoris
     } else if ($row.closest("table").attr("id") === "tableKotakDetail") {
       this.attachKotakRowHandlers($row);
     }
@@ -1287,7 +1411,13 @@ const penjualanHandler = {
     $row.find(".btn-delete").on("click", () => {
       const tableId = $row.closest("table").attr("id");
       const salesType =
-        tableId === "tableAksesorisDetail" ? "aksesoris" : tableId === "tableKotakDetail" ? "kotak" : "manual";
+        tableId === "tableAksesorisDetail"
+          ? "aksesoris"
+          : tableId === "tableSilverDetail"
+            ? "silver"
+            : tableId === "tableKotakDetail"
+              ? "kotak"
+              : "manual";
       $row.remove();
       this.updateGrandTotal(salesType);
     });
@@ -1326,7 +1456,23 @@ const penjualanHandler = {
     };
 
     $totalHargaInput.add($beratInput).on("input", calculateHargaPerGram);
-    $jumlahInput.on("input", () => this.updateGrandTotal(salesType));
+
+    // Untuk silver: update berat otomatis saat jumlah berubah
+    if (salesType === "silver") {
+      const beratSatuan = parseFloat($row.data("berat-satuan")) || 0;
+      if (beratSatuan > 0) {
+        $jumlahInput.on("input", function () {
+          const jumlah = parseInt($(this).val()) || 1;
+          const beratTotal = beratSatuan * jumlah;
+          $beratInput.val(beratTotal.toFixed(2));
+          calculateHargaPerGram();
+        });
+      } else {
+        $jumlahInput.on("input", () => this.updateGrandTotal(salesType));
+      }
+    } else {
+      $jumlahInput.on("input", () => this.updateGrandTotal(salesType));
+    }
 
     $totalHargaInput.on("blur", function () {
       const value = $(this).val().replace(/\./g, "");
@@ -1402,7 +1548,7 @@ const penjualanHandler = {
   // Update UI for sales type
   updateUIForSalesType(type) {
     // Hide all containers
-    $("#aksesorisTableContainer, #kotakTableContainer, #manualTableContainer").hide();
+    $("#aksesorisTableContainer, #silverTableContainer, #kotakTableContainer, #manualTableContainer").hide();
     $("#btnTambah, #btnTambahBaris").hide();
 
     let detailTitle = "Detail Barang";
@@ -1412,6 +1558,11 @@ const penjualanHandler = {
         $("#aksesorisTableContainer").show();
         $("#btnTambah").show();
         detailTitle = "Detail Aksesoris";
+        break;
+      case "silver":
+        $("#silverTableContainer").show();
+        $("#btnTambah").show();
+        detailTitle = "Detail Silver";
         break;
       case "kotak":
         $("#kotakTableContainer").show();
@@ -1632,6 +1783,10 @@ const penjualanHandler = {
         tableSelector = "#tableAksesorisDetail";
         grandTotalId = "#grand-total-aksesoris";
         break;
+      case "silver":
+        tableSelector = "#tableSilverDetail";
+        grandTotalId = "#grand-total-silver";
+        break;
       case "kotak":
         tableSelector = "#tableKotakDetail";
         grandTotalId = "#grand-total-kotak";
@@ -1644,7 +1799,7 @@ const penjualanHandler = {
 
     let total = 0;
 
-    if (salesType === "aksesoris") {
+    if (salesType === "aksesoris" || salesType === "silver") {
       $(tableSelector + " tbody tr:not(.input-row) .total-harga-input").each(function () {
         const value = $(this).val().replace(/\./g, "");
         total += parseFloat(value) || 0;
@@ -1806,9 +1961,11 @@ const penjualanHandler = {
       const tableSelector =
         salesType === "aksesoris"
           ? "#tableAksesorisDetail"
-          : salesType === "kotak"
-            ? "#tableKotakDetail"
-            : "#tableManualDetail";
+          : salesType === "silver"
+            ? "#tableSilverDetail"
+            : salesType === "kotak"
+              ? "#tableKotakDetail"
+              : "#tableManualDetail";
 
       // Check if table has rows
       if ($(tableSelector + " tbody tr:not(.input-row)").length === 0) {
@@ -1959,7 +2116,7 @@ const penjualanHandler = {
     const items = [];
     let validationErrors = [];
 
-    if (salesType === "aksesoris") {
+    if (salesType === "aksesoris" || salesType === "silver") {
       $(tableSelector + " tbody tr:not(.input-row)").each(function (index) {
         const kode = $(this).find("td:nth-child(1)").text();
         const nama = $(this).find("td:nth-child(2)").text();
@@ -1988,12 +2145,16 @@ const penjualanHandler = {
         }
 
         if (rowValid) {
+          // Hitung totalBerat untuk silver
+          const totalBerat = berat * jumlah;
+
           items.push({
             kodeText: kode,
             nama: nama,
             jumlah: jumlah,
             kadar: kadar,
             berat: berat,
+            totalBerat: totalBerat,
             hargaPerGram: hargaPerGram,
             totalHarga: totalHarga,
           });
@@ -2094,7 +2255,7 @@ const penjualanHandler = {
             );
           }
         } else {
-          // Untuk penjualan aksesoris dan kotak
+          // Untuk penjualan aksesoris, kotak, dan silver
           const kode = item.kodeText;
           if (!kode || kode === "-") continue;
           // Untuk penjualan aksesoris dan kotak
@@ -2161,8 +2322,8 @@ const penjualanHandler = {
     }
 
     try {
-      // ✅ Gunakan StockService - single source of truth
-      await StockService.updateStock({
+      // Prepare stock update data
+      const stockUpdateData = {
         kode,
         jenis: jenisTransaksi,
         jumlah,
@@ -2170,7 +2331,17 @@ const penjualanHandler = {
         sales: $("#sales").val(),
         currentStock,
         newStock,
-      });
+      };
+
+      // Add kadar, berat, totalBerat for silver
+      if (salesType === "silver" && item.kadar && item.berat) {
+        stockUpdateData.kadar = item.kadar;
+        stockUpdateData.berat = item.berat;
+        stockUpdateData.totalBerat = item.totalBerat || item.berat * jumlah;
+      }
+
+      // ✅ Gunakan StockService - single source of truth
+      await StockService.updateStock(stockUpdateData);
 
       readsMonitor.increment("Stock Transaction Write", 1);
     } catch (error) {
@@ -2254,9 +2425,90 @@ const penjualanHandler = {
     }
   },
 
-  // Print receipt
+  // Print receipt - Try print service first, fallback to browser
+  async printReceipt() {
+    // ✅ Prevent double-click
+    if (this.isPrinting) return;
+    this.isPrinting = true;
+
+    if (!currentTransactionData) {
+      this.isPrinting = false;
+      utils.showAlert("Tidak ada data transaksi untuk dicetak!");
+      return;
+    }
+
+    // ✅ Show loading alert
+    Swal.fire({
+      title: "Proses Print",
+      html: "Mohon tunggu, sedang mencetak struk...",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      willOpen: () => Swal.showLoading(),
+    });
+
+    try {
+      // Try print service if available
+      if (window.printService && window.printService.isOnline) {
+        try {
+          const transaction = currentTransactionData;
+
+          // Format jam dari timestamp saat ini
+          const now = new Date();
+          const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+
+          // Prepare receipt data for print service
+          const receiptData = {
+            transactionType: transaction.salesType.toUpperCase(),
+            tanggal: transaction.tanggal,
+            jam: jam,
+            sales: transaction.sales,
+            items: transaction.items.map((item) => ({
+              nama: item.nama || "-",
+              kode: item.kodeText || "-",
+              kadar: item.kadar || "-",
+              berat: item.berat || "-",
+              totalHarga: parseInt(item.totalHarga) || 0,
+              keterangan: item.keterangan || "",
+            })),
+            totalHarga: parseInt(transaction.totalHarga.replace(/\./g, "")) || 0,
+            jumlahBayar:
+              transaction.metodeBayar !== "free" ? parseInt(transaction.totalHarga.replace(/\./g, "")) || 0 : 0,
+            kembalian: 0,
+            metodeBayar: transaction.metodeBayar,
+            nominalDP: transaction.metodeBayar === "dp" ? parseInt(transaction.nominalDP.replace(/\./g, "")) || 0 : 0,
+            sisaPembayaran:
+              transaction.metodeBayar === "dp" ? parseInt(transaction.sisaPembayaran.replace(/\./g, "")) || 0 : 0,
+          };
+
+          const result = await window.printService.printReceipt(receiptData);
+
+          if (result.success && result.method !== "browser") {
+            Swal.fire({
+              icon: "success",
+              title: "Sukses",
+              text: "Struk berhasil dicetak ke printer thermal!",
+              timer: 2000,
+              showConfirmButton: false,
+            });
+            return;
+          }
+        } catch (error) {
+          console.warn("Print service failed, falling back to browser:", error);
+        }
+      }
+
+      // Fallback to browser print
+      Swal.close();
+      this.printReceiptBrowser();
+    } finally {
+      this.isPrinting = false;
+    }
+  },
+
+  // Print receipt - Browser fallback
   // Print receipt - PERBAIKAN LOGIKA DP > TOTAL
-  printReceipt() {
+  printReceiptBrowser() {
     if (!currentTransactionData) {
       utils.showAlert("Tidak ada data transaksi untuk dicetak!");
       return;
@@ -2482,8 +2734,103 @@ const penjualanHandler = {
     printWindow.document.close();
   },
 
-  // Print invoice
-  printInvoice() {
+  // Print invoice - Try print service first, fallback to browser
+  async printInvoice() {
+    // ✅ Prevent double-click
+    if (this.isPrinting) return;
+    this.isPrinting = true;
+
+    if (!currentTransactionData) {
+      this.isPrinting = false;
+      utils.showAlert("Tidak ada data transaksi untuk dicetak!");
+      return;
+    }
+
+    // Khusus manual dengan >1 item, cetak per item
+    if (
+      currentTransactionData.salesType === "manual" &&
+      currentTransactionData.items &&
+      currentTransactionData.items.length > 1
+    ) {
+      this.isPrinting = false; // Reset before calling other function
+      return await this.printInvoicePerItem();
+    }
+
+    // ✅ Show loading alert
+    Swal.fire({
+      title: "Proses Print",
+      html: "Mohon tunggu, sedang mencetak invoice...",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      willOpen: () => Swal.showLoading(),
+    });
+
+    try {
+      // Try print service if available
+      if (window.printService && window.printService.isOnline) {
+        try {
+          const transaction = currentTransactionData;
+
+          // Prepare tanggal dan jam
+          let tanggal = transaction.tanggal;
+          const now = new Date();
+          const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+          if (transaction.timestamp && transaction.timestamp.toDate) {
+            tanggal = utils.formatDate(transaction.timestamp);
+          }
+
+          // Collect keterangan from items
+          const keteranganList = transaction.items
+            .filter((item) => item.keterangan && item.keterangan.trim() !== "")
+            .map((item) => item.keterangan);
+          const notes = keteranganList.length > 0 ? keteranganList.join(" ") : "";
+
+          // Prepare invoice data for print service
+          const invoiceData = {
+            tanggal: tanggal + " " + jam,
+            sales: transaction.sales || "-",
+            customerName: transaction.customerName || "",
+            customerPhone: transaction.customerPhone || "",
+            items: transaction.items.map((item) => ({
+              nama: item.nama || "-",
+              kode: item.kodeText || "-",
+              kadar: item.kadar || "-",
+              berat: item.berat || "-",
+              jumlah: 1,
+              totalHarga: parseInt(item.totalHarga) || 0,
+            })),
+            totalHarga: parseInt(transaction.totalHarga.replace(/\./g, "")) || 0,
+            notes: notes,
+          };
+
+          const result = await window.printService.printInvoice(invoiceData);
+
+          if (result.success && result.method !== "browser") {
+            Swal.fire({
+              icon: "success",
+              title: "Sukses",
+              text: "Invoice berhasil dicetak ke printer A4!",
+              timer: 2000,
+              showConfirmButton: false,
+            });
+            return;
+          }
+        } catch (error) {
+          console.warn("Print service failed, falling back to browser:", error);
+        }
+      }
+
+      // Fallback to browser print
+      Swal.close();
+      this.printInvoiceBrowser();
+    } finally {
+      this.isPrinting = false;
+    }
+  },
+
+  // Print invoice - Browser fallback
+  printInvoiceBrowser() {
     if (!currentTransactionData) {
       utils.showAlert("Tidak ada data transaksi untuk dicetak!");
       return;
@@ -2599,7 +2946,165 @@ const penjualanHandler = {
   },
 
   // Print separate invoices per item for manual sales
-  printInvoicePerItem() {
+  async printInvoicePerItem() {
+    // ✅ Prevent double-click
+    if (this.isPrinting) return;
+    this.isPrinting = true;
+
+    if (!currentTransactionData) {
+      this.isPrinting = false;
+      utils.showAlert("Tidak ada data transaksi untuk dicetak!");
+      return;
+    }
+
+    // ✅ Show loading alert
+    Swal.fire({
+      title: "Proses Print",
+      html: "Mohon tunggu, sedang mencetak invoice per item...",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      willOpen: () => Swal.showLoading(),
+    });
+
+    try {
+      const tx = currentTransactionData;
+      const items = Array.isArray(tx.items) ? tx.items : [];
+
+      // Fallback jika hanya 1 item
+      if (items.length <= 1) {
+        Swal.close();
+        this.isPrinting = false;
+        this.printInvoice();
+        return;
+      }
+
+      // Check if print service exists
+      if (!window.printService) {
+        console.warn("Print service not initialized, using browser fallback");
+        Swal.close();
+        this.isPrinting = false;
+        this.printInvoicePerItemBrowser();
+        return;
+      }
+
+      utils.showLoading(true);
+
+      // Format jam
+      const now = new Date();
+      const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+
+      let printedCount = 0;
+      let failedCount = 0;
+      const failedItems = [];
+
+      // ✅ SIMPLIFIED: Print each item sequentially
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+
+        // Prepare invoice data for single item
+        const invoiceData = {
+          tanggal: tx.tanggal + " " + jam,
+          sales: tx.sales || "-",
+          customerName: tx.customerName || "",
+          customerPhone: tx.customerPhone || "",
+          items: [
+            {
+              nama: item.nama || item.namaBarang || "-",
+              kode: item.kode || item.kodeText || item.kodeLock || "-",
+              kadar: item.kadar || "-",
+              berat: item.berat || item.gr || 0,
+              jumlah: 1,
+              totalHarga: parseInt(item.totalHarga) || 0,
+            },
+          ],
+          totalHarga: parseInt(item.totalHarga) || 0,
+          notes: item.keterangan || "",
+        };
+
+        try {
+          // ✅ SIMPLIFIED: Direct request
+          const response = await fetch("http://localhost:3001/api/print/invoice", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(invoiceData),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+          }
+
+          const result = await response.json();
+
+          if (result.success && result.jobID) {
+            printedCount++;
+          } else {
+            throw new Error(result.error || "Print request failed");
+          }
+        } catch (itemError) {
+          failedCount++;
+          failedItems.push({ item: i + 1, name: item.nama || item.namaBarang, reason: itemError.message });
+          console.error(`  ❌ Item ${i + 1} failed: ${itemError.message}`);
+        }
+
+        // ✅ SIMPLIFIED: Reduced delay (500ms instead of 1500ms)
+        if (i < items.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      }
+
+      utils.showLoading(false);
+
+      if (printedCount > 0) {
+        let message = "";
+        if (failedCount > 0) {
+          const failedList = failedItems.map((f) => `- ${f.name}: ${f.reason}`).join("\n");
+          message = `${printedCount} invoice berhasil dicetak, ${failedCount} gagal:\n\n${failedList}`;
+        } else {
+          message = `Semua ${printedCount} invoice berhasil dicetak!`;
+        }
+
+        Swal.fire({
+          icon: printedCount === items.length ? "success" : "warning",
+          title: printedCount === items.length ? "Sukses" : "Sebagian Berhasil",
+          text: message,
+          confirmButtonText: "OK",
+        });
+      } else {
+        const failedList = failedItems.map((f) => `- ${f.name}: ${f.reason}`).join("\n");
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: `Semua invoice gagal dicetak:\n\n${failedList}`,
+          confirmButtonText: "OK",
+        });
+      }
+
+      return;
+    } catch (error) {
+      console.error("Print service error:", error.message);
+      utils.showLoading(false);
+
+      // Ask user if they want to use browser fallback
+      const useFallback = await utils.showConfirm(
+        "Print service tidak tersedia. Gunakan browser print sebagai alternatif?",
+        "Print Service Offline",
+      );
+
+      if (useFallback) {
+        Swal.close();
+        this.printInvoicePerItemBrowser();
+      } else {
+        Swal.close();
+      }
+    } finally {
+      this.isPrinting = false;
+    }
+  },
+
+  // Browser fallback for printing per item
+  printInvoicePerItemBrowser() {
     if (!currentTransactionData) {
       utils.showAlert("Tidak ada data transaksi untuk dicetak!");
       return;
@@ -2607,12 +3112,6 @@ const penjualanHandler = {
 
     const tx = currentTransactionData;
     const items = Array.isArray(tx.items) ? tx.items : [];
-
-    // Fallback jika hanya 1 item
-    if (items.length <= 1) {
-      this.printInvoice();
-      return;
-    }
 
     const parseHarga = (val) => {
       if (val == null) return 0;
@@ -2764,22 +3263,23 @@ const penjualanHandler = {
   // Reset form
   resetForm() {
     try {
+      // Reset sales type to default
+      $("#jenisPenjualan").val("aksesoris").trigger("change");
+
+      // Reset date to current date
+      this.setDefaultDate();
+
       // Reset sales name field
       $("#sales").val("").removeClass("is-valid is-invalid");
       $("#customerName").val("");
       $("#customerPhone").val("");
 
-      // Reset jenisManual (will be handled by toggleJenisManualField)
+      // Reset jenisManual
       $("#jenisManual").val("").removeClass("is-valid is-invalid");
+      $("#jenisManualContainer").hide();
 
       // Clear all tables
       $("#tableAksesorisDetail tbody, #tableKotakDetail tbody, #tableManualDetail tbody").empty();
-
-      // Reset sales type to default (trigger will handle jenisManual visibility)
-      $("#jenisPenjualan").val("aksesoris").trigger("change");
-
-      // Reset date to current date
-      this.setDefaultDate();
 
       // Reset payment fields
       $("#metodeBayar").val("tunai").trigger("change");

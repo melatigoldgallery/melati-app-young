@@ -1,0 +1,150 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Invoice Customer</title>
+    <style>
+      @page {
+        size: 20.5cm 10.5cm landscape;
+        margin: 0;
+      }
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12px;
+        margin: 0;
+        padding: 0;
+        width: 20.5cm;
+        height: 10.5cm;
+        position: relative;
+        background: transparent;
+      }
+      .invoice {
+        width: 20.5cm;
+        height: 10.5cm;
+        position: relative;
+      }
+
+      /* Customer Info - Kanan Atas */
+      .customer-section {
+        position: absolute;
+        top: 1.1cm;
+        right: 1cm;
+        text-align: right;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+      .customer-section .date {
+        font-weight: normal;
+        margin-bottom: 0.1cm;
+      }
+      .customer-section .customer-name {
+        font-weight: normal;
+      }
+      .customer-section .customer-phone {
+        font-weight: normal;
+      }
+
+      /* Table Items - Area Tengah */
+      .items-table {
+        position: absolute;
+        top: 4.7cm;
+        left: 1cm;
+        width: 19cm;
+      }
+      .item-row {
+        display: grid;
+        grid-template-columns: 2cm 2cm 5cm 1.7cm 1.7cm 2.6cm;
+        column-gap: 0.3cm;
+        margin-bottom: 0.15cm;
+        font-size: 12px;
+        align-items: start;
+      }
+      .item-row span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .item-row span:nth-child(1),
+      .item-row span:nth-child(2),
+      .item-row span:nth-child(3),
+      .item-row span:nth-child(4),
+      .item-row span:nth-child(5),
+      .item-row span:nth-child(6) {
+        text-align: center;
+      }
+      .item-row .item-name {
+        white-space: normal;
+        word-wrap: break-word;
+        overflow: visible;
+      }
+
+      /* Total Section - Kanan Bawah */
+      .total-section {
+        position: absolute;
+        top: 7.6cm;
+        right: 3.5cm;
+        text-align: right;
+        font-size: 12px;
+        font-weight: bold;
+      }
+
+      /* Keterangan Section */
+      .keterangan-section {
+        position: absolute;
+        top: 6.8cm;
+        left: 0.9cm;
+        right: 5cm;
+        font-size: 10px;
+        font-style: italic;
+        color: #333;
+      }
+
+      /* Sales ID - Kanan Bawah */
+      .sales-section {
+        position: absolute;
+        top: 8.5cm;
+        right: 2.3cm;
+        text-align: right;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="invoice">
+      <!-- Customer Info - Kanan Atas -->
+      <div class="customer-section">
+        <div class="date">{{date}}{{tanggal}}</div>
+        <div class="customer-name">{{customerName}}{{#unless customerName}}-{{/unless}}</div>
+        <div class="customer-phone">{{customerPhone}}</div>
+      </div>
+
+      <!-- Items Table - Area Tengah -->
+      <div class="items-table">
+        {{#each items}}
+        <div class="item-row">
+          <span class="item-code">{{code}}{{kode}}</span>
+          <span class="item-qty">
+            {{#if quantity}}{{quantity}}{{else}}{{#if jumlah}}{{jumlah}}{{else}}1{{/if}}{{/if}}pcs
+          </span>
+          <span class="item-name">{{name}}{{nama}}</span>
+          <span class="item-purity">{{purity}}{{kadar}}</span>
+          <span class="item-weight">{{weight}}{{berat}}gr</span>
+          <span class="item-price">{{formatRupiah price}}</span>
+        </div>
+        {{/each}}
+      </div>
+
+      <!-- Keterangan - Di bawah items -->
+      {{#if notes}}
+      <div class="keterangan-section">
+        <strong>Keterangan:</strong>
+        {{notes}}
+      </div>
+      {{/if}}
+
+      <!-- Total - Kanan Bawah -->
+      <div class="total-section">{{formatRupiah total}}</div>
+
+      <!-- Sales ID - Kanan Bawah -->
+      <div class="sales-section">{{sales}}</div>
+    </div>
+  </body>
+</html>

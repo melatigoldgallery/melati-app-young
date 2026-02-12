@@ -118,8 +118,8 @@
       }
 
       .summary-card {
-        background: linear-gradient(135deg, #ffda69 0%, #ffb30f 100%);
-        color: rgb(12, 12, 12);
+        background: linear-gradient(135deg, #000dc2 0%, #5cdafa 100%);
+        color: white;
         border-radius: 0.5rem;
         padding: 1.5rem;
         text-align: center;
@@ -225,11 +225,27 @@
         word-wrap: break-word;
         max-width: 150px;
       }
+
+      /* Perbaikan untuk dropdown DataTables entries */
+      .dataTables_length select {
+        min-width: 60px !important;
+        width: auto !important;
+        padding: 0.375rem 2rem 0.375rem 0.75rem !important;
+        font-size: 0.95rem !important;
+      }
+
+      .dataTables_length label {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        font-size: 0.95rem !important;
+      }
     </style>
     <title>Data Penjualan - Melati Gold Young</title>
   </head>
   <body>
     <div class="app-container">
+      <!-- Sidebar -->
       <aside class="sidebar">
         <div class="text-center p-3">
           <div class="spinner-border spinner-border-sm text-primary" role="status">
@@ -285,12 +301,12 @@
           <div class="content-wrapper">
             <!-- Filter Section -->
             <div class="card mb-4">
-              <div class="card-header">
+              <div class="card-header d-flex justify-content-between align-items-center">
                 <h2 class="mb-0">
-                  <i class="fas fa-filter text-dark"></i>
+                  <i class="fas fa-filter"></i>
                   Filter Data Penjualan
                 </h2>
-                <div class="col-md-2">
+                <div>
                   <button type="button" class="btn btn-primary" id="btnTambahTransaksi">
                     <i class="fas fa-plus me-2"></i>
                     Transaksi Baru
@@ -299,25 +315,26 @@
               </div>
               <div class="card-body">
                 <div class="row g-3 align-items-end">
-                  <div class="col-md-3">
+                  <div class="col-md-4">
                     <label for="filterTanggal" class="form-label">Tanggal</label>
                     <div class="input-group">
                       <input type="text" class="form-control datepicker" id="filterTanggal" placeholder="dd/mm/yyyy" />
-                      <span class="input-group-text text-dark">
+                      <span class="input-group-text bg-transparent text-secondary">
                         <i class="fas fa-calendar-alt"></i>
                       </span>
                     </div>
                   </div>
-                  <div class="col-md-3">
+                  <div class="col-md-4">
                     <label for="filterJenisPenjualan" class="form-label">Jenis Penjualan</label>
                     <select class="form-select" id="filterJenisPenjualan">
                       <option value="all">Semua</option>
                       <option value="aksesoris">Aksesoris</option>
                       <option value="kotak">Kotak</option>
+                      <option value="silver">Silver</option>
                       <option value="manual">Manual</option>
                     </select>
                   </div>
-                  <div class="col-md-3">
+                  <div class="col-md-4">
                     <label for="filterSales" class="form-label">Sales</label>
                     <select class="form-select" id="filterSales">
                       <option value="all">Semua Sales</option>
@@ -328,7 +345,7 @@
             </div>
 
             <!-- Summary Cards -->
-            <div class="summary-cards">
+            <div class="summary-cards d-none">
               <div class="d-flex justify-content-center gap-3 flex-wrap">
                 <div class="summary-card">
                   <h5>Total Transaksi</h5>
@@ -438,82 +455,45 @@
       </div>
     </div>
 
-    <!-- Delete Confirmation Modal - REPLACE EXISTING -->
+    <!-- Delete Confirmation Modal -->
     <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title" id="deleteModalLabel">Pilih Jenis Penghapusan</h5>
+            <h5 class="modal-title" id="deleteModalLabel">Hapus Penjualan</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <div class="alert alert-info">
-              <h6 class="mb-2">Pilih jenis penghapusan:</h6>
-              <ul class="mb-0 small">
-                <li>
-                  <strong>Hapus Penjualan:</strong>
-                  Hapus data penjualan, stok tetap berkurang
-                </li>
-                <li>
-                  <strong>Batal Penjualan:</strong>
-                  Batalkan transaksi dan kembalikan stok
-                </li>
-              </ul>
+            <div class="alert alert-warning">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              <strong>Peringatan!</strong>
+              Tindakan ini tidak dapat dibatalkan.
             </div>
 
             <div id="deleteTransactionInfo" class="mb-3">
               <!-- Info transaksi akan diisi oleh JavaScript -->
             </div>
 
-            <!-- Multiple Items Selection (hidden by default) -->
-            <div id="multipleItemsSection" style="display: none" class="mb-3">
-              <h6>Pilih item yang akan dibatalkan:</h6>
-              <div id="itemCheckboxes">
-                <!-- Checkboxes akan diisi oleh JavaScript -->
-              </div>
+            <div id="restoreInfo" class="mb-3">
+              <!-- Info restore stok akan diisi oleh JavaScript -->
             </div>
 
-            <div class="d-grid gap-2 mb-3">
-              <button type="button" class="btn btn-warning" id="btnHapusPenjualan">
-                <i class="fas fa-trash me-2"></i>
-                Hapus Penjualan
-              </button>
-              <button type="button" class="btn btn-danger" id="btnBatalPenjualan">
-                <i class="fas fa-undo me-2"></i>
-                Batal Penjualan
-              </button>
-            </div>
-
-            <!-- Password Section (hidden by default) -->
-            <div id="passwordSection" style="display: none">
-              <div class="alert alert-warning">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                <strong>Peringatan!</strong>
-                Tindakan ini tidak dapat dibatalkan.
-              </div>
-              <div class="mb-3">
-                <label for="deleteVerificationPassword" class="form-label">Masukkan kata sandi verifikasi:</label>
-                <input
-                  type="password"
-                  class="form-control"
-                  id="deleteVerificationPassword"
-                  placeholder="Kata sandi admin"
-                />
-              </div>
-              <div class="d-grid gap-2">
-                <button type="button" class="btn btn-success" id="btnConfirmAction">
-                  <i class="fas fa-check me-2"></i>
-                  Konfirmasi
-                </button>
-                <button type="button" class="btn btn-secondary" id="btnBackToOptions">
-                  <i class="fas fa-arrow-left me-2"></i>
-                  Kembali
-                </button>
-              </div>
+            <div class="mb-3">
+              <label for="deleteVerificationPassword" class="form-label">Masukkan kata sandi verifikasi:</label>
+              <input
+                type="password"
+                class="form-control"
+                id="deleteVerificationPassword"
+                placeholder="Kata sandi admin"
+              />
             </div>
           </div>
-          <div class="modal-footer" id="modalFooter">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="button" class="btn btn-danger" id="btnConfirmDelete">
+              <i class="fas fa-trash me-2"></i>
+              Hapus Penjualan
+            </button>
           </div>
         </div>
       </div>

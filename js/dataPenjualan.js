@@ -3,6 +3,7 @@ import {
   collection,
   getDocs,
   doc,
+  getDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -120,6 +121,18 @@ const cacheManager = {
 const utils = {
   showAlert: (message, title = "Informasi", type = "info") =>
     Swal.fire({ title, text: message, icon: type, confirmButtonText: "OK", confirmButtonColor: "#0d6efd" }),
+
+  showConfirm: (message, title = "Konfirmasi") =>
+    Swal.fire({
+      title,
+      text: message,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Ya",
+      cancelButtonText: "Tidak",
+      confirmButtonColor: "#0d6efd",
+      cancelButtonColor: "#6c757d",
+    }).then((result) => result.isConfirmed),
 
   showLoading: (show) => {
     const loader = document.getElementById("loadingIndicator");
@@ -312,6 +325,9 @@ class OptimizedDataPenjualanApp {
     this.currentSelectedDate = null;
     this.currentListeningDate = null;
     this.currentDeleteAction = null;
+    this.isPrinting = false; // ✅ Double-click prevention flag
+    this.pendingEditTransactionId = null; // ✅ NEW: For edit verification
+    this.passwordCache = null; // ✅ NEW: Cache passwords from Firestore
 
     // ✅ PERBAIKAN: Tambahkan properties untuk inactivity timer
     this.inactivityTimer = null;
@@ -428,6 +444,9 @@ class OptimizedDataPenjualanApp {
     // Load initial data
     await this.loadInitialData();
 
+    // ✅ NEW: Load passwords from Firestore
+    await this.loadPasswords();
+
     this.initDataTable();
     this.populateSalesFilter();
     this.loadFilterFromURL();
@@ -498,6 +517,31 @@ class OptimizedDataPenjualanApp {
     } catch (error) {
       console.error("Error loading from Firestore:", error);
       throw error;
+    }
+  }
+
+  // ✅ NEW: Load passwords dari Firestore
+  async loadPasswords() {
+    try {
+      const settingsDoc = await getDoc(doc(firestore, "settings", "passwords"));
+      if (settingsDoc.exists()) {
+        this.passwordCache = settingsDoc.data();
+        console.log("✅ Passwords loaded from Firestore");
+      } else {
+        // Default passwords jika belum ada
+        this.passwordCache = {
+          editDataPenjualan: "admin123",
+          deleteDataPenjualan: "smlt116",
+        };
+        console.log("⚠️ Using default passwords (Firestore not initialized)");
+      }
+    } catch (error) {
+      console.error("Error loading passwords:", error);
+      // Fallback ke default
+      this.passwordCache = {
+        editDataPenjualan: "admin123",
+        deleteDataPenjualan: "smlt116",
+      };
     }
   }
 
@@ -633,22 +677,68 @@ class OptimizedDataPenjualanApp {
   // Setup event listeners
   setupEventListeners() {
     const events = {
-      btnTambahTransaksi: () => (window.location.href = "penjualanAksesoris.html"),
-      btnRefreshData: () => this.refreshData(),
-      btnPrintReceipt: () => this.printDocument("receipt"),
-      btnPrintInvoice: () => this.printDocument("invoice"),
-      btnSaveEdit: () => this.saveEditTransaction(),
+      btnTambahTransaksi: (e) => {
+        e.preventDefault();
+        window.location.href = "penjualanAksesoris.html";
+      },
+      btnRefreshData: async (e) => {
+        e.preventDefault();
+        await this.refreshData();
+      },
+      btnPrintReceipt: async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await this.printDocument("receipt");
+      },
+      btnPrintInvoice: async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await this.printDocument("invoice");
+      },
+      btnSaveEdit: (e) => {
+        e.preventDefault();
+        this.saveEditTransaction();
+      },
     };
 
     // Event listener untuk confirm delete
     const btnConfirmDelete = document.getElementById("btnConfirmDelete");
     if (btnConfirmDelete) {
-      btnConfirmDelete.addEventListener("click", () => this.confirmDeleteTransaction());
+      btnConfirmDelete.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.confirmDeleteTransaction();
+      });
+    }
+
+    // ✅ NEW: Event listener untuk verifikasi edit
+    const btnVerifikasiEdit = document.getElementById("btnVerifikasiEdit");
+    if (btnVerifikasiEdit) {
+      btnVerifikasiEdit.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.verifikasiKodeEdit();
+      });
+    }
+
+    // ✅ NEW: Handle Enter key di verifikasi modal
+    const kodeVerifikasiEdit = document.getElementById("kodeVerifikasiEdit");
+    if (kodeVerifikasiEdit) {
+      kodeVerifikasiEdit.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          this.verifikasiKodeEdit();
+        }
+      });
     }
 
     Object.entries(events).forEach(([id, handler]) => {
       const element = document.getElementById(id);
-      if (element) element.addEventListener("click", handler);
+      if (element) {
+        element.addEventListener("click", handler);
+        // Ensure button type is button, not submit
+        if (element.tagName === "BUTTON" && !element.hasAttribute("type")) {
+          element.setAttribute("type", "button");
+        }
+      }
     });
 
     this.setupAutoFilter();
@@ -1177,13 +1267,68 @@ class OptimizedDataPenjualanApp {
     $("#printModal").modal("show");
   }
 
-  // Handle edit action
+  // Handle edit action (✅ MODIFIED: Add verification)
   handleEdit(transactionId) {
-    this.currentTransaction = this.salesData.find((t) => t.id === transactionId);
-    if (!this.currentTransaction) {
-      return utils.showAlert("Transaksi tidak ditemukan", "Error", "error");
+    this.pendingEditTransactionId = transactionId;
+    this.showVerifikasiEditModal();
+  }
+
+  // ✅ NEW: Show modal verifikasi edit
+  showVerifikasiEditModal() {
+    $("#verifikasiEditModal").modal("show");
+    // Clear previous input
+    document.getElementById("kodeVerifikasiEdit").value = "";
+    // Auto focus
+    setTimeout(() => {
+      document.getElementById("kodeVerifikasiEdit").focus();
+    }, 500);
+  }
+
+  // ✅ NEW: Verifikasi kode edit
+  async verifikasiKodeEdit() {
+    const kode = document.getElementById("kodeVerifikasiEdit").value.trim();
+
+    if (!kode) {
+      utils.showAlert("Kode akses harus diisi!", "Error", "error");
+      return;
     }
+
+    try {
+      // Reload password untuk keamanan (cegah cache lama)
+      const settingsDoc = await getDoc(doc(firestore, "settings", "passwords"));
+      const passwords = settingsDoc.exists() ? settingsDoc.data() : this.passwordCache;
+      const correctPassword = passwords?.editDataPenjualan || "admin123";
+
+      if (kode !== correctPassword) {
+        utils.showAlert("Kode akses salah!", "Akses Ditolak", "error");
+        document.getElementById("kodeVerifikasiEdit").value = "";
+        document.getElementById("kodeVerifikasiEdit").focus();
+        return;
+      }
+
+      // Kode benar, close modal verifikasi
+      $("#verifikasiEditModal").modal("hide");
+      document.getElementById("kodeVerifikasiEdit").value = "";
+
+      // Lanjut ke edit modal
+      this.proceedToEdit();
+    } catch (error) {
+      console.error("Error verifikasi:", error);
+      utils.showAlert("Terjadi kesalahan saat verifikasi. Coba lagi.", "Error", "error");
+    }
+  }
+
+  // ✅ NEW: Proceed to edit modal
+  proceedToEdit() {
+    this.currentTransaction = this.salesData.find((t) => t.id === this.pendingEditTransactionId);
+
+    if (!this.currentTransaction) {
+      utils.showAlert("Data transaksi tidak ditemukan!", "Error", "error");
+      return;
+    }
+
     this.showEditModal();
+    this.pendingEditTransactionId = null;
   }
 
   // Handle delete action
@@ -1232,9 +1377,9 @@ class OptimizedDataPenjualanApp {
     }
 
     let formHtml = `
-      <div class="alert alert-warning mb-3">
-        <i class="fas fa-exclamation-triangle me-2"></i>
-        <strong>Perhatian:</strong> Kode barang dan jumlah tidak dapat diubah. Untuk mengubah stok, hapus transaksi ini dan buat transaksi baru.
+      <div class="alert alert-info mb-3">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Informasi:</strong> Kode barang tidak dapat diubah. Perubahan jumlah hanya mempengaruhi data laporan penjualan dan tidak mengubah stok inventory.
       </div>
       <div class="row mb-3">
         <div class="col-md-6">
@@ -1272,11 +1417,15 @@ class OptimizedDataPenjualanApp {
                 </div>
               </div>
               <div class="row mt-2">
-                <div class="col-md-6">
+                <div class="col-md-4">
+                  <label for="editJumlah_${index}" class="form-label">Jumlah (Pcs): <span class="badge bg-info">Editable</span></label>
+                  <input type="number" class="form-control" id="editJumlah_${index}" value="${item.jumlah || 1}" min="1">
+                </div>
+                <div class="col-md-4">
                   <label for="editNama_${index}" class="form-label">Nama Barang:</label>
                   <input type="text" class="form-control" id="editNama_${index}" value="${item.nama || ""}">
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
                   <label for="editKadar_${index}" class="form-label">Kadar:</label>
                   <input type="text" class="form-control" id="editKadar_${index}" value="${item.kadar || ""}">
                 </div>
@@ -1307,15 +1456,19 @@ class OptimizedDataPenjualanApp {
           // Aksesoris & Kotak: Kode, Nama, Kadar, Berat, Harga
           formHtml += `
             <div class="border p-3 mb-3 rounded">
-              <h6>Item ${index + 1} ${item.jumlah > 1 ? `(${item.jumlah} pcs)` : ""}</h6>
+              <h6>Item ${index + 1}</h6>
               <div class="row">
-                <div class="col-md-6">
+                <div class="col-md-4">
                   <label for="editKode_${index}" class="form-label">Kode: <span class="badge bg-secondary">Tidak dapat diubah</span></label>
                   <input type="text" class="form-control" id="editKode_${index}" value="${
                     item.kodeText || item.kode || ""
                   }" readonly>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
+                  <label for="editJumlah_${index}" class="form-label">Jumlah (Pcs): <span class="badge bg-info">Editable</span></label>
+                  <input type="number" class="form-control" id="editJumlah_${index}" value="${item.jumlah || 1}" min="1">
+                </div>
+                <div class="col-md-4">
                   <label for="editNama_${index}" class="form-label">Nama Barang:</label>
                   <input type="text" class="form-control" id="editNama_${index}" value="${item.nama || ""}">
                 </div>
@@ -1421,12 +1574,15 @@ class OptimizedDataPenjualanApp {
         updateData.items = this.currentTransaction.items.map((item, index) => {
           const updatedItem = { ...item };
 
-          // ✅ OPSI B: Kode, kodeLock, jumlah TIDAK dapat diubah
-          // Pertahankan nilai original untuk field yang mempengaruhi stok
+          // Kode dan kodeLock TIDAK dapat diubah (pertahankan nilai original)
           updatedItem.kodeText = item.kodeText || "";
           updatedItem.kode = item.kode || item.kodeText || "";
           updatedItem.kodeLock = item.kodeLock || "";
-          updatedItem.jumlah = item.jumlah || 1;
+
+          // Jumlah DAPAT diubah (baca dari input field)
+          const jumlahInput = document.getElementById(`editJumlah_${index}`);
+          const newJumlah = jumlahInput ? parseInt(jumlahInput.value) || 1 : item.jumlah || 1;
+          updatedItem.jumlah = Math.max(1, newJumlah); // Minimal 1
 
           // Allow edit: nama, kadar, berat, harga, keterangan
           const namaInput = document.getElementById(`editNama_${index}`);
@@ -1587,6 +1743,7 @@ class OptimizedDataPenjualanApp {
   }
 
   // Confirm delete with password verification
+  // Confirm delete with password verification (✅ MODIFIED: Use Firestore password)
   async confirmDeleteTransaction() {
     const password = document.getElementById("deleteVerificationPassword").value;
 
@@ -1594,11 +1751,25 @@ class OptimizedDataPenjualanApp {
       return utils.showAlert("Masukkan kata sandi verifikasi terlebih dahulu", "Peringatan", "warning");
     }
 
-    if (password !== VERIFICATION_PASSWORD) {
-      return utils.showAlert("Kata sandi verifikasi salah", "Error", "error");
-    }
+    try {
+      // ✅ MODIFIED: Get password from Firestore
+      const settingsDoc = await getDoc(doc(firestore, "settings", "passwords"));
+      const passwords = settingsDoc.exists() ? settingsDoc.data() : this.passwordCache;
+      const correctPassword = passwords?.deleteDataPenjualan || VERIFICATION_PASSWORD;
 
-    await this.deleteTransaction();
+      if (password !== correctPassword) {
+        return utils.showAlert("Kata sandi verifikasi salah", "Error", "error");
+      }
+
+      await this.deleteTransaction();
+    } catch (error) {
+      console.error("Error verifying delete password:", error);
+      // Fallback ke hardcoded password jika Firestore error
+      if (password !== VERIFICATION_PASSWORD) {
+        return utils.showAlert("Kata sandi verifikasi salah", "Error", "error");
+      }
+      await this.deleteTransaction();
+    }
   }
 
   // Smart deletion: auto-restore stock if possible
@@ -1778,29 +1949,139 @@ class OptimizedDataPenjualanApp {
   }
 
   // Print document (receipt or invoice)
-  printDocument(type) {
+  async printDocument(type) {
+    // ✅ Prevent double-click
+    if (this.isPrinting) return;
+    this.isPrinting = true;
+
     if (!this.currentTransaction) {
+      this.isPrinting = false;
       return utils.showAlert("Tidak ada data transaksi untuk dicetak!");
     }
 
     const transaction = this.currentTransaction;
 
-    // Khusus invoice dengan >1 item: cetak per item satu-satu via iframe (anti duplikat)
+    // Khusus invoice dengan >1 item: cetak per item satu-satu
     if (type === "invoice" && transaction && Array.isArray(transaction.items) && transaction.items.length > 1) {
+      this.isPrinting = false; // Reset sebelum panggil method lain
       try {
         $("#printModal").modal("hide");
       } catch (_) {}
-      return this.printInvoicePerItem(transaction);
+      return await this.printInvoicePerItem(transaction);
     }
 
-    // Fallback: gunakan window.open untuk struk atau invoice biasa (single)
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      return utils.showAlert("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak.", "Error", "error");
+    // ✅ Show loading alert
+    Swal.fire({
+      title: "Proses Print",
+      html: type === "receipt" ? "Mohon tunggu, sedang mencetak struk..." : "Mohon tunggu, sedang mencetak invoice...",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      willOpen: () => Swal.showLoading(),
+    });
+
+    try {
+      // Try print service if available and online
+      if (window.printService && window.printService.isOnline) {
+        try {
+          // Prepare data for print service
+          const printData = this.preparePrintData(transaction);
+
+          let result;
+          if (type === "receipt") {
+            result = await window.printService.printReceipt(printData);
+          } else {
+            result = await window.printService.printInvoice(printData);
+          }
+
+          if (result.success) {
+            console.log(`✅ ${type} printed via service:`, result.jobID);
+            try {
+              $("#printModal").modal("hide");
+            } catch (_) {}
+            return;
+          }
+        } catch (error) {
+          console.error("❌ Print service error, falling back to browser:", error);
+        }
+      }
+
+      // Fallback: gunakan window.open untuk struk atau invoice biasa (single)
+      Swal.close();
+      console.log("📄 Using browser print (fallback)");
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        return utils.showAlert("Popup diblokir oleh browser. Mohon izinkan popup untuk mencetak.", "Error", "error");
+      }
+      const html = type === "receipt" ? this.generateReceiptHTML(transaction) : this.generateInvoiceHTML(transaction);
+      printWindow.document.write(html);
+      printWindow.document.close();
+    } finally {
+      this.isPrinting = false;
+      Swal.close();
     }
-    const html = type === "receipt" ? this.generateReceiptHTML(transaction) : this.generateInvoiceHTML(transaction);
-    printWindow.document.write(html);
-    printWindow.document.close();
+  }
+
+  // Prepare print data for print service
+  preparePrintData(transaction) {
+    // Convert Firestore timestamp to JavaScript Date
+    let timestampDate = null;
+    if (transaction.timestamp) {
+      // Firestore timestamp has toDate() method
+      if (typeof transaction.timestamp.toDate === "function") {
+        timestampDate = transaction.timestamp.toDate();
+      } else if (transaction.timestamp.seconds) {
+        // Firestore timestamp object with seconds
+        timestampDate = new Date(transaction.timestamp.seconds * 1000);
+      } else {
+        // Already a regular timestamp/date
+        timestampDate = new Date(transaction.timestamp);
+      }
+    }
+
+    const tanggal = timestampDate ? utils.formatDate(timestampDate) : utils.formatDate(transaction.tanggal);
+
+    // Format jam dari timestamp
+    let jam = "";
+    if (timestampDate) {
+      jam = timestampDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    // Format items for print service
+    const items = (transaction.items || []).map((item) => ({
+      nama: item.nama || "-",
+      kode: item.kodeText || item.kode || item.barcode || "-",
+      kadar: item.kadar || "-",
+      berat: item.berat || "",
+      jumlah: item.jumlah || 1,
+      harga: item.totalHarga || 0,
+      totalHarga: item.totalHarga || 0,
+      kodeLock: item.kodeLock || "",
+      keterangan: item.keterangan || "",
+    }));
+
+    // Collect notes from items
+    const notes = items
+      .filter((item) => item.keterangan && item.keterangan.trim() !== "")
+      .map((item) => item.keterangan)
+      .join(" ");
+
+    return {
+      transactionType: (transaction.jenisPenjualan || "AKSESORIS").toUpperCase(),
+      tanggal: tanggal + (jam ? " " + jam : ""),
+      jam: jam,
+      sales: transaction.sales || "Admin",
+      items: items,
+      totalHarga: transaction.totalHarga || 0,
+      jumlahBayar: transaction.jumlahBayar || transaction.totalHarga || 0,
+      kembalian: transaction.kembalian || 0,
+      metodeBayar: transaction.metodeBayar || transaction.statusPembayaran?.toLowerCase() || "tunai",
+      nominalDP: transaction.nominalDP || 0,
+      sisaPembayaran: transaction.sisaPembayaran || 0,
+      customerName: transaction.customerName || "",
+      customerPhone: transaction.customerPhone || "",
+      notes: notes,
+    };
   }
 
   // Generate receipt HTML
@@ -2059,7 +2340,152 @@ class OptimizedDataPenjualanApp {
   }
 
   // Cetak invoice per item (khusus penjualan manual > 1 item)
-  printInvoicePerItem(transaction) {
+  async printInvoicePerItem(transaction) {
+    // ✅ Prevent double-click
+    if (this.isPrinting) return;
+    this.isPrinting = true;
+
+    if (!transaction?.items || transaction.items.length === 0) {
+      this.isPrinting = false;
+      return utils.showAlert("Tidak ada item untuk dicetak.", "Info", "info");
+    }
+
+    const items = transaction.items;
+
+    // Fallback jika hanya 1 item - just print directly without recursion
+    if (items.length <= 1) {
+      this.isPrinting = false;
+      return this.printInvoicePerItemBrowser(transaction);
+    }
+
+    // Try print service first
+    if (!window.printService) {
+      console.warn("Print service not initialized, using browser fallback");
+      this.isPrinting = false;
+      return this.printInvoicePerItemBrowser(transaction);
+    }
+
+    // ✅ Show loading alert
+    Swal.fire({
+      title: "Proses Print",
+      html: `Mohon tunggu, sedang mencetak ${items.length} invoice...`,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      willOpen: () => Swal.showLoading(),
+    });
+
+    try {
+      // Get timestamp and format date/time
+      const printData = this.preparePrintData(transaction);
+      const tanggal = printData.tanggal.split(" ")[0]; // Get date part
+      const jam = printData.jam || new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+
+      let printedCount = 0;
+      let failedCount = 0;
+      const failedItems = [];
+
+      // ✅ SIMPLIFIED: Print each item sequentially
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+
+        // Prepare invoice data for single item
+        const invoiceData = {
+          tanggal: tanggal + " " + jam,
+          sales: transaction.sales || "-",
+          customerName: transaction.customerName || "",
+          customerPhone: transaction.customerPhone || "",
+          items: [
+            {
+              nama: item.nama || "-",
+              kode: item.kodeText || item.kode || "-",
+              kadar: item.kadar || "-",
+              berat: item.berat || 0,
+              jumlah: 1,
+              totalHarga: parseInt(item.totalHarga) || 0,
+            },
+          ],
+          totalHarga: parseInt(item.totalHarga) || 0,
+          notes: item.keterangan || "",
+        };
+
+        try {
+          // ✅ SIMPLIFIED: Direct request
+          const response = await fetch("http://localhost:3001/api/print/invoice", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(invoiceData),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+          }
+
+          const result = await response.json();
+
+          if (result.success && result.jobID) {
+            printedCount++;
+          } else {
+            throw new Error(result.error || "Print request failed");
+          }
+        } catch (itemError) {
+          failedCount++;
+          failedItems.push({ item: i + 1, name: item.nama, reason: itemError.message });
+          console.error(`  ❌ Item ${i + 1} failed: ${itemError.message}`);
+        }
+
+        // ✅ SIMPLIFIED: Reduced delay (500ms instead of 2000ms)
+        if (i < items.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      }
+
+      Swal.close();
+
+      if (printedCount > 0) {
+        let message = "";
+        if (failedCount > 0) {
+          const failedList = failedItems.map((f) => `- ${f.name}: ${f.reason}`).join("\n");
+          message = `${printedCount} invoice berhasil dicetak, ${failedCount} gagal:\n\n${failedList}`;
+        } else {
+          message = `Semua ${printedCount} invoice berhasil dicetak!`;
+        }
+
+        utils.showAlert(
+          message,
+          printedCount === items.length ? "Sukses" : "Sebagian Berhasil",
+          printedCount === items.length ? "success" : "warning",
+        );
+      } else {
+        const failedList = failedItems.map((f) => `- ${f.name}: ${f.reason}`).join("\n");
+        utils.showAlert(`Semua invoice gagal dicetak:\n\n${failedList}`, "Error", "error");
+      }
+
+      $("#printModal").modal("hide");
+      return;
+    } catch (error) {
+      console.error("Print service error:", error.message);
+      Swal.close();
+
+      // Ask user if they want to use browser fallback
+      const useFallback = await utils.showConfirm(
+        "Print service tidak tersedia. Gunakan browser print sebagai alternatif?",
+        "Print Service Offline",
+      );
+
+      if (useFallback) {
+        Swal.close();
+        return this.printInvoicePerItemBrowser(transaction);
+      }
+    } finally {
+      this.isPrinting = false;
+      Swal.close();
+    }
+  }
+
+  // Browser fallback for multi-invoice print
+  printInvoicePerItemBrowser(transaction) {
     if (!transaction?.items || transaction.items.length === 0) {
       return utils.showAlert("Tidak ada item untuk dicetak.", "Info", "info");
     }

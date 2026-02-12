@@ -1,4 +1,5 @@
- .<!DOCTYPE html>
+.
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -40,10 +41,10 @@
     <script src="https://cdn.datatables.net/buttons/2.2.3/js/buttons.html5.min.js"></script>
     <!-- Animate.css -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/pages/absensi-modern.css" />
     <!-- Favicon -->
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/pages/absensi-modern.css" />
     <title>Laporan Stok Aksesoris - Melati Gold Shop</title>
     <style>
       /* Loading indicator */
@@ -148,8 +149,15 @@
             </div>
             <div class="card-body">
               <form class="row g-3 align-items-end">
-                <div class="col-md-3">
-                  <label for="startDate" class="form-label">Tanggal</label>
+                <div class="col-md-2">
+                  <label for="jenisLaporan" class="form-label">Jenis Laporan</label>
+                  <select class="form-select" id="jenisLaporan">
+                    <option value="kotak-aksesoris" selected>Kotak & Aksesoris</option>
+                    <option value="silver">Silver</option>
+                  </select>
+                </div>
+                <div class="col-md-2">
+                  <label for="startDate" class="form-label">Tanggal Awal</label>
                   <div class="input-group">
                     <input type="text" class="form-control datepicker" id="startDate" placeholder="dd/mm/yyyy" />
                     <span class="input-group-text bg-transparent text-secondary">
@@ -157,8 +165,17 @@
                     </span>
                   </div>
                 </div>
+                <div class="col-md-2">
+                  <label for="endDate" class="form-label">Tanggal Akhir</label>
+                  <div class="input-group">
+                    <input type="text" class="form-control datepicker" id="endDate" placeholder="dd/mm/yyyy" />
+                    <span class="input-group-text bg-transparent text-secondary">
+                      <i class="fas fa-calendar-alt"></i>
+                    </span>
+                  </div>
+                </div>
                 <!-- Action Buttons Section -->
-                <div class="col-md-8 col-lg-9">
+                <div class="col-md-6">
                   <div class="d-flex flex-wrap gap-2">
                     <button type="button" class="btn btn-primary px-4" id="filterStockBtn">
                       <i class="fas fa-search me-2"></i>
@@ -175,11 +192,12 @@
             <div class="card-header">
               <h2>
                 <i class="fas fa-boxes"></i>
-                Data Stok Aksesoris
+                <span id="tableTitle">Data Stok Aksesoris</span>
               </h2>
             </div>
             <div class="card-body">
-              <div class="table-responsive">
+              <!-- Tabel untuk Kotak & Aksesoris -->
+              <div class="table-responsive" id="tableKotakAksesorisContainer">
                 <table class="table table-striped table-bordered" id="stockTable">
                   <thead>
                     <tr>
@@ -198,6 +216,63 @@
                   <tbody>
                     <!-- Data will be populated by JavaScript -->
                   </tbody>
+                </table>
+              </div>
+
+              <!-- Tabel untuk Silver -->
+              <div class="table-responsive" id="tableSilverContainer" style="display: none">
+                <table class="table table-striped table-bordered" id="silverStockTable">
+                  <thead>
+                    <tr>
+                      <th class="text-center">No</th>
+                      <th class="text-center">Kode</th>
+                      <th>Nama</th>
+                      <th class="text-center">Stok Awal</th>
+                      <th class="text-center">Tambah Stok</th>
+                      <th class="text-center">Laku</th>
+                      <th class="text-center">Lock</th>
+                      <th class="text-center">Return</th>
+                      <th class="text-center">Stok Akhir</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Data will be populated by JavaScript -->
+                  </tbody>
+                  <tfoot>
+                    <tr class="table-secondary fw-bold">
+                      <td colspan="3" class="text-end">TOTAL:</td>
+                      <td class="text-center" id="totalStokAwal">
+                        0
+                        <br />
+                        <small class="text-muted">0.00 gr</small>
+                      </td>
+                      <td class="text-center" id="totalTambah">
+                        0
+                        <br />
+                        <small class="text-muted">0.00 gr</small>
+                      </td>
+                      <td class="text-center" id="totalLaku">
+                        0
+                        <br />
+                        <small class="text-muted">0.00 gr</small>
+                      </td>
+                      <td class="text-center" id="totalLock">
+                        0
+                        <br />
+                        <small class="text-muted">0.00 gr</small>
+                      </td>
+                      <td class="text-center" id="totalReturn">
+                        0
+                        <br />
+                        <small class="text-muted">0.00 gr</small>
+                      </td>
+                      <td class="text-center" id="totalStokAkhir">
+                        0
+                        <br />
+                        <small class="text-muted">0.00 gr</small>
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>

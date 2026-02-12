@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -34,6 +34,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- jsPDF for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <link rel="stylesheet" href="css/pages/absensi-modern.css" />
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
     <title>Laporan Penjualan Aksesoris - Melati Gold Shop</title>
@@ -160,8 +163,8 @@
           <!-- Filter Card -->
           <div class="card-body">
             <form class="row g-3 align-items-end">
-              <div class="col-md-3">
-                <label for="startDate" class="form-label">Tanggal</label>
+              <div class="col-md-2">
+                <label for="startDate" class="form-label">Tanggal Mulai</label>
                 <div class="input-group">
                   <input type="text" class="form-control datepicker" id="startDate" placeholder="dd/mm/yyyy" />
                   <span class="input-group-text bg-transparent text-secondary">
@@ -169,7 +172,16 @@
                   </span>
                 </div>
               </div>
-              <div class="col-md-3">
+              <div class="col-md-2">
+                <label for="endDate" class="form-label">Tanggal Akhir</label>
+                <div class="input-group">
+                  <input type="text" class="form-control datepicker" id="endDate" placeholder="dd/mm/yyyy" />
+                  <span class="input-group-text bg-transparent text-secondary">
+                    <i class="fas fa-calendar-alt"></i>
+                  </span>
+                </div>
+              </div>
+              <div class="col-md-2">
                 <label for="salesType" class="form-label">Jenis Penjualan</label>
                 <select class="form-select" id="salesType">
                   <option value="all" selected>Semua Jenis</option>
@@ -179,13 +191,20 @@
                   <option value="manual">Penjualan Manual</option>
                 </select>
               </div>
-              <div class="col-md-3">
+              <div class="col-md-2">
                 <label for="salesPerson" class="form-label">Sales</label>
                 <select class="form-select" id="salesPerson">
                   <option value="all" selected>Semua Sales</option>
                 </select>
               </div>
-              <div class="col-md-3">
+              <div class="col-md-2">
+                <label for="reportType" class="form-label">Jenis Laporan</label>
+                <select class="form-select" id="reportType">
+                  <option value="rekap" selected>Rekap (Per Kode)</option>
+                  <option value="detail">Detail (Per Transaksi)</option>
+                </select>
+              </div>
+              <div class="col-md-2">
                 <button type="button" class="btn btn-primary" id="filterSalesBtn">
                   <i class="fas fa-search me-1"></i>
                   Tampilkan
@@ -208,6 +227,8 @@
                   <thead>
                     <tr>
                       <th>Tanggal</th>
+                      <th>Jam</th>
+                      <th>Sales</th>
                       <th>Jenis</th>
                       <th>Kode</th>
                       <th>Nama Barang</th>
@@ -224,7 +245,7 @@
                   </tbody>
                   <tfoot>
                     <tr class="table-info fw-bold">
-                      <td colspan="4" class="text-end">TOTAL:</td>
+                      <td colspan="6" class="text-end">TOTAL:</td>
                       <td class="text-center"></td>
                       <td class="text-center"></td>
                       <td></td>
@@ -237,34 +258,30 @@
               </div>
             </div>
           </div>
-          <div class="card mt-4">
+
+          <!-- Export Laporan - DISEMBUNYIKAN: Menggunakan tombol DataTables untuk UX lebih baik -->
+          <div class="card mt-3" style="display: none">
             <div class="card-header">
               <h6 class="mb-0">
-                <i class="fas fa-file-excel me-2"></i>
-                Export Laporan Detail Bulanan
+                <i class="fas fa-download me-2"></i>
+                Export Laporan
               </h6>
             </div>
             <div class="card-body">
-              <p class="text-muted mb-3">
-                <i class="fas fa-info-circle me-1"></i>
-                Export laporan penjualan bulanan yang dikelompokkan per tanggal dan jenis (Aksesoris, Kotak, Silver,
-                Manual) dengan subtotal dan grand total.
-              </p>
-              <div class="row align-items-end">
-                <div class="col-md-2 mb-3 mb-md-0">
-                  <label for="exportMonthInput" class="form-label fw-semibold">
-                    <i class="fas fa-calendar-alt me-1"></i>
-                    Pilih Bulan:
-                  </label>
-                  <input type="month" class="form-control" id="exportMonthInput" />
-                </div>
-                <div class="col-md-3">
-                  <button class="btn btn-success" id="btnExportPenjualanBulanan">
-                    <i class="fas fa-download me-2"></i>
-                    Export Excel
-                  </button>
-                </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-success" id="btnExportExcel">
+                  <i class="fas fa-file-excel me-2"></i>
+                  Export Excel
+                </button>
+                <button class="btn btn-danger" id="btnExportPDF">
+                  <i class="fas fa-file-pdf me-2"></i>
+                  Export PDF
+                </button>
               </div>
+              <small class="text-muted d-block mt-2">
+                <i class="fas fa-info-circle me-1"></i>
+                Data yang diexport sesuai dengan filter yang sedang ditampilkan (data agregasi per kode barang)
+              </small>
             </div>
           </div>
         </div>

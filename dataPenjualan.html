@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -498,7 +498,51 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal Verifikasi Edit -->
+    <div
+      class="modal fade"
+      id="verifikasiEditModal"
+      tabindex="-1"
+      aria-labelledby="verifikasiEditModalLabel"
+      aria-hidden="true"
+      data-bs-backdrop="static"
+    >
+      <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title" id="verifikasiEditModalLabel">
+              <i class="fas fa-lock me-2"></i>
+              Verifikasi Akses
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label for="kodeVerifikasiEdit" class="form-label">Masukkan Kode Akses:</label>
+              <input
+                type="password"
+                class="form-control"
+                id="kodeVerifikasiEdit"
+                placeholder="Kode akses edit"
+                autocomplete="off"
+              />
+              <div class="form-text">Masukkan kode akses untuk mengedit data transaksi penjualan</div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="button" class="btn btn-primary" id="btnVerifikasiEdit">
+              <i class="fas fa-check me-2"></i>
+              Verifikasi
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="js/sidebar-loader.js"></script>
+    <script src="js/services/print-service.js"></script>
     <script type="module" src="js/dataPenjualan.js"></script>
     <script type="module" src="js/main.js"></script>
   </body>

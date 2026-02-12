@@ -152,6 +152,7 @@ export const aksesorisSaleHandler = {
 
   OPSI_KOTAK: [],
   OPSI_AKSESORIS: [],
+  OPSI_SILVER: [],
   modalKelolaKode: null,
   modalFormKode: null,
   currentKategori: "kotak",
@@ -229,9 +230,10 @@ export const aksesorisSaleHandler = {
   },
 
   async loadKodeAksesorisData() {
-    const { OPSI_KOTAK, OPSI_AKSESORIS } = await this.fetchKodeAksesoris();
+    const { OPSI_KOTAK, OPSI_AKSESORIS, OPSI_SILVER } = await this.fetchKodeAksesoris();
     this.OPSI_KOTAK = OPSI_KOTAK;
     this.OPSI_AKSESORIS = OPSI_AKSESORIS;
+    this.OPSI_SILVER = OPSI_SILVER;
   },
 
   // Fungsi untuk inisialisasi modal
@@ -310,6 +312,14 @@ export const aksesorisSaleHandler = {
       });
     }
 
+    const silverTab = document.getElementById("silver-tab");
+    if (silverTab) {
+      silverTab.addEventListener("click", () => {
+        this.currentKategori = "silver";
+        this.loadKodeBarang("silver");
+      });
+    }
+
     // Event listeners untuk pencarian
     this.attachSearchListeners();
 
@@ -326,6 +336,13 @@ export const aksesorisSaleHandler = {
     if (btnTambahAksesorisKode) {
       btnTambahAksesorisKode.addEventListener("click", () => {
         this.showFormKodeModal("aksesoris");
+      });
+    }
+
+    const btnTambahSilver = document.getElementById("btnTambahSilver");
+    if (btnTambahSilver) {
+      btnTambahSilver.addEventListener("click", () => {
+        this.showFormKodeModal("silver");
       });
     }
 
@@ -433,11 +450,31 @@ export const aksesorisSaleHandler = {
         }
       });
     }
+
+    // Search untuk silver
+    const searchSilver = document.getElementById("searchSilver");
+    const clearSearchSilver = document.getElementById("clearSearchSilver");
+
+    if (searchSilver) {
+      searchSilver.addEventListener("input", () => {
+        this.filterTable("silver", searchSilver.value);
+      });
+    }
+
+    if (clearSearchSilver) {
+      clearSearchSilver.addEventListener("click", () => {
+        if (searchSilver) {
+          searchSilver.value = "";
+          this.filterTable("silver", "");
+        }
+      });
+    }
   },
 
   // Fungsi untuk memfilter tabel berdasarkan input pencarian
   filterTable(kategori, searchText) {
-    const tableId = kategori === "kotak" ? "tableKodeKotak" : kategori === "aksesoris" ? "tableKodeAksesoris" : "";
+    const tableId =
+      kategori === "kotak" ? "tableKodeKotak" : kategori === "aksesoris" ? "tableKodeAksesoris" : "tableKodeSilver";
     const table = document.getElementById(tableId);
 
     if (!table) return;
@@ -499,13 +536,15 @@ export const aksesorisSaleHandler = {
       if (cachedData) {
         return cachedData;
       }
-      const [kotakSnapshot, aksesorisSnapshot] = await Promise.all([
+      const [kotakSnapshot, aksesorisSnapshot, silverSnapshot] = await Promise.all([
         getDocs(collection(firestore, "kodeAksesoris", "kategori", "kotak")),
         getDocs(collection(firestore, "kodeAksesoris", "kategori", "aksesoris")),
+        getDocs(collection(firestore, "kodeAksesoris", "kategori", "silver")),
       ]);
 
       const OPSI_KOTAK = [{ value: "0", text: "Pilih Kategori" }];
       const OPSI_AKSESORIS = [{ value: "0", text: "Pilih Kategori" }];
+      const OPSI_SILVER = [{ value: "0", text: "Pilih Kategori" }];
 
       kotakSnapshot.forEach((doc) => {
         const data = doc.data();
@@ -525,7 +564,18 @@ export const aksesorisSaleHandler = {
         });
       });
 
-      const result = { OPSI_KOTAK, OPSI_AKSESORIS };
+      silverSnapshot.forEach((doc) => {
+        const data = doc.data();
+        OPSI_SILVER.push({
+          id: doc.id,
+          text: data.text,
+          nama: data.nama,
+          kadar: data.kadar || 0,
+          berat: data.berat || 0,
+        });
+      });
+
+      const result = { OPSI_KOTAK, OPSI_AKSESORIS, OPSI_SILVER };
       setCacheWithTimestamp(cacheKey, result, CACHE_TTL_STANDARD);
 
       return result;
@@ -534,6 +584,7 @@ export const aksesorisSaleHandler = {
       return {
         OPSI_KOTAK: [{ value: "0", text: "Pilih Kategori" }],
         OPSI_AKSESORIS: [{ value: "0", text: "Pilih Kategori" }],
+        OPSI_SILVER: [{ value: "0", text: "Pilih Kategori" }],
       };
     }
   },
@@ -541,7 +592,14 @@ export const aksesorisSaleHandler = {
   // Fungsi untuk menangani perubahan kategori
   handleCategoryChange(kategori, tbody) {
     tbody.innerHTML = "";
-    const options = kategori === "1" ? this.OPSI_KOTAK : kategori === "2" ? this.OPSI_AKSESORIS : [];
+    const options =
+      kategori === "1"
+        ? this.OPSI_KOTAK
+        : kategori === "2"
+          ? this.OPSI_AKSESORIS
+          : kategori === "3"
+            ? this.OPSI_SILVER
+            : [];
     this.updateAllKodeBarangOptions(options);
     if (options.length) {
       this.tambahBaris(kategori, tbody);
@@ -571,6 +629,11 @@ export const aksesorisSaleHandler = {
         if (kategori === "kotak" && cachedData.harga !== undefined) {
           document.getElementById("hargaKode").value = cachedData.harga || "";
         }
+        // Load kadar & berat jika kategori silver
+        if (kategori === "silver") {
+          document.getElementById("kadarKode").value = cachedData.kadar || "";
+          document.getElementById("beratKode").value = cachedData.berat || "";
+        }
         return;
       }
 
@@ -584,6 +647,11 @@ export const aksesorisSaleHandler = {
         // Load harga jika kategori kotak
         if (kategori === "kotak" && data.harga !== undefined) {
           document.getElementById("hargaKode").value = data.harga || "";
+        }
+        // Load kadar & berat jika kategori silver
+        if (kategori === "silver") {
+          document.getElementById("kadarKode").value = data.kadar || "";
+          document.getElementById("beratKode").value = data.berat || "";
         }
         setCacheWithTimestamp(cacheKey, data, CACHE_TTL_STANDARD);
       } else {
@@ -601,7 +669,7 @@ export const aksesorisSaleHandler = {
     const newRow = document.createElement("tr");
     const rowCount = tbody.children.length + 1;
 
-    const options = kategori === "1" ? this.OPSI_KOTAK : kategori === "2" ? this.OPSI_AKSESORIS : [];
+    const options = kategori === "1" ? this.OPSI_KOTAK : kategori === "2" ? this.OPSI_AKSESORIS : this.OPSI_SILVER;
 
     newRow.innerHTML = `
                   <td>${rowCount}</td>
@@ -675,10 +743,6 @@ export const aksesorisSaleHandler = {
   // Fungsi untuk memperbarui nama barang
   updateNamaBarang(kodeBarangSelect, namaBarangInput) {
     const selectedOption = kodeBarangSelect.options[kodeBarangSelect.selectedIndex];
-    if (!selectedOption) {
-      namaBarangInput.value = "";
-      return;
-    }
     const nama = selectedOption.getAttribute("data-nama");
     namaBarangInput.value = nama || "";
   },
@@ -795,7 +859,7 @@ export const aksesorisSaleHandler = {
             ? "kotak"
             : this.elements.selectKategori.value === "2"
               ? "aksesoris"
-              : "",
+              : "silver",
       });
     });
     return isValid ? items : null;
@@ -836,17 +900,6 @@ export const aksesorisSaleHandler = {
 
       const tanggalInput = document.getElementById("tanggal").value;
 
-      // ✅ FIX: Konversi format dd/mm/yyyy ke ISO string
-      let tanggalISO;
-      if (tanggalInput) {
-        const parts = tanggalInput.split("/");
-        if (parts.length === 3) {
-          // parts[0] = day, parts[1] = month, parts[2] = year
-          const date = new Date(parts[2], parts[1] - 1, parts[0]);
-          tanggalISO = date.toISOString();
-        }
-      }
-
       const currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
       const salesName = currentUser.username || "System";
 
@@ -859,7 +912,7 @@ export const aksesorisSaleHandler = {
           jumlah: parseInt(item.jumlah) || 0,
           keterangan: `Tambah stok: ${item.nama}`,
           sales: salesName,
-          tanggal: tanggalISO, // ✅ Kirim ISO format
+          tanggal: tanggalInput, // ✅ Simpan format dd/mm/yyyy langsung
         });
       }
 
@@ -1183,24 +1236,29 @@ export const aksesorisSaleHandler = {
         return;
       }
 
-      const startParts = filterDateStart.value.split("/");
-      const endParts = filterDateEnd.value.split("/");
+      // Helper function to normalize date format (d/m/yyyy or dd/mm/yyyy → dd/mm/yyyy)
+      const normalizeDate = (dateStr) => {
+        const parts = dateStr.split("/");
+        if (parts.length !== 3) return dateStr;
 
-      if (startParts.length !== 3 || endParts.length !== 3) {
+        const day = parts[0].padStart(2, "0");
+        const month = parts[1].padStart(2, "0");
+        const year = parts[2];
+
+        return `${day}/${month}/${year}`;
+      };
+
+      const startDateStr = normalizeDate(filterDateStart.value);
+      const endDateStr = normalizeDate(filterDateEnd.value);
+
+      // Validate format (flexible - accepts d/m/yyyy or dd/mm/yyyy)
+      const datePattern = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
+      if (!datePattern.test(filterDateStart.value) || !datePattern.test(filterDateEnd.value)) {
         throw new Error("Format tanggal tidak valid");
       }
 
-      const startDate = new Date(startParts[2], startParts[1] - 1, startParts[0]);
-      const endDate = new Date(endParts[2], endParts[1] - 1, endParts[0]);
-      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-        throw new Error("Tanggal tidak valid");
-      }
-
-      startDate.setHours(0, 0, 0, 0);
-      endDate.setHours(23, 59, 59, 999);
-
       // Create cache key
-      const cacheKey = `stockAdditionHistory_${filterDateStart.value}_${filterDateEnd.value}`;
+      const cacheKey = `stockAdditionHistory_${startDateStr}_${endDateStr}`;
 
       const cachedData = getCacheWithValidation(cacheKey);
       if (cachedData) {
@@ -1209,26 +1267,51 @@ export const aksesorisSaleHandler = {
         return;
       }
 
-      // ✅ Query dari stokAksesorisTransaksi dengan filter jenis stockAddition
+      // ✅ Query semua data stockAddition, filter by tanggal string di client-side
       const transactionsRef = collection(firestore, "stokAksesorisTransaksi");
-      const q = query(
-        transactionsRef,
-        where("jenis", "==", "stockAddition"),
-        where("timestamp", ">=", Timestamp.fromDate(startDate)),
-        where("timestamp", "<=", Timestamp.fromDate(endDate)),
-        orderBy("timestamp", "desc"),
-      );
+      const q = query(transactionsRef, where("jenis", "==", "stockAddition"), orderBy("timestamp", "desc"));
 
       const snapshot = await getDocs(q);
       const historyData = [];
 
+      // Helper function untuk compare tanggal string (dd/mm/yyyy)
+      const isDateInRange = (dateStr, startStr, endStr) => {
+        if (!dateStr || dateStr === "-") return false;
+
+        // Normalize input tanggal juga
+        const normalizedDate = normalizeDate(dateStr);
+
+        // Convert dd/mm/yyyy → yyyymmdd untuk comparison
+        const toComparable = (str) => {
+          const parts = str.split("/");
+          if (parts.length !== 3) return "";
+          // parts sudah normalized, tapi tetap pastikan
+          const d = parts[0].padStart(2, "0");
+          const m = parts[1].padStart(2, "0");
+          const y = parts[2];
+          return y + m + d;
+        };
+
+        const date = toComparable(normalizedDate);
+        const start = toComparable(startStr);
+        const end = toComparable(endStr);
+
+        return date && start && end && date >= start && date <= end;
+      };
+
       snapshot.forEach((doc) => {
         const data = doc.data();
+
+        // ✅ Filter by tanggal string - zero timezone issues!
+        if (!isDateInRange(data.tanggal, startDateStr, endDateStr)) {
+          return; // Skip data di luar range
+        }
 
         // Determine kategori untuk jenisText
         let jenisText = "Lainnya";
         if (data.kategori === "kotak") jenisText = "Kotak";
         else if (data.kategori === "aksesoris") jenisText = "Aksesoris";
+        else if (data.kategori === "silver") jenisText = "Silver";
 
         historyData.push({
           id: doc.id,
@@ -1456,7 +1539,8 @@ export const aksesorisSaleHandler = {
 
   async loadKodeBarang(kategori) {
     try {
-      const tableId = kategori === "kotak" ? "tableKodeKotak" : kategori === "aksesoris" ? "tableKodeAksesoris" : "";
+      const tableId =
+        kategori === "kotak" ? "tableKodeKotak" : kategori === "aksesoris" ? "tableKodeAksesoris" : "tableKodeSilver";
       const tableBody = document.querySelector(`#${tableId} tbody`);
 
       if (!tableBody) {
@@ -1481,12 +1565,21 @@ export const aksesorisSaleHandler = {
 
       snapshot.forEach((doc) => {
         const data = doc.data();
-        kodeData.push({
+        const item = {
           id: doc.id,
           text: data.text,
           nama: data.nama,
-          harga: data.harga || 0, // ✅ Tambahkan field harga
-        });
+        };
+        // Tambahkan field harga untuk kotak
+        if (kategori === "kotak") {
+          item.harga = data.harga || 0;
+        }
+        // Tambahkan field kadar & berat untuk silver
+        if (kategori === "silver") {
+          item.kadar = data.kadar || 0;
+          item.berat = data.berat || 0;
+        }
+        kodeData.push(item);
       });
 
       // Debug: Log data untuk memastikan harga dimuat
@@ -1496,7 +1589,8 @@ export const aksesorisSaleHandler = {
       this.renderKodeBarangTable(tableBody, kodeData, kategori);
     } catch (error) {
       console.error("Error loading kode barang:", error);
-      const tableId = kategori === "kotak" ? "tableKodeKotak" : kategori === "aksesoris" ? "tableKodeAksesoris" : "";
+      const tableId =
+        kategori === "kotak" ? "tableKodeKotak" : kategori === "aksesoris" ? "tableKodeAksesoris" : "tableKodeSilver";
       const tableBody = document.querySelector(`#${tableId} tbody`);
       if (tableBody) {
         tableBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Error: ${error.message}</td></tr>`;
@@ -1510,8 +1604,7 @@ export const aksesorisSaleHandler = {
     let no = 1;
 
     kodeData.forEach((item) => {
-      // 🔥 PERBAIKAN: Hanya tampilkan "-" jika harga benar-benar tidak ada (undefined/null)
-      // Jika harga = 0, tetap tampilkan Rp 0
+      // Column untuk harga (hanya kotak)
       const hargaColumn =
         kategori === "kotak"
           ? `<td>${
@@ -1521,10 +1614,14 @@ export const aksesorisSaleHandler = {
             }</td>`
           : "";
 
-      // Debug log per item
-      if (kategori === "kotak") {
-        console.log(`Item ${item.text}: harga =`, item.harga);
-      }
+      // Columns untuk kadar & berat (hanya silver)
+      const kadarBeratColumns =
+        kategori === "silver"
+          ? `
+          <td class="text-center">${item.kadar || "-"}</td>
+          <td class="text-center">${item.berat ? `${item.berat} gr` : "-"}</td>
+        `
+          : "";
 
       html += `
         <tr>
@@ -1532,6 +1629,7 @@ export const aksesorisSaleHandler = {
           <td>${item.text}</td>
           <td>${item.nama}</td>
           ${hargaColumn}
+          ${kadarBeratColumns}
           <td>
             <button class="btn btn-warning btn-sm me-1 btn-edit" data-id="${item.id}">
               <i class="fas fa-edit"></i>
@@ -1572,10 +1670,20 @@ export const aksesorisSaleHandler = {
     document.getElementById("kategoriKode").value = kategori;
     const modalTitle = document.getElementById("modalFormKodeLabel");
     const hargaContainer = document.getElementById("hargaKodeContainer");
+    const kadarContainer = document.getElementById("kadarKodeContainer");
+    const beratContainer = document.getElementById("beratKodeContainer");
 
     // Tampilkan input harga hanya untuk kategori kotak
     if (hargaContainer) {
       hargaContainer.style.display = kategori === "kotak" ? "block" : "none";
+    }
+
+    // Tampilkan input kadar & berat hanya untuk silver
+    if (kadarContainer) {
+      kadarContainer.style.display = kategori === "silver" ? "block" : "none";
+    }
+    if (beratContainer) {
+      beratContainer.style.display = kategori === "silver" ? "block" : "none";
     }
 
     if (modalTitle) {
@@ -1610,6 +1718,15 @@ export const aksesorisSaleHandler = {
       data.harga = parseInt(harga) || 0;
     }
 
+    // Tambahkan field kadar & berat untuk kategori silver
+    if (kategori === "silver") {
+      const kadar = document.getElementById("kadarKode").value;
+      const berat = document.getElementById("beratKode").value;
+
+      data.kadar = parseInt(kadar) || 0;
+      data.berat = parseFloat(berat) || 0;
+    }
+
     try {
       if (docId) {
         await this.updateKodeBarang(docId, kategori, data);
@@ -1631,7 +1748,8 @@ export const aksesorisSaleHandler = {
       if (
         selectKategori &&
         ((selectKategori.value === "1" && kategori === "kotak") ||
-          (selectKategori.value === "2" && kategori === "aksesoris"))
+          (selectKategori.value === "2" && kategori === "aksesoris") ||
+          (selectKategori.value === "3" && kategori === "silver"))
       ) {
         const tbody = document.querySelector("#tableTambahAksesoris tbody");
         this.handleCategoryChange(selectKategori.value, tbody);
@@ -1646,6 +1764,7 @@ export const aksesorisSaleHandler = {
   validateKodeBarangForm() {
     const textKode = document.getElementById("textKode");
     const namaKode = document.getElementById("namaKode");
+    const kategori = document.getElementById("kategoriKode").value;
 
     if (!textKode || !namaKode) {
       console.error("Form elements not found");
@@ -1657,8 +1776,26 @@ export const aksesorisSaleHandler = {
     const nama = namaKode.value;
 
     if (!text || !nama) {
-      this.showErrorNotification("Semua field harus diisi!");
+      this.showErrorNotification("Kode dan Nama harus diisi!");
       return false;
+    }
+
+    // Validasi khusus untuk silver
+    if (kategori === "silver") {
+      const kadarKode = document.getElementById("kadarKode");
+      const beratKode = document.getElementById("beratKode");
+
+      if (!kadarKode.value) {
+        this.showErrorNotification("Kadar harus diisi untuk kategori Silver!");
+        kadarKode.focus();
+        return false;
+      }
+
+      if (!beratKode.value || parseFloat(beratKode.value) <= 0) {
+        this.showErrorNotification("Berat harus diisi dan lebih dari 0 untuk kategori Silver!");
+        beratKode.focus();
+        return false;
+      }
     }
 
     return true;
@@ -1679,6 +1816,12 @@ export const aksesorisSaleHandler = {
       // ✅ Sync harga untuk kategori kotak
       if (kategori === "kotak" && data.harga !== undefined) {
         stokData.harga = parseInt(data.harga) || 0;
+      }
+
+      // ✅ Sync kadar & berat untuk kategori silver
+      if (kategori === "silver") {
+        stokData.kadar = parseInt(data.kadar) || 0;
+        stokData.berat = parseFloat(data.berat) || 0;
       }
 
       await addDoc(collection(firestore, "stokAksesoris"), stokData);
@@ -1711,6 +1854,12 @@ export const aksesorisSaleHandler = {
         // ✅ Sync harga untuk kategori kotak
         if (kategori === "kotak" && data.harga !== undefined) {
           updateData.harga = parseInt(data.harga) || 0;
+        }
+
+        // ✅ Sync kadar & berat untuk kategori silver
+        if (kategori === "silver") {
+          updateData.kadar = parseInt(data.kadar) || 0;
+          updateData.berat = parseFloat(data.berat) || 0;
         }
 
         const stockDocRef = doc(firestore, "stokAksesoris", stockSnapshot.docs[0].id);

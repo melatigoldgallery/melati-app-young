@@ -216,6 +216,35 @@
         font-size: 0.875em;
         color: #dc3545;
       }
+
+      /* Print Service Status Indicator */
+      .print-service-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin-left: 1rem;
+        transition: all 0.3s ease;
+      }
+
+      .print-service-status.online {
+        background-color: #d1e7dd;
+        color: #0f5132;
+        border: 1px solid #badbcc;
+      }
+
+      .print-service-status.offline {
+        background-color: #fff3cd;
+        color: #997404;
+        border: 1px solid #ffe69c;
+      }
+
+      .print-service-status i {
+        font-size: 1rem;
+      }
     </style>
     <title>Penjualan - Melati Gold Shop</title>
   </head>
@@ -274,6 +303,13 @@
             </nav>
           </div>
 
+          <!-- Print Service Status Indicator -->
+          <div id="printServiceStatus" class="alert alert-dismissible fade show" role="alert" style="display: none">
+            <i class="fas fa-print me-2"></i>
+            <span id="printServiceStatusText"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+
           <div class="content-wrapper">
             <!-- Form Penjualan -->
             <div class="card mb-4">
@@ -303,6 +339,7 @@
                     <select class="form-select" id="jenisPenjualan">
                       <option value="aksesoris" selected>Aksesoris</option>
                       <option value="kotak">Kotak</option>
+                      <option value="silver">Silver</option>
                       <option value="manual">Penjualan Manual</option>
                     </select>
                   </div>
@@ -392,6 +429,34 @@
                       <tr>
                         <th colspan="6" class="text-end">Total:</th>
                         <th id="grand-total-aksesoris">0</th>
+                        <th></th>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                <!-- Tabel untuk Silver -->
+                <div class="table-responsive" id="silverTableContainer" style="display: none">
+                  <table class="table table-hover" id="tableSilverDetail">
+                    <thead class="table-light">
+                      <tr>
+                        <th style="width: 10%">Barcode</th>
+                        <th style="width: 35%">Nama Barang</th>
+                        <th style="width: 10%">Jumlah</th>
+                        <th style="width: 10%">Kadar</th>
+                        <th style="width: 10%">Berat</th>
+                        <th style="width: 15%">Harga Per Gram</th>
+                        <th style="width: 15%">Total Harga</th>
+                        <th style="width: 5%">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <!-- Baris akan ditambahkan oleh JavaScript -->
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <th colspan="6" class="text-end">Total:</th>
+                        <th id="grand-total-silver">0</th>
                         <th></th>
                       </tr>
                     </tfoot>
@@ -719,6 +784,79 @@
       </div>
     </div>
 
+    <!-- Modal Pilih Silver -->
+    <div
+      class="modal fade"
+      id="modalPilihSilver"
+      tabindex="-1"
+      aria-labelledby="modalPilihSilverLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+          <div class="modal-header bg-info text-white">
+            <h5 class="modal-title" id="modalPilihSilverLabel">
+              <i class="fas fa-coins me-2"></i>
+              Pilih Silver
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <div class="input-group">
+                  <span class="input-group-text bg-light">
+                    <i class="fas fa-search"></i>
+                  </span>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="searchSilver"
+                    placeholder="Cari kode atau nama silver..."
+                  />
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="d-flex align-items-center text-muted">
+                  <i class="fas fa-info-circle me-2"></i>
+                  <small>Klik pada baris untuk memilih silver</small>
+                </div>
+              </div>
+            </div>
+            <div class="table-responsive" style="max-height: 450px">
+              <table class="table table-hover table-striped" id="tableSilver">
+                <thead class="table-dark sticky-top">
+                  <tr>
+                    <th style="width: 20%">
+                      <i class="fas fa-barcode me-2"></i>
+                      Kode
+                    </th>
+                    <th style="width: 60%">
+                      <i class="fas fa-coins me-2"></i>
+                      Nama Silver
+                    </th>
+                    <th style="width: 20%" class="text-end">
+                      <i class="fas fa-box me-2"></i>
+                      Stok
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Data silver akan ditampilkan di sini -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              <i class="fas fa-times me-2"></i>
+              Tutup
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Print Modal -->
     <div class="modal fade" id="printModal" tabindex="-1" aria-labelledby="printModalLabel" aria-hidden="true">
       <div class="modal-dialog">
@@ -747,7 +885,8 @@
       </div>
     </div>
     <script src="js/sidebar-loader.js"></script>
-    <script src="js/staffHelper.js"></script>
+    <script src="js/pages/staffHelper.js"></script>
+    <script src="js/services/print-service.js"></script>
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/penjualanAksesoris.js"></script>
   </body>
