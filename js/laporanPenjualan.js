@@ -1349,7 +1349,7 @@ const laporanPenjualanHandler = {
     const wsData = [];
 
     // Header
-    wsData.push(["LAPORAN PENJUALAN MELATI BAWAH"]);
+    wsData.push(["LAPORAN PENJUALAN MELATI ATAS"]);
     wsData.push([jenisLabel]);
     wsData.push([`${startDate} - ${endDate}`]);
     wsData.push([]);
@@ -1439,7 +1439,7 @@ const laporanPenjualanHandler = {
     const wsData = [];
 
     // Header
-    wsData.push(["LAPORAN PENJUALAN DETAIL - MELATI BAWAH"]);
+    wsData.push(["LAPORAN PENJUALAN DETAIL - MELATI ATAS"]);
     wsData.push([jenisLabel]);
     wsData.push([`${startDate} - ${endDate}`]);
     wsData.push([]);
@@ -1613,7 +1613,7 @@ const laporanPenjualanHandler = {
     // Header
     doc.setFontSize(16);
     doc.setFont(undefined, "bold");
-    doc.text("LAPORAN PENJUALAN MELATI BAWAH", 148.5, 15, { align: "center" });
+    doc.text("LAPORAN PENJUALAN MELATI ATAS", 148.5, 15, { align: "center" });
 
     doc.setFontSize(12);
     doc.text(jenisLabel, 148.5, 22, { align: "center" });
@@ -1758,7 +1758,7 @@ const laporanPenjualanHandler = {
     // Header
     doc.setFontSize(16);
     doc.setFont(undefined, "bold");
-    doc.text("LAPORAN PENJUALAN DETAIL - MELATI BAWAH", 148.5, 12, { align: "center" });
+    doc.text("LAPORAN PENJUALAN DETAIL - MELATI ATAS", 148.5, 12, { align: "center" });
 
     doc.setFontSize(12);
     doc.text(jenisLabel, 148.5, 19, { align: "center" });
@@ -1880,7 +1880,7 @@ const laporanPenjualanHandler = {
     // Header dengan range
     doc.setFontSize(16);
     doc.setFont(undefined, "bold");
-    doc.text("LAPORAN PENJUALAN DETAIL - MELATI BAWAH", 148.5, 12, { align: "center" });
+    doc.text("LAPORAN PENJUALAN DETAIL - MELATI ATAS", 148.5, 12, { align: "center" });
 
     doc.setFontSize(12);
     doc.text(jenisLabel, 148.5, 19, { align: "center" });
