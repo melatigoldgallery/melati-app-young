@@ -793,11 +793,21 @@
               return match ? match[1] : null;
             };
 
+            const showSearchNotice = (message, isError = false) => {
+              const list = document.getElementById("searchResultsList");
+              const container = document.getElementById("searchResults");
+              if (!list || !container) return;
+
+              list.innerHTML = `<div style="padding:10px;border-radius:4px;background:${isError ? "#fff3f3" : "#f8f9fa"};color:${isError ? "#842029" : "#495057"};font-size:11px;line-height:1.4">${message}</div>`;
+              container.style.display = "block";
+            };
+
             // Search YouTube videos by query
             const searchYouTube = async (query) => {
               if (!YOUTUBE_CONFIG?.apiKey || YOUTUBE_CONFIG.apiKey === "YOUR_API_KEY_HERE") {
-                alert(
-                  "⚠️ Setup API Key dulu!\n\nEdit: js/youtube-config.js\nDapatkan gratis: console.cloud.google.com",
+                showSearchNotice(
+                  "API key belum diatur. Anda tetap bisa memutar video dengan paste URL YouTube atau Video ID (11 karakter).",
+                  true,
                 );
                 return null;
               }
@@ -805,11 +815,33 @@
               try {
                 const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=${YOUTUBE_CONFIG.maxSearchResults}&key=${YOUTUBE_CONFIG.apiKey}`;
                 const res = await fetch(url);
-                if (!res.ok) throw new Error("API error");
+                if (!res.ok) {
+                  let detailText = "";
+                  try {
+                    const errorJson = await res.json();
+                    detailText = errorJson?.error?.message || "";
+                  } catch (parseErr) {}
+
+                  const error = new Error(detailText || `HTTP ${res.status}: YouTube API request failed`);
+                  error.status = res.status;
+                  throw error;
+                }
                 return (await res.json()).items;
               } catch (err) {
                 console.error("Search failed:", err);
-                alert("Pencarian gagal. Cek API Key & koneksi internet.");
+                const is403 = err?.status === 403 || /403|forbidden|quota|referer/i.test(String(err?.message));
+
+                if (is403) {
+                  showSearchNotice(
+                    "Pencarian teks diblokir (403). Biasanya karena YouTube Data API belum aktif, quota habis, atau HTTP referrer belum diizinkan. Solusi cepat: paste URL/ID video untuk diputar langsung.",
+                    true,
+                  );
+                } else {
+                  showSearchNotice(
+                    "Pencarian gagal. Cek koneksi internet, API key, dan konfigurasi YouTube Data API v3.",
+                    true,
+                  );
+                }
                 return null;
               }
             };
@@ -903,6 +935,8 @@
               const handleSearch = async () => {
                 const query = queryInput?.value.trim();
                 if (!query) return alert("Masukkan judul atau URL");
+
+                results.style.display = "none";
 
                 const videoId = extractVideoId(query);
                 if (videoId) return loadVideoById(videoId);
