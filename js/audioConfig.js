@@ -4,6 +4,3 @@ export const AUDIO_PATHS = {
   informasiEnd: "audio/informasiEnd.mp3",
   notifOn: "audio/notifOn.mp3",
 };
-
-// Re-export primeAudioPlayback from audioHandlers
-export { primeAudioPlayback } from "./audioHandlers.js";

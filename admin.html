@@ -575,7 +575,7 @@
             <div
               style="
                 padding: 8px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: linear-gradient(135deg, #2e2c16 0%, #ebe703 100%);
                 color: white;
                 display: flex;
                 justify-content: space-between;
@@ -650,8 +650,8 @@
 
           <!-- YouTube IFrame API -->
           <script>
-            let YOUTUBE_CONFIG = null;
-            const FALLBACK_CONFIG = {
+            // YouTube Configuration (inline)
+            const YOUTUBE_CONFIG = {
               apiKey: "AIzaSyBnxHJL4vsbnXqLDHHSAZdv1cTrJ6ciYzM",
               defaultVideoId: "JdqL89ZZwFw",
               defaultVolume: 50,
@@ -659,20 +659,95 @@
               maxSearchResults: 5,
             };
 
-            // Load config from external file or use fallback
-            import("./js/youtube-config.js")
-              .then((module) => {
-                YOUTUBE_CONFIG = module.YOUTUBE_CONFIG;
-                console.log("✅ YouTube config loaded from file");
-              })
-              .catch((err) => {
-                console.warn("⚠️ youtube-config.js not found, using fallback config");
-                YOUTUBE_CONFIG = FALLBACK_CONFIG;
+            // YouTube Volume Controller (inline)
+            class YouTubeVolumeController {
+              constructor() {
+                this.player = null;
+                this.originalVolume = YOUTUBE_CONFIG.defaultVolume;
+                this.reducedVolume = YOUTUBE_CONFIG.reducedVolume;
+                this.isReady = false;
+                this.isFading = false;
+                this.fadeInterval = null;
+              }
 
-                if (YOUTUBE_CONFIG.apiKey === "YOUR_API_KEY_HERE") {
-                  console.error("❌ API Key belum diatur! Edit FALLBACK_CONFIG di admin.html");
+              setPlayer(player) {
+                this.player = player;
+                this.isReady = true;
+              }
+
+              async fadeVolume(targetVolume, duration = 1000) {
+                if (!this.player || !this.isReady || this.isFading) {
+                  return;
                 }
-              });
+
+                return new Promise((resolve) => {
+                  this.isFading = true;
+                  const currentVolume = this.player.getVolume();
+                  const volumeDiff = targetVolume - currentVolume;
+                  const steps = 30;
+                  const stepDuration = duration / steps;
+                  const stepSize = volumeDiff / steps;
+
+                  let currentStep = 0;
+
+                  this.fadeInterval = setInterval(() => {
+                    currentStep++;
+
+                    if (currentStep >= steps) {
+                      this.player.setVolume(targetVolume);
+                      clearInterval(this.fadeInterval);
+                      this.isFading = false;
+                      resolve();
+                    } else {
+                      const newVolume = currentVolume + stepSize * currentStep;
+                      this.player.setVolume(Math.round(newVolume));
+                    }
+                  }, stepDuration);
+                });
+              }
+
+              async reduceVolume(fadeDuration = 1000) {
+                if (!this.player || !this.isReady) {
+                  console.warn("⚠️ YouTube player not ready");
+                  return;
+                }
+
+                try {
+                  this.originalVolume = this.player.getVolume();
+                  await this.fadeVolume(this.reducedVolume, fadeDuration);
+                } catch (error) {
+                  console.error("Error reducing YouTube volume:", error);
+                }
+              }
+
+              async restoreVolume(fadeDuration = 1500) {
+                if (!this.player || !this.isReady) {
+                  return;
+                }
+
+                try {
+                  await this.fadeVolume(this.originalVolume, fadeDuration);
+                } catch (error) {
+                  console.error("Error restoring YouTube volume:", error);
+                }
+              }
+
+              isPlayerReady() {
+                return this.isReady && this.player !== null;
+              }
+
+              stopFade() {
+                if (this.fadeInterval) {
+                  clearInterval(this.fadeInterval);
+                  this.fadeInterval = null;
+                  this.isFading = false;
+                }
+              }
+            }
+
+            // Create global instance and expose to window
+            const youtubeController = new YouTubeVolumeController();
+            window.youtubeController = youtubeController;
 
             // Load YouTube IFrame API
             const tag = document.createElement("script");
@@ -685,37 +760,28 @@
 
             // YouTube ready callback
             window.onYouTubeIframeAPIReady = function () {
-              // Wait for config to load
-              const checkConfig = setInterval(() => {
-                if (YOUTUBE_CONFIG) {
-                  clearInterval(checkConfig);
-                  ytPlayer = new YT.Player("youtube-player", {
-                    height: "300",
-                    width: "520",
-                    videoId: YOUTUBE_CONFIG.defaultVideoId,
-                    playerVars: {
-                      autoplay: 1,
-                      loop: 1,
-                      playlist: YOUTUBE_CONFIG.defaultVideoId,
-                      controls: 1,
-                      modestbranding: 1,
-                      rel: 0,
-                    },
-                    events: {
-                      onReady: (e) => {
-                        e.target.setVolume(YOUTUBE_CONFIG.defaultVolume);
-                        import("./js/youtubeController.js").then((m) => {
-                          m.youtubeController.setPlayer(ytPlayer);
-                          console.log("✅ YouTube player ready");
-                        });
-                      },
-                      onStateChange: (e) => {
-                        if (e.data == YT.PlayerState.ENDED) e.target.playVideo();
-                      },
-                    },
-                  });
-                }
-              }, 100);
+              ytPlayer = new YT.Player("youtube-player", {
+                height: "300",
+                width: "520",
+                videoId: YOUTUBE_CONFIG.defaultVideoId,
+                playerVars: {
+                  autoplay: 1,
+                  loop: 1,
+                  playlist: YOUTUBE_CONFIG.defaultVideoId,
+                  controls: 1,
+                  modestbranding: 1,
+                  rel: 0,
+                },
+                events: {
+                  onReady: (e) => {
+                    e.target.setVolume(YOUTUBE_CONFIG.defaultVolume);
+                    youtubeController.setPlayer(ytPlayer);
+                  },
+                  onStateChange: (e) => {
+                    if (e.data == YT.PlayerState.ENDED) e.target.playVideo();
+                  },
+                },
+              });
             };
 
             // Extract YouTube Video ID from URL
@@ -860,9 +926,8 @@
           </script>
 
           <!-- Closing Announcement Script -->
-          <script type="module">
-            import { playClosingAnnouncement, primeAudioPlayback } from "./js/audioHandlers.js";
-
+          <script>
+            // Closing announcement scheduling (uses functions from audioHandlers.js via melati.js)
             const MESSAGE =
               "Kepada pelanggan Melati, kami informasikan, toko akan tutup pada jam 9 malam. Silakan melanjutkan berbelanja dan kami akan membantu hingga selesai. Terima kasih atas perhatiannya";
 
@@ -880,6 +945,12 @@
             };
 
             async function triggerAutoForSlot(targetHour, targetMinute, repeatCount = 1) {
+              // Wait for playClosingAnnouncement to be available from melati.js
+              if (!window.playClosingAnnouncement) {
+                console.warn("playClosingAnnouncement not available yet");
+                return;
+              }
+
               const slotKey = makeSlotKey(new Date(), targetHour, targetMinute);
               if (lastAutoRunSlot === slotKey) return;
               if (localStorage.getItem(AUTO_RUN_STORAGE_KEY) === slotKey) {
@@ -891,7 +962,7 @@
               } catch (e) {}
               lastAutoRunSlot = slotKey;
               for (let i = 0; i < repeatCount; i++) {
-                await playClosingAnnouncement(MESSAGE);
+                await window.playClosingAnnouncement(MESSAGE);
                 if (i < repeatCount - 1) {
                   await new Promise((r) => setTimeout(r, 1000));
                 }
@@ -937,11 +1008,21 @@
             document.addEventListener("DOMContentLoaded", () => {
               scheduleDailyCheck();
               const btn = document.getElementById("announceClosingNow");
-              if (btn) btn.addEventListener("click", () => playClosingAnnouncement(MESSAGE));
+              if (btn) {
+                btn.addEventListener("click", () => {
+                  if (window.playClosingAnnouncement) {
+                    window.playClosingAnnouncement(MESSAGE);
+                  } else {
+                    console.warn("playClosingAnnouncement not available yet");
+                  }
+                });
+              }
 
               const unlock = () => {
                 try {
-                  primeAudioPlayback();
+                  if (window.primeAudioPlayback) {
+                    window.primeAudioPlayback();
+                  }
                 } catch (e) {}
                 window.removeEventListener("click", unlock);
                 window.removeEventListener("keydown", unlock);

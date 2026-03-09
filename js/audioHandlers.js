@@ -1,5 +1,12 @@
 import { AUDIO_PATHS } from "./audioConfig.js";
-import { youtubeController } from "./youtubeController.js";
+
+// Use global youtubeController from window (set in admin.html inline script)
+const getYoutubeController = () =>
+  window.youtubeController || {
+    reduceVolume: async () => console.warn("YouTube controller not available"),
+    restoreVolume: async () => console.warn("YouTube controller not available"),
+    isPlayerReady: () => false,
+  };
 
 let isAudioPlaying = false;
 let audioCtx = null;
@@ -61,7 +68,7 @@ export async function playWaitMessageSequence() {
     isAudioPlaying = true;
 
     // Kecilkan volume YouTube
-    await youtubeController.reduceVolume();
+    await getYoutubeController().reduceVolume();
 
     await playAudio(AUDIO_PATHS.informasi);
 
@@ -72,13 +79,13 @@ export async function playWaitMessageSequence() {
     await playAudio(AUDIO_PATHS.informasiEnd);
 
     // Kembalikan volume YouTube
-    await youtubeController.restoreVolume();
+    await getYoutubeController().restoreVolume();
 
     isAudioPlaying = false;
     return true;
   } catch (error) {
     console.error("Error playing wait message:", error);
-    await youtubeController.restoreVolume();
+    await getYoutubeController().restoreVolume();
     isAudioPlaying = false;
     return false;
   }
@@ -91,7 +98,7 @@ export async function playTakeQueueMessage() {
     isAudioPlaying = true;
 
     // Kecilkan volume YouTube
-    await youtubeController.reduceVolume();
+    await getYoutubeController().reduceVolume();
 
     await playAudio(AUDIO_PATHS.informasi);
     const message =
@@ -101,13 +108,13 @@ export async function playTakeQueueMessage() {
     await playAudio(AUDIO_PATHS.informasiEnd);
 
     // Kembalikan volume YouTube
-    await youtubeController.restoreVolume();
+    await getYoutubeController().restoreVolume();
 
     isAudioPlaying = false;
     return true;
   } catch (error) {
     console.error("Error playing take queue message:", error);
-    await youtubeController.restoreVolume();
+    await getYoutubeController().restoreVolume();
     isAudioPlaying = false;
     return false;
   }
@@ -120,7 +127,7 @@ export async function announceQueueNumber(queueNumber) {
     isAudioPlaying = true;
 
     // Kecilkan volume YouTube
-    await youtubeController.reduceVolume();
+    await getYoutubeController().reduceVolume();
 
     const letter = queueNumber.charAt(0);
     const numbers = queueNumber.substring(1);
@@ -129,13 +136,13 @@ export async function announceQueueNumber(queueNumber) {
     await speak(text);
 
     // Kembalikan volume YouTube
-    await youtubeController.restoreVolume();
+    await getYoutubeController().restoreVolume();
 
     isAudioPlaying = false;
     return true;
   } catch (error) {
     console.error("Error announcing queue number:", error);
-    await youtubeController.restoreVolume();
+    await getYoutubeController().restoreVolume();
     isAudioPlaying = false;
     return false;
   }
@@ -148,7 +155,7 @@ export async function playQueueAnnouncement(queueNumber) {
     isAudioPlaying = true;
 
     // Kecilkan volume YouTube
-    await youtubeController.reduceVolume();
+    await getYoutubeController().reduceVolume();
 
     const letter = queueNumber.charAt(0);
     const numbers = queueNumber.substring(1);
@@ -187,13 +194,13 @@ export async function playQueueAnnouncement(queueNumber) {
     });
 
     // Kembalikan volume YouTube
-    await youtubeController.restoreVolume();
+    await getYoutubeController().restoreVolume();
 
     isAudioPlaying = false;
     return true;
   } catch (error) {
     console.error("Error announcing queue:", error);
-    await youtubeController.restoreVolume();
+    await getYoutubeController().restoreVolume();
     isAudioPlaying = false;
     return false;
   }
@@ -206,7 +213,7 @@ export async function announceVehicleMessage(carType, plateNumber, vehicleColor 
     isAudioPlaying = true;
 
     // Kecilkan volume YouTube
-    await youtubeController.reduceVolume();
+    await getYoutubeController().reduceVolume();
 
     await playAudio(AUDIO_PATHS.informasi);
 
@@ -218,13 +225,13 @@ export async function announceVehicleMessage(carType, plateNumber, vehicleColor 
     await playAudio(AUDIO_PATHS.informasiEnd);
 
     // Kembalikan volume YouTube
-    await youtubeController.restoreVolume();
+    await getYoutubeController().restoreVolume();
 
     isAudioPlaying = false;
     return true;
   } catch (error) {
     console.error("Error announcing vehicle message:", error);
-    await youtubeController.restoreVolume();
+    await getYoutubeController().restoreVolume();
     isAudioPlaying = false;
     return false;
   }
@@ -275,7 +282,7 @@ export async function playClosingAnnouncement(message, infoBoxId = "infoBox") {
     isAudioPlaying = true;
 
     // Kecilkan volume YouTube
-    await youtubeController.reduceVolume();
+    await getYoutubeController().reduceVolume();
 
     await playAudio(AUDIO_PATHS.informasi);
 
@@ -284,13 +291,13 @@ export async function playClosingAnnouncement(message, infoBoxId = "infoBox") {
     await playAudio(AUDIO_PATHS.informasiEnd);
 
     // Kembalikan volume YouTube
-    await youtubeController.restoreVolume();
+    await getYoutubeController().restoreVolume();
 
     isAudioPlaying = false;
     return true;
   } catch (error) {
     console.error("Error playing closing announcement:", error);
-    await youtubeController.restoreVolume();
+    await getYoutubeController().restoreVolume();
     isAudioPlaying = false;
     return false;
   }
@@ -320,3 +327,9 @@ export async function playClosingAnnouncement(message, infoBoxId = "infoBox") {
     }
   });
 })();
+
+// Expose functions to window for non-module scripts (e.g., admin.html closing announcement)
+if (typeof window !== "undefined") {
+  window.playClosingAnnouncement = playClosingAnnouncement;
+  window.primeAudioPlayback = primeAudioPlayback;
+}
