@@ -650,20 +650,28 @@
 
           <!-- YouTube IFrame API -->
           <script>
-            // Import YouTube config
             let YOUTUBE_CONFIG = null;
+            const FALLBACK_CONFIG = {
+              apiKey: "AIzaSyBnxHJL4vsbnXqLDHHSAZdv1cTrJ6ciYzM",
+              defaultVideoId: "JdqL89ZZwFw",
+              defaultVolume: 50,
+              reducedVolume: 10,
+              maxSearchResults: 5,
+            };
 
-            // Load config
+            // Load config from external file or use fallback
             import("./js/youtube-config.js")
               .then((module) => {
                 YOUTUBE_CONFIG = module.YOUTUBE_CONFIG;
-                console.log("✅ YouTube config loaded");
+                console.log("✅ YouTube config loaded from file");
               })
               .catch((err) => {
-                console.error("❌ YouTube config not found. Copy youtube-config.example.js to youtube-config.js");
-                alert(
-                  "Setup Required:\n1. Copy js/youtube-config.example.js\n2. Rename to youtube-config.js\n3. Add your API Key",
-                );
+                console.warn("⚠️ youtube-config.js not found, using fallback config");
+                YOUTUBE_CONFIG = FALLBACK_CONFIG;
+
+                if (YOUTUBE_CONFIG.apiKey === "YOUR_API_KEY_HERE") {
+                  console.error("❌ API Key belum diatur! Edit FALLBACK_CONFIG di admin.html");
+                }
               });
 
             // Load YouTube IFrame API
@@ -813,7 +821,7 @@
               // Toggle player
               toggle?.addEventListener("click", () => {
                 expanded = !expanded;
-                wrapper.style.maxHeight = expanded ? "200px" : "0px";
+                wrapper.style.maxHeight = expanded ? "300px" : "0px";
                 toggle.innerHTML = `<i class="fas fa-chevron-${expanded ? "down" : "up"}"></i>`;
               });
 
@@ -948,11 +956,8 @@
       </main>
     </div>
 
-    <!-- Load Sidebar -->
     <script src="js/sidebar-loader.js"></script>
-    <!-- Load Queue System -->
     <script type="module" src="js/melati.js"></script>
-    <!-- Load Main UI -->
     <script type="module" src="js/main.js"></script>
   </body>
 </html>
