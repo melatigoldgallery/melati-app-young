@@ -659,6 +659,89 @@
               maxSearchResults: 5,
             };
 
+            // Auto-Next Queue System
+            const autoNextState = {
+              playedIds: new Set(),
+              queue: [],
+              lastSearchQuery: "",
+              isSearching: false,
+            };
+
+            // Fetch next videos using YouTube Data API
+            async function fetchNextVideos(currentVideoId) {
+              if (autoNextState.isSearching) return;
+              autoNextState.isSearching = true;
+
+              try {
+                // Get current video title for better search
+                const infoUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${currentVideoId}&key=${YOUTUBE_CONFIG.apiKey}`;
+                const infoRes = await fetch(infoUrl);
+                let searchQuery = "background music instrumental";
+
+                if (infoRes.ok) {
+                  const infoData = await infoRes.json();
+                  if (infoData.items?.length > 0) {
+                    const title = infoData.items[0].snippet.title;
+                    // Use first few words of title as search query
+                    searchQuery =
+                      title
+                        .split(/[\-\|,\[\(]/)
+                        .map((s) => s.trim())
+                        .filter(Boolean)[0] || title;
+                    searchQuery = searchQuery.substring(0, 50);
+                  }
+                }
+
+                autoNextState.lastSearchQuery = searchQuery;
+
+                // Search for similar videos
+                const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(searchQuery)}&type=video&videoCategoryId=10&maxResults=10&key=${YOUTUBE_CONFIG.apiKey}`;
+                const searchRes = await fetch(searchUrl);
+
+                if (searchRes.ok) {
+                  const searchData = await searchRes.json();
+                  const newVideos = (searchData.items || [])
+                    .map((item) => item.id.videoId)
+                    .filter((id) => id && !autoNextState.playedIds.has(id));
+
+                  autoNextState.queue.push(...newVideos);
+                  console.log(`🎵 Queue updated: ${autoNextState.queue.length} videos`);
+                }
+              } catch (err) {
+                console.error("Auto-next fetch error:", err);
+              } finally {
+                autoNextState.isSearching = false;
+              }
+            }
+
+            // Play next video from queue
+            async function playNextVideo() {
+              // If queue is empty, fetch more
+              if (autoNextState.queue.length === 0) {
+                const currentUrl = ytPlayer?.getVideoUrl?.() || "";
+                const match = currentUrl.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+                const currentId = match ? match[1] : YOUTUBE_CONFIG.defaultVideoId;
+                await fetchNextVideos(currentId);
+              }
+
+              // Play next from queue
+              if (autoNextState.queue.length > 0) {
+                const nextId = autoNextState.queue.shift();
+                autoNextState.playedIds.add(nextId);
+                ytPlayer.loadVideoById({ videoId: nextId, startSeconds: 0 });
+                console.log(`▶️ Auto-next: playing ${nextId}`);
+
+                // Pre-fetch more if queue is low
+                if (autoNextState.queue.length <= 2) {
+                  fetchNextVideos(nextId);
+                }
+              } else {
+                // Fallback: replay current video
+                console.log("⚠️ Queue empty, replaying...");
+                ytPlayer.playVideo();
+              }
+            }
+
             // YouTube Volume Controller (inline)
             class YouTubeVolumeController {
               constructor() {
@@ -766,23 +849,98 @@
                 videoId: YOUTUBE_CONFIG.defaultVideoId,
                 playerVars: {
                   autoplay: 1,
-                  loop: 1,
-                  playlist: YOUTUBE_CONFIG.defaultVideoId,
                   controls: 1,
                   modestbranding: 1,
-                  rel: 0,
+                  rel: 1,
+                  enablejsapi: 1,
+                  origin: window.location.origin,
                 },
                 events: {
                   onReady: (e) => {
                     e.target.setVolume(YOUTUBE_CONFIG.defaultVolume);
                     youtubeController.setPlayer(ytPlayer);
+                    console.log("✅ YouTube Player Ready");
+
+                    // Track initial video
+                    autoNextState.playedIds.add(YOUTUBE_CONFIG.defaultVideoId);
+                    // Pre-fetch queue for auto-next
+                    fetchNextVideos(YOUTUBE_CONFIG.defaultVideoId);
+
+                    // Auto-skip ads when possible
+                    startAdSkipper();
                   },
                   onStateChange: (e) => {
-                    if (e.data == YT.PlayerState.ENDED) e.target.playVideo();
+                    // Monitor for ads and attempt to skip
+                    attemptSkipAd(e.target);
+
+                    // Auto-play next video when current video ends
+                    if (e.data === YT.PlayerState.ENDED) {
+                      console.log("🔄 Video ended, loading next...");
+                      playNextVideo();
+                    }
+                  },
+                  onError: (e) => {
+                    console.error("YouTube Player Error:", e.data);
+                    // Error codes:
+                    // 2 – Invalid parameter
+                    // 5 – HTML5 player error
+                    // 100 – Video not found or private
+                    // 101/150 – Video not available for embed
+                    if (e.data === 101 || e.data === 150) {
+                      alert("Video tidak bisa diputar di embed. Silakan pilih video lain.");
+                    }
                   },
                 },
               });
             };
+
+            // Auto-skip iklan (Limited: hanya skippable ads, non-skippable tetap muncul)
+            function startAdSkipper() {
+              setInterval(() => {
+                if (!ytPlayer) return;
+
+                try {
+                  // Attempt 1: Check player state
+                  const playerState = ytPlayer.getPlayerState();
+
+                  // Attempt 2: Try to access iframe and click skip button
+                  // Note: Ini mungkin blocked oleh CORS, tapi worth trying
+                  const iframe = document.querySelector("#youtube-player");
+                  if (iframe && iframe.contentWindow) {
+                    try {
+                      const skipButton = iframe.contentWindow.document.querySelector(
+                        ".ytp-ad-skip-button, .ytp-ad-skip-button-modern",
+                      );
+                      if (skipButton) {
+                        skipButton.click();
+                        console.log("✅ Iklan di-skip");
+                      }
+                    } catch (e) {
+                      // CORS blocked - expected
+                    }
+                  }
+                } catch (err) {
+                  // Silent fail
+                }
+              }, 1000);
+            }
+
+            function attemptSkipAd(player) {
+              try {
+                // Check if currently playing an ad
+                const duration = player.getDuration();
+                const currentTime = player.getCurrentTime();
+
+                // Try to detect and skip if possible
+                if (duration && currentTime >= 5) {
+                  // Ads typically allow skip after 5 seconds
+                  // This won't actually skip due to YouTube restrictions
+                  // but we monitor the state
+                }
+              } catch (err) {
+                // Silent fail
+              }
+            }
 
             // Extract YouTube Video ID from URL
             const extractVideoId = (input) => {
@@ -893,7 +1051,11 @@
             // Load video by ID
             const loadVideoById = (videoId) => {
               if (ytPlayer?.loadVideoById) {
-                ytPlayer.loadVideoById(videoId);
+                ytPlayer.loadVideoById({ videoId: videoId, startSeconds: 0 });
+                // Track and pre-fetch queue for auto-next
+                autoNextState.playedIds.add(videoId);
+                autoNextState.queue = [];
+                fetchNextVideos(videoId);
                 document.getElementById("youtube-search-input").style.display = "none";
                 document.getElementById("searchResults").style.display = "none";
                 document.getElementById("youtubeSearchQuery").value = "";
