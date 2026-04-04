@@ -192,10 +192,13 @@ export class QueueManager {
   updateMissedQueueDisplay() {
     const missedQueueDisplay = document.getElementById("missedQueueDisplay");
     if (missedQueueDisplay) {
-      if (this.missedQueue.length > 0) {
-        missedQueueDisplay.textContent = this.missedQueue.join(", ");
-      } else {
+      if (this.missedQueue.length === 0) {
         missedQueueDisplay.textContent = "-";
+      } else {
+        const MAX_SHOW = 2;
+        const visible = this.missedQueue.slice(0, MAX_SHOW).join(", ");
+        const remaining = this.missedQueue.length - MAX_SHOW;
+        missedQueueDisplay.textContent = remaining > 0 ? `${visible}, ...` : visible;
       }
     }
   }
