@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <link rel="stylesheet" href="css/pages/absensi-modern.css" />
     <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <title>Sistem Antrian - Melati Gold Young</title>
   </head>
   <body>
@@ -90,7 +91,7 @@
           </div>
 
           <div class="row d-flex justify-content-evenly">
-            <div class="col-md-4 mb-4">
+            <div class="col-md-3 mb-4">
               <div class="card queue-card">
                 <div class="card-header d-flex justify-content-center p-2">
                   <h6 class="card-title mb-0">
@@ -101,11 +102,31 @@
                 <div class="card-body">
                   <div class="queue-display" id="delayQueueNumber">-</div>
                   <div class="action-buttons">
-                    <button class="btn btn-outline-primary d-none" id="sequentialCallButton">
+                    <button class="btn btn-danger" id="moveToMissedButton">
+                      <i class="fas fa-exclamation-circle me-1"></i>
+                      Nomor Antrian Terlewat
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-3 mb-4">
+              <div class="card queue-card border-danger">
+                <div class="card-header d-flex justify-content-center p-2 bg-danger text-white">
+                  <h6 class="card-title mb-0 text-dark">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    Handle Antrian Terlewat
+                  </h6>
+                </div>
+                <div class="card-body">
+                  <div class="queue-display" id="missedQueueDisplay">-</div>
+                  <div class="action-buttons">
+                    <button class="btn btn-primary" id="callMissedButton">
                       <i class="fas fa-bullhorn"></i>
                       Panggil Nomor Antrian
                     </button>
-                    <button class="btn btn-outline-success text-dark" id="delayHandleButton">
+                    <button class="btn btn-success" id="missedHandleButton">
                       <i class="fas fa-check-circle"></i>
                       Sudah Dilayani
                     </button>
@@ -114,7 +135,7 @@
               </div>
             </div>
 
-            <div class="col-md-4 mb-4">
+            <div class="col-md-3 mb-4">
               <div class="card queue-card">
                 <div class="card-header d-flex justify-content-center p-2">
                   <h6 class="card-title mb-0">
@@ -125,27 +146,27 @@
                 <div class="card-body">
                   <div class="queue-display" id="queueNumber">-</div>
                   <div class="action-buttons">
-                    <button class="btn btn-outline-primary text-dark" id="callButton">
+                    <button class="btn btn-primary" id="callButton">
                       <i class="fas fa-bullhorn"></i>
                       Panggil Nomor Antrian
                     </button>
-                    <button class="btn btn-outline-success text-dark" id="handleButton">
+                    <button class="btn btn-success" id="handleButton">
                       <i class="fas fa-check-circle"></i>
                       Sudah Dilayani
                     </button>
-                    <button class="btn btn-outline-warning text-dark" id="skipQueueButton">
+                    <button class="btn btn-warning" id="skipQueueButton">
                       <i class="fas fa-forward"></i>
                       Skip Nomor Antrian
                     </button>
-                    <button class="btn btn-outline-secondary text-dark" id="delayQueueButton">
+                    <button class="btn btn-secondary" id="delayQueueButton">
                       <i class="fas fa-pause-circle"></i>
                       Nomor Antrian Tertunda
                     </button>
-                    <button class="btn btn-outline-primary text-dark" id="customQueueButton">
+                    <button class="btn btn-info" id="customQueueButton">
                       <i class="fas fa-step-forward"></i>
                       Custom Nomor Antrian
                     </button>
-                    <button class="btn btn-outline-danger text-dark" id="resetButton">
+                    <button class="btn btn-danger" id="resetButton">
                       <i class="fas fa-redo-alt"></i>
                       Reset Nomor Antrian
                     </button>
@@ -153,7 +174,7 @@
                 </div>
               </div>
             </div>
-            <div class="col-md-4 mb-4">
+            <div class="col-md-3 mb-4">
               <div class="card queue-card">
                 <div class="card-header d-flex justify-content-center p-2">
                   <h6 class="card-title mb-0">
@@ -192,7 +213,7 @@
             </div>
           </div>
 
-          <div class="card mb-4">
+          <div class="card mb-4 d-none">
             <div class="card-header">
               <h5 class="card-title mb-0">
                 <i class="fas fa-car me-2"></i>
@@ -521,6 +542,107 @@
             </div>
           </div>
 
+          <!-- Move to Missed Queue Modal -->
+          <div
+            class="modal fade"
+            id="moveToMissedModal"
+            tabindex="-1"
+            aria-labelledby="moveToMissedModalLabel"
+            aria-hidden="true"
+          >
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                  <h5 class="modal-title" id="moveToMissedModalLabel">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    Pindahkan ke Antrian Terlewat
+                  </h5>
+                  <button
+                    type="button"
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"
+                  ></button>
+                </div>
+                <div class="modal-body">
+                  <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span>Pilih nomor antrian tertunda yang akan dipindahkan ke daftar terlewat.</span>
+                  </div>
+                  <div class="form-group mb-3">
+                    <label for="moveToMissedSelect" class="form-label">Pilih nomor antrian:</label>
+                    <select
+                      class="form-select"
+                      id="moveToMissedSelect"
+                      aria-label="Pilih nomor antrian tertunda"
+                    ></select>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>
+                    Batal
+                  </button>
+                  <button type="button" class="btn btn-danger" id="confirmMoveToMissed">
+                    <i class="fas fa-check me-2"></i>
+                    Pindahkan
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Missed Handle Modal -->
+          <div
+            class="modal fade"
+            id="missedHandleModal"
+            tabindex="-1"
+            aria-labelledby="missedHandleModalLabel"
+            aria-hidden="true"
+          >
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                  <h5 class="modal-title" id="missedHandleModalLabel">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Konfirmasi Pelayanan Terlewat
+                  </h5>
+                  <button
+                    type="button"
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"
+                  ></button>
+                </div>
+                <div class="modal-body">
+                  <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span>Pilih nomor antrian terlewat yang sudah dilayani.</span>
+                  </div>
+                  <div class="form-group mb-3">
+                    <label for="missedHandleSelect" class="form-label">Pilih nomor antrian yang sudah dilayani:</label>
+                    <select
+                      class="form-select"
+                      id="missedHandleSelect"
+                      aria-label="Pilih nomor antrian terlewat"
+                    ></select>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>
+                    Batal
+                  </button>
+                  <button type="button" class="btn btn-success" id="confirmMissedHandle">
+                    <i class="fas fa-check me-2"></i>
+                    Selesai
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reset Confirmation Modal -->
           <div
             class="modal fade"
             id="resetConfirmModal"

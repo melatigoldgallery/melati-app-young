@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -181,13 +181,16 @@
       .queue-card {
         border-radius: 15px;
         overflow: hidden;
-        box-shadow: var(--shadow-soft);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        height: 450px;
-        width: 670px;
-        max-width: 98vw;
+        transition:
+          transform 0.3s ease,
+          box-shadow 0.3s ease;
+        width: 100%;
+        height: clamp(250px, 55vh, 500px);
         border: none;
         position: relative;
+        box-shadow: 0 20px 40px rgba(184, 152, 7, 0.63);
+        display: flex;
+        flex-direction: column;
       }
 
       .queue-card::before {
@@ -205,11 +208,29 @@
       }
 
       .card-current::before {
-        background: linear-gradient(90deg, #27ae60, #2ecc71);
+        background: linear-gradient(90deg, var(--gold-secondary), var(--gold-dark));
       }
 
       .card-next::before {
-        background: linear-gradient(90deg, #3498db, #2980b9);
+        background: linear-gradient(90deg, var(--gold-dark), var(--gold-secondary));
+      }
+
+      /* Card Antrian Terlewat */
+      .card-delayed::before {
+        background: linear-gradient(90deg, #ff9800, #ff6d00);
+      }
+
+      .card-delayed .queue-card-header {
+        background-color: #fff8e1;
+        border-bottom-color: #ffcc02;
+      }
+
+      .card-delayed .queue-card-header h1 {
+        color: var(--dark-brown);
+      }
+
+      .card-delayed .queue-number {
+        color: var(--dark-brown);
       }
 
       .queue-card-header {
@@ -219,14 +240,15 @@
       }
 
       .queue-card-header h1 {
-        font-family:'Times New Roman', Times, serif;
-        font-size: 3.25rem;
+        font-family: "Times New Roman", Times, serif;
+        font-size: clamp(1.6rem, 2.6vw, 3.25rem);
         font-weight: bold;
         margin: 0;
         color: var(--dark-brown);
         display: flex;
         align-items: center;
         justify-content: center;
+        white-space: nowrap;
       }
 
       .queue-card-header h1 i {
@@ -241,6 +263,7 @@
         align-items: center;
         justify-content: center;
         position: relative;
+        flex: 1;
       }
 
       /* Styling untuk nomor antrian */
@@ -261,7 +284,7 @@
         word-wrap: break-word;
         overflow-wrap: break-word;
         transition: font-size 0.3s ease;
-        font-size: 14rem;
+        font-size: clamp(4rem, 30vh, 20rem);
       }
 
       /* Garis bawah untuk nomor antrian */
@@ -333,7 +356,9 @@
       }
 
       .footer p {
-        font-family: playfair display, serif;
+        font-family:
+          playfair display,
+          serif;
       }
 
       /* Animation for Queue Numbers */
@@ -382,9 +407,27 @@
         border: 1px solid var(--gold-primary);
         border-radius: 10px;
         padding: 1px;
-        background: linear-gradient(var(--white), var(--white)) padding-box,
+        background:
+          linear-gradient(var(--white), var(--white)) padding-box,
           linear-gradient(45deg, var(--gold-primary), var(--gold-secondary), var(--gold-primary)) border-box;
         border: 1px solid transparent;
+      }
+
+      /* Queue number font-size utility classes (digunakan untuk card terlewat) */
+      .queue-number.text-xl {
+        font-size: clamp(3rem, 26vh, 17rem);
+      }
+      .queue-number.text-lg {
+        font-size: clamp(2.5rem, 17vh, 11rem);
+      }
+      .queue-number.text-md {
+        font-size: clamp(1.5rem, 10vh, 6rem);
+      }
+      .queue-number.text-sm {
+        font-size: clamp(1.25rem, 7vh, 4rem);
+      }
+      .queue-number.text-xs {
+        font-size: clamp(1rem, 5vh, 3rem);
       }
     </style>
   </head>
@@ -428,14 +471,12 @@
       </div>
 
       <!-- Queue Cards -->
-      <div class="row justify-content-center align-items-center mt-0" style="gap: 0.5rem; min-height: 500px">
+      <div id="cards-row" class="row justify-content-center align-items-stretch mt-0 g-2 layout-two-col">
         <!-- Current Queue Card -->
-        <div class="col-auto" data-aos="fade-up" data-aos-delay="300">
+        <div class="col-12 col-md-5" id="current-card-wrapper" data-aos="fade-up" data-aos-delay="300">
           <div class="queue-card card-current gold-border">
             <div class="queue-card-header">
-              <h1>
-                SEDANG DILAYANI
-              </h1>
+              <h1>SEDANG DILAYANI</h1>
             </div>
             <div class="queue-card-body">
               <div class="queue-number active" id="queueNumber">-</div>
@@ -443,13 +484,29 @@
           </div>
         </div>
 
+        <!-- Delayed Queue Card (hanya tampil jika ada antrian terlewat) -->
+        <div
+          class="col-12 col-md-4"
+          id="delayed-card-wrapper"
+          style="display: none"
+          data-aos="fade-up"
+          data-aos-delay="350"
+        >
+          <div class="queue-card card-delayed gold-border">
+            <div class="queue-card-header">
+              <h1>ANTRIAN TERLEWAT</h1>
+            </div>
+            <div class="queue-card-body">
+              <div class="queue-number" id="delayQueueNumber">-</div>
+            </div>
+          </div>
+        </div>
+
         <!-- Next Queue Card -->
-        <div class="col-auto" data-aos="fade-up" data-aos-delay="400">
+        <div class="col-12 col-md-5" id="next-card-wrapper" data-aos="fade-up" data-aos-delay="400">
           <div class="queue-card card-next gold-border">
             <div class="queue-card-header">
-              <h1>
-                ANTRIAN BERIKUTNYA
-              </h1>
+              <h1 id="next-card-header">AKAN DIPANGGIL</h1>
             </div>
             <div class="queue-card-body">
               <div class="queue-number" id="nextQueueNumber">-</div>
@@ -496,32 +553,18 @@
       updateDateTime();
       setInterval(updateDateTime, 1000);
 
-      // Fungsi untuk menyesuaikan ukuran font berdasarkan panjang teks
       function adjustDelayedQueueFontSize(text) {
-        const element = document.getElementById("delayQueueNumber");
-        if (!element) return;
-
-        // Reset class
-        element.classList.remove("text-xs", "text-sm", "text-md", "text-lg", "text-xl");
-
-        // Hitung total karakter (termasuk koma dan spasi)
-        const totalLength = String(text).length;
-
-        // Hitung jumlah nomor antrian
-        const numberOfQueues = String(text).split(",").length;
-
-        // Tentukan class berdasarkan panjang teks dan jumlah antrian
-        if (numberOfQueues <= 1) {
-          element.classList.add("text-xl");
-        } else if (numberOfQueues <= 2) {
-          element.classList.add(totalLength > 7 ? "text-lg" : "text-xl");
-        } else if (numberOfQueues <= 3) {
-          element.classList.add(totalLength > 11 ? "text-md" : "text-lg");
-        } else if (numberOfQueues <= 4) {
-          element.classList.add(totalLength > 15 ? "text-sm" : "text-md");
-        } else {
-          element.classList.add("text-xs");
-        }
+        const el = document.getElementById("delayQueueNumber");
+        if (!el) return;
+        el.classList.remove("text-xs", "text-sm", "text-md", "text-lg", "text-xl");
+        const count = String(text)
+          .split(",")
+          .filter((s) => s.trim()).length;
+        if (count <= 1) el.classList.add("text-xl");
+        else if (count <= 2) el.classList.add("text-lg");
+        else if (count <= 3) el.classList.add("text-md");
+        else if (count <= 4) el.classList.add("text-sm");
+        else el.classList.add("text-xs");
       }
 
       // Animasi saat nomor antrian berubah
@@ -547,19 +590,57 @@
                   const data = snapshot.val();
                   if (!data) return;
 
-                  // Update current queue
                   updateQueueElement("queueNumber", data.currentQueue);
-
-                  // Update next queue
                   updateQueueElement("nextQueueNumber", data.nextQueue);
 
-                  // Update delayed queue with font size adjustment
-                  if (data.delayedQueue) {
-                    const element = document.getElementById("delayQueueNumber");
-                    if (element && element.textContent !== String(data.delayedQueue)) {
-                      element.textContent = data.delayedQueue;
-                      adjustDelayedQueueFontSize(data.delayedQueue);
-                      animateQueueChange("delayQueueNumber");
+                  // Normalkan missedQueue dari Firebase (array/object/string → string tampilan)
+                  // Card "ANTRIAN TERLEWAT" di display membaca missedQueue (Handle Terlewat di admin)
+                  let delayedText = null;
+                  if (data.missedQueue) {
+                    if (Array.isArray(data.missedQueue)) {
+                      const arr = data.missedQueue.filter((v) => v);
+                      if (arr.length > 0) delayedText = arr.join(", ");
+                    } else if (typeof data.missedQueue === "object") {
+                      const arr = Object.values(data.missedQueue).filter((v) => v);
+                      if (arr.length > 0) delayedText = arr.join(", ");
+                    } else if (typeof data.missedQueue === "string" && data.missedQueue.trim()) {
+                      delayedText = data.missedQueue.trim();
+                    }
+                  }
+
+                  // Tampilkan/sembunyikan card antrian terlewat
+                  const delayedWrapper = document.getElementById("delayed-card-wrapper");
+                  const currentWrapper = document.getElementById("current-card-wrapper");
+                  const nextWrapper = document.getElementById("next-card-wrapper");
+                  const cardsRow = document.getElementById("cards-row");
+                  const nextCardHeader = document.getElementById("next-card-header");
+                  if (delayedText) {
+                    updateQueueElement("delayQueueNumber", delayedText);
+                    adjustDelayedQueueFontSize(delayedText);
+                    if (delayedWrapper) delayedWrapper.style.display = "";
+                    if (cardsRow) cardsRow.classList.remove("layout-two-col");
+                    if (nextCardHeader) nextCardHeader.textContent = "ANTRIAN BERIKUTNYA";
+                    // Saat 3 card: masing-masing col-md-4
+                    if (currentWrapper) {
+                      currentWrapper.classList.remove("col-md-5");
+                      currentWrapper.classList.add("col-md-4");
+                    }
+                    if (nextWrapper) {
+                      nextWrapper.classList.remove("col-md-5");
+                      nextWrapper.classList.add("col-md-4");
+                    }
+                  } else {
+                    if (delayedWrapper) delayedWrapper.style.display = "none";
+                    if (cardsRow) cardsRow.classList.add("layout-two-col");
+                    if (nextCardHeader) nextCardHeader.textContent = "AKAN DIPANGGIL";
+                    // Saat 2 card: masing-masing col-md-5
+                    if (currentWrapper) {
+                      currentWrapper.classList.remove("col-md-4");
+                      currentWrapper.classList.add("col-md-5");
+                    }
+                    if (nextWrapper) {
+                      nextWrapper.classList.remove("col-md-4");
+                      nextWrapper.classList.add("col-md-5");
                     }
                   }
                 });
