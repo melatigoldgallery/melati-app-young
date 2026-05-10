@@ -5,9 +5,10 @@
   --young-secondary: #b8860b; /* Dark goldenrod */
   --young-black: #0a0a0a;
   --young-white: #ffffff;
-  --young-bg: radial-gradient(1000px 600px at 80% -100px, rgba(255, 215, 0, 0.25), transparent 70%),
-               radial-gradient(800px 500px at -10% 120%, rgba(255, 193, 7, 0.18), transparent 70%),
-               linear-gradient(135deg, #000000 0%, #0d0d0d 60%, #111111 100%);
+  --young-bg:
+    radial-gradient(1000px 600px at 80% -100px, rgba(255, 215, 0, 0.25), transparent 70%),
+    radial-gradient(800px 500px at -10% 120%, rgba(255, 193, 7, 0.18), transparent 70%),
+    linear-gradient(135deg, #000000 0%, #0d0d0d 60%, #111111 100%);
 }
 
 /* Body theme hook so we don't affect other pages */
@@ -18,7 +19,8 @@
 
 /* Add a subtle grid/watermark to differentiate visually */
 .theme-young .login-background .overlay {
-  background: linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.6)),
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.6)),
     repeating-linear-gradient(
       0deg,
       rgba(255, 215, 0, 0.05) 0px,
@@ -46,7 +48,7 @@
   font-weight: 700;
   letter-spacing: 1px;
   padding: 6px 50px;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
   text-transform: uppercase;
   font-size: 11px;
   z-index: 2;
@@ -78,7 +80,6 @@
   color: #111 !important; /* black text on gold */
   border: 1px solid var(--young-secondary);
   box-shadow: 0 10px 30px rgba(255, 215, 0, 0.35);
-
 }
 .theme-young .login-button:hover {
   transform: translateY(-2px);
@@ -107,10 +108,64 @@
   background: var(--young-white) !important;
   backdrop-filter: none;
   border: 1px solid #111;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2), 0 0 0 3px rgba(255, 215, 0, 0.08);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.2),
+    0 0 0 3px rgba(255, 215, 0, 0.08);
 }
 
 /* Logo halo to make it pop differently */
 .theme-young .logo-container .logo {
   filter: drop-shadow(0 6px 16px rgba(255, 215, 0, 0.25)) saturate(1.05);
+}
+
+/* Migration notice styles and hide original login form */
+.theme-young .login-form-container {
+  display: none; /* Sembunyikan form login di versi yang sudah bermigrasi */
+}
+
+.theme-young .migration-notice {
+  background: linear-gradient(180deg, rgba(255, 245, 225, 0.95), #fff);
+  border: 1px solid rgba(170, 130, 0, 0.12);
+  padding: 22px 24px;
+  margin: 14px 18px 6px 18px;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
+}
+.theme-young .migration-notice h2 {
+  margin: 0 0 6px 0;
+  color: var(--young-black);
+  font-size: 1.1rem;
+}
+.theme-young .migration-notice p {
+  margin: 6px 0;
+  color: #444;
+  font-size: 0.95rem;
+}
+.theme-young .migration-notice .migration-actions {
+  margin-top: 12px;
+}
+.theme-young .migration-button {
+  display: inline-block;
+  background: linear-gradient(135deg, var(--young-primary), var(--young-secondary));
+  color: #111;
+  padding: 10px 16px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 700;
+  box-shadow: 0 8px 20px rgba(255, 215, 0, 0.18);
+}
+.theme-young .migration-button:hover {
+  transform: translateY(-2px);
+}
+
+@media (max-width: 640px) {
+  .theme-young .migration-notice {
+    padding: 16px;
+    margin: 12px;
+  }
+  .theme-young .migration-button {
+    width: 100%;
+    box-sizing: border-box;
+  }
 }
